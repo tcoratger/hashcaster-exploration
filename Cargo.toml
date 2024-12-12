@@ -39,5 +39,6 @@ module_name_repetitions = "allow"
 hashcaster-field = { path = "crates/field" }
 hashcaster-boolcheck = { path = "crates/boolcheck" }
 
-
 derive_more = "1.0"
+bytemuck = "1.0"
+num-traits = "0.2"

@@ -1,7 +1,9 @@
 // Derived from work licensed under the Apache License 2.0
 // Copyright 2024 Irreducible Inc.
 
+use bytemuck::Zeroable;
 use derive_more::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
+use std::ops::Deref;
 
 /// Represents an unsigned integer type with a bit-width of `N`.
 ///
@@ -25,6 +27,7 @@ use derive_more::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign
     BitOrAssign,
     BitXor,
     BitXorAssign,
+    Zeroable,
 )]
 pub struct SmallU<const N: usize>(u8);
 
@@ -61,6 +64,16 @@ impl<const N: usize> SmallU<N> {
         // Mask the input value with the maximum possible value (`MAX`)
         // to retain only the least significant `N` bits.
         Self(val & Self::MAX.0)
+    }
+}
+
+impl<const N: usize> Deref for SmallU<N> {
+    type Target = u8;
+
+    /// Returns a reference to the inner `u8` value.
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

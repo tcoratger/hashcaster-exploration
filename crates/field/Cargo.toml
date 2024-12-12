@@ -6,3 +6,9 @@ rust-version.workspace = true
 
 [dependencies]
 derive_more = { workspace = true, features = ["full"] }
+bytemuck = { workspace = true, features = [
+    "derive",
+    "min_const_generics",
+    "must_cast",
+] }
+num-traits = { workspace = true }
