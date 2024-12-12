@@ -1,0 +1,8 @@
+[package]
+name = "hashcaster-field"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["full"] }
