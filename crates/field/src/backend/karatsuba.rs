@@ -2,22 +2,64 @@ use std::arch::aarch64::{
     uint8x16_t, veorq_u8, vextq_u8, vgetq_lane_u64, vmull_p64, vreinterpretq_u64_u8,
 };
 
-/// Karatsuba decomposition for `x*y`.
+/// Performs a Karatsuba decomposition for the polynomial multiplication `x * y`.
+///
+/// The Karatsuba algorithm splits each input (128-bit vectors) into high (`x.hi`, `y.hi`)
+/// and low (`x.lo`, `y.lo`) 64-bit halves and computes three partial products:
+/// - `H = x.hi * y.hi`: High product
+/// - `L = x.lo * y.lo`: Low product
+/// - `M = (x.hi ^ x.lo) * (y.hi ^ y.lo)`: Middle product
+///
+/// The decomposition utilizes the following formula:
+/// \[
+/// x \times y = x_1 \times y_1 \times 10^{2k} + ((x_1 + x_2) \times (y_1 + y_2) - x_1 \times y_1 -
+/// x_2 \times y_2) \times 10^k + x_2 \times y_2 \]
+/// - `H = x_1 × y_1 × 10^{2k}` (high product, computed in this function as `h`)
+/// - `L = x_2 × y_2` (low product, computed as `l`)
+/// - `M = (x_1 + x_2) × (y_1 + y_2) - H - L` (middle product, partially computed here as `m`)
+///
+/// This implementation focuses on efficiently calculating `H`, `M`, and `L`
+/// using NEON intrinsics for polynomial multiplication over GF(2).
+///
+/// # Parameters
+/// - `x`: A 128-bit SIMD vector (`uint8x16_t`) representing the first polynomial operand.
+/// - `y`: A 128-bit SIMD vector (`uint8x16_t`) representing the second polynomial operand.
+///
+/// # Returns
+/// A tuple `(H, M, L)` where:
+/// - `H` is the high product: `x.hi * y.hi`
+/// - `M` is the middle product: `(x.hi ^ x.lo) * (y.hi ^ y.lo)`
+/// - `L` is the low product: `x.lo * y.lo`
+///
+/// # Safety
+/// This function is `unsafe` because it requires the `neon` target feature.
+/// Ensure the target CPU supports NEON before calling this function.
+///
+/// # Example
+/// ```rust
+/// use std::arch::aarch64::*;
+///
+/// unsafe {
+///     let x: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+///         vcreate_u64(0x123456789ABCDEF0),
+///         vcreate_u64(0xFEDCBA9876543210),
+///     ));
+///     let y: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+///         vcreate_u64(0x0FEDCBA987654321),
+///         vcreate_u64(0x123456789ABCDEF0),
+///     ));
+///     let (h, m, l) = karatsuba1(x, y);
+/// }
+/// ```
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn karatsuba1(x: uint8x16_t, y: uint8x16_t) -> (uint8x16_t, uint8x16_t, uint8x16_t) {
-    // First Karatsuba step: decompose x and y.
-    //
-    // (x1*y0 + x0*y1) = (x1+x0) * (y1+x0) + (x1*y1) + (x0*y0)
-    //        M                                 H         L
-    //
-    // m = x.hi^x.lo * y.hi^y.lo
-    let m = pmull(
-        veorq_u8(x, vextq_u8(x, x, 8)), // x.hi^x.lo
-        veorq_u8(y, vextq_u8(y, y, 8)), // y.hi^y.lo
-    );
-    let h = pmull2(x, y); // h = x.hi * y.hi
-    let l = pmull(x, y); // l = x.lo * y.lo
+    // M = (x.hi ^ x.lo) * (y.hi ^ y.lo)
+    let m = pmull(veorq_u8(x, vextq_u8(x, x, 8)), veorq_u8(y, vextq_u8(y, y, 8)));
+    // H = x.hi * y.hi
+    let h = pmull2(x, y);
+    // L = x.lo * y.lo
+    let l = pmull(x, y);
     (h, m, l)
 }
 
@@ -176,6 +218,35 @@ mod tests {
     use super::*;
     use std::arch::aarch64::*;
 
+    /// Computes the carry-less polynomial multiplication over GF(2).
+    ///
+    /// Simulates the multiplication of two 128-bit integers, `a` and `b`, as polynomials,
+    /// where addition is XOR and multiplication is AND.
+    ///
+    /// # Parameters
+    /// - `a`: First 128-bit polynomial operand.
+    /// - `b`: Second 128-bit polynomial operand.
+    ///
+    /// # Returns
+    /// - Result of the polynomial multiplication as a 128-bit integer.
+    ///
+    /// # Example
+    /// ```
+    /// let a = 0b1011; // x^3 + x + 1
+    /// let b = 0b0110; // x^2 + x
+    /// assert_eq!(expected_pmull_result(a, b), 0b111010); // x^5 + x^4 + x^3 + x
+    /// ```
+    fn expected_pmull_result(a: u128, b: u128) -> u128 {
+        let mut result = 0;
+        for i in 0..64 {
+            if b & (1 << i) != 0 {
+                // Multiply by x^i and add (XOR)
+                result ^= a << i;
+            }
+        }
+        result
+    }
+
     #[test]
     #[allow(unsafe_code)]
     fn test_pmull_simple() {
@@ -252,30 +323,14 @@ mod tests {
             // This uses the carry-less multiplication intrinsic
             let result = pmull(a, b);
 
-            // Compute the expected result manually
-            // Use bitwise operations to simulate polynomial multiplication in GF(2^n)
-            // Initialize the expected result to zero
-            let mut expected: u128 = 0;
-            // Interpret the lower half of `v1` as a 128-bit integer
-            let operand_a = v1 as u128;
-            // Interpret the lower half of `v2` as a 128-bit integer
-            let operand_b = v2 as u128;
-            for i in 0..64 {
-                // Iterate through each bit of the second operand
-                if (operand_b & (1 << i)) != 0 {
-                    // Check if the i-th bit of `b` is set
-                    // If set, XOR the shifted `a` (i.e., multiply by x^i) into the result
-                    expected ^= operand_a << i;
-                }
-            }
-
             // Verify that the result matches the expected value
             // Convert the result from `pmull` into a comparable form
             let result_u128: u128 = std::mem::transmute::<uint8x16_t, u128>(result);
 
             // Assert equality between the computed and expected results
             assert_eq!(
-                result_u128, expected,
+                result_u128,
+                expected_pmull_result(v1 as u128, v2 as u128),
                 "pmull result did not match the expected polynomial multiplication value"
             );
         }
@@ -365,31 +420,137 @@ mod tests {
             // Perform polynomial multiplication on the upper 64 bits using `pmull2`
             let result = pmull2(a, b);
 
-            // Compute the expected result manually
-            // Use bitwise operations to simulate polynomial multiplication in GF(2^n)
-            // Initialize the expected result to zero
-            let mut expected: u128 = 0;
-            // Interpret the upper half of `v1` as a 128-bit integer
-            let operand_a = v1_high as u128;
-            // Interpret the upper half of `v2` as a 128-bit integer
-            let operand_b = v2_high as u128;
-            for i in 0..64 {
-                // Iterate through each bit of the second operand
-                if (operand_b & (1 << i)) != 0 {
-                    // Check if the i-th bit of `b` is set
-                    // If set, XOR the shifted `a` (i.e., multiply by x^i) into the result
-                    expected ^= operand_a << i;
-                }
-            }
-
             // Verify that the result matches the expected value
             // Convert the result from `pmull2` into a comparable form
             let result_u128: u128 = std::mem::transmute::<uint8x16_t, u128>(result);
 
             // Assert equality between the computed and expected results
             assert_eq!(
-                result_u128, expected,
+                result_u128,
+                expected_pmull_result(v1_high as u128, v2_high as u128),
                 "pmull2 result did not match the expected polynomial multiplication value"
+            );
+        }
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn test_karatsuba1() {
+        unsafe {
+            // Define input polynomials (128-bit numbers)
+            let x: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0x123456789ABCDEF0), // Lower 64 bits
+                vcreate_u64(0xFEDCBA9876543210), // Upper 64 bits
+            ));
+            let y: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0x0FEDCBA987654321), // Lower 64 bits
+                vcreate_u64(0x123456789ABCDEF0), // Upper 64 bits
+            ));
+
+            // Perform Karatsuba decomposition
+            let (h, m, l) = karatsuba1(x, y);
+
+            // Define individual components of `x` and `y`
+            let x_hi: u64 = 0xFEDCBA9876543210; // Upper 64 bits of x
+            let x_lo: u64 = 0x123456789ABCDEF0; // Lower 64 bits of x
+            let y_hi: u64 = 0x123456789ABCDEF0; // Upper 64 bits of y
+            let y_lo: u64 = 0x0FEDCBA987654321; // Lower 64 bits of y
+
+            // Compute expected values
+
+            // High product: x_hi * y_hi
+            let expected_h: u128 = expected_pmull_result(x_hi as u128, y_hi as u128);
+
+            // Low product: x_lo * y_lo
+            let expected_l: u128 = expected_pmull_result(x_lo as u128, y_lo as u128);
+
+            // Middle product: (x_hi ^ x_lo) * (y_hi ^ y_lo)
+            let xor_x = x_hi ^ x_lo;
+            let xor_y = y_hi ^ y_lo;
+            let expected_m: u128 = expected_pmull_result(xor_x as u128, xor_y as u128);
+
+            // Convert results for comparison
+            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(h);
+            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(m);
+            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(l);
+
+            // Assert high product
+            assert_eq!(
+                computed_h, expected_h,
+                "High product mismatch: got {:#x}, expected {:#x}",
+                computed_h, expected_h
+            );
+
+            // Assert middle product
+            assert_eq!(
+                computed_m, expected_m,
+                "Middle product mismatch: got {:#x}, expected {:#x}",
+                computed_m, expected_m
+            );
+
+            // Assert low product
+            assert_eq!(
+                computed_l, expected_l,
+                "Low product mismatch: got {:#x}, expected {:#x}",
+                computed_l, expected_l
+            );
+        }
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn test_karatsuba1_simple_case_manual() {
+        unsafe {
+            // Define input polynomials (128-bit numbers)
+            let x: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0b1011), // Lower 64 bits: A(x) = x^3 + x + 1
+                vcreate_u64(0),      // Upper 64 bits unused
+            ));
+            let y: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0b0110), // Lower 64 bits: B(x) = x^2 + x
+                vcreate_u64(0),      // Upper 64 bits unused
+            ));
+
+            // Perform Karatsuba decomposition
+            let (h, m, l) = karatsuba1(x, y);
+
+            // Expected results
+            // High product (upper 64 bits): 0 * 0 = 0
+            let expected_h: u128 = 0;
+
+            // Low product (lower 64 bits): 0b1011 * 0b0110
+            // A(x) = x^3 + x + 1, B(x) = x^2 + x
+            // Result: x^5 + x^4 + x^3 + x = 0b111010
+            let expected_l: u128 = 0b111010;
+
+            // Middle product: (0 ^ 0b1011) * (0 ^ 0b0110) = 0b1011 * 0b0110
+            // Same as low product
+            let expected_m: u128 = expected_l;
+
+            // Convert results for comparison
+            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(h);
+            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(m);
+            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(l);
+
+            // Assert high product
+            assert_eq!(
+                computed_h, expected_h,
+                "High product mismatch: got {:#x}, expected {:#x}",
+                computed_h, expected_h
+            );
+
+            // Assert middle product
+            assert_eq!(
+                computed_m, expected_m,
+                "Middle product mismatch: got {:#x}, expected {:#x}",
+                computed_m, expected_m
+            );
+
+            // Assert low product
+            assert_eq!(
+                computed_l, expected_l,
+                "Low product mismatch: got {:#x}, expected {:#x}",
+                computed_l, expected_l
             );
         }
     }
