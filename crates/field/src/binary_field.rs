@@ -85,6 +85,7 @@ impl Mul<Self> for BinaryField128b {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: Self) -> Self::Output {
         // Multiplication in binary fields is AND.
         Self(self.0 & other.0)

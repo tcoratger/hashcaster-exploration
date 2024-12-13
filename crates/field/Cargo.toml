@@ -12,3 +12,7 @@ bytemuck = { workspace = true, features = [
     "must_cast",
 ] }
 num-traits = { workspace = true }
+
+
+[dev-dependencies]
+ruint = { workspace = true }

@@ -42,3 +42,4 @@ hashcaster-boolcheck = { path = "crates/boolcheck" }
 derive_more = "1.0"
 bytemuck = "1.0"
 num-traits = "0.2"
+ruint = "1.0"
