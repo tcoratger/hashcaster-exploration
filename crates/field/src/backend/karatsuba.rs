@@ -366,7 +366,6 @@ unsafe fn pmull2(a: uint8x16_t, b: uint8x16_t) -> uint8x16_t {
 mod tests {
     use super::*;
     use crate::backend::test_utils::{expected_mont_reduce, expected_pmull_result};
-    use ruint::aliases::U256;
     use std::arch::aarch64::*;
 
     #[test]

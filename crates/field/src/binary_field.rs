@@ -22,11 +22,13 @@ impl Zero for BinaryField128b {
     }
 }
 
-// impl One for BinaryField128b {
-//     fn one() -> Self {
-//         Self(1)
-//     }
-// }
+impl One for BinaryField128b {
+    fn one() -> Self {
+        // This is the multiplicative identity in binary fields.
+        // This means that for all `a` in the field, `a * 1 = a`.
+        Self(257870231182273679343338569694386847745)
+    }
+}
 
 impl Neg for BinaryField128b {
     type Output = Self;
@@ -366,8 +368,8 @@ mod tests {
             // - `b` computes `value * one`, where `value` is treated as the multiplier.
             // Both cases should yield the same result because multiplication in binary fields is
             // commutative.
-            let a = one.mul(&value);
-            let b = value.mul(&one);
+            let a = one * &value;
+            let b = value * &one;
 
             // Convert the `one` value to a `uint8x16_t` SIMD vector.
             // This is required to align with the helper functions (`expected_pmull_result` and
@@ -475,6 +477,40 @@ mod tests {
                 b.0, expected_result,
                 "Multiplying value2 with value1 failed: got {:#x}, expected {:#x}",
                 b.0, expected_result
+            );
+        }
+    }
+
+    #[test]
+    fn test_mul_identity() {
+        // Define the multiplicative identity (one) as a 128-bit number
+        let one = BinaryField128b::one();
+
+        // Define a few test values
+        let values = [
+            BinaryField128b::new(0),                  // Zero value
+            BinaryField128b::new(0x123456789ABCDEF0), // Arbitrary non-zero value
+            BinaryField128b::new(u128::MAX),          // Maximum possible value
+            BinaryField128b::new(0xFEDCBA9876543210), // Another arbitrary value
+        ];
+
+        for value in values.iter() {
+            // Compute value * one
+            let result_a = *value * &one;
+            // Compute one * value
+            let result_b = one * value;
+
+            // Assert that both are equal to the original value
+            assert_eq!(
+                *value, result_a,
+                "Multiplication with one (value * one) failed: got {:#x}, expected {:#x}",
+                result_a.0, value.0
+            );
+
+            assert_eq!(
+                *value, result_b,
+                "Multiplication with one (one * value) failed: got {:#x}, expected {:#x}",
+                result_b.0, value.0
             );
         }
     }
