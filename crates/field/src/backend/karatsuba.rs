@@ -1,5 +1,6 @@
 use std::arch::aarch64::{
     uint8x16_t, veorq_u8, vextq_u8, vgetq_lane_u64, vmull_p64, vreinterpretq_u64_u8,
+    vreinterpretq_u8_p128,
 };
 
 /// Performs a Karatsuba decomposition for the polynomial multiplication `x * y`.
@@ -81,8 +82,8 @@ unsafe fn karatsuba1(x: uint8x16_t, y: uint8x16_t) -> (uint8x16_t, uint8x16_t, u
 ///
 /// # Returns
 /// A tuple `(high, low)` where:
-/// - `high`: Upper 128 bits of the product (`z_hi`).
-/// - `low`: Lower 128 bits of the product (`z_lo`).
+/// - `high`: Upper 128 bits of the product (`x23`).
+/// - `low`: Lower 128 bits of the product (`x01`).
 ///
 /// # Safety
 /// This function is `unsafe` because it requires the `neon` target feature. Ensure that
@@ -100,7 +101,7 @@ unsafe fn karatsuba1(x: uint8x16_t, y: uint8x16_t) -> (uint8x16_t, uint8x16_t, u
 ///     let h = /* High product */;
 ///     let m = /* Middle product */;
 ///     let l = /* Low product */;
-///     let (z_hi, z_lo) = karatsuba2(h, m, l);
+///     let (x23, x01) = karatsuba2(h, m, l);
 /// }
 /// ```
 #[inline]
@@ -122,28 +123,86 @@ unsafe fn karatsuba2(h: uint8x16_t, m: uint8x16_t, l: uint8x16_t) -> (uint8x16_t
         veorq_u8(t0, t1)
     };
 
-    // Construct the lower 128 bits of the result (`z_lo`).
+    // Construct the lower 128 bits of the result (`x01`).
     // Combine low product (`l`) with intermediate XOR results.
     // {m0 ^ l1 ^ h0 ^ l0, l0}
-    let z_lo = vextq_u8(
+    let x01 = vextq_u8(
         vextq_u8(l, l, 8), // Rotate low (`l`) to isolate {l1, l0}.
         t,                 // XOR with intermediate term.
         8,
     );
 
-    // Construct the upper 128 bits of the result (`z_hi`).
+    // Construct the upper 128 bits of the result (`x23`).
     // Combine high product (`h`) with intermediate XOR results.
     // {h1, m1 ^ h0 ^ h1 ^ l1}
-    let z_hi = vextq_u8(
+    let x23 = vextq_u8(
         t,                 // XOR with intermediate term.
         vextq_u8(h, h, 8), // Rotate high (`h`) to isolate {h1, h0}.
         8,
     );
 
     // Return the combined result as `(high, low)`:
-    // - `z_hi` is the upper 128 bits.
-    // - `z_lo` is the lower 128 bits.
-    (z_hi, z_lo)
+    // - `x23` is the upper 128 bits.
+    // - `x01` is the lower 128 bits.
+    (x23, x01)
+}
+
+/// Performs Montgomery reduction on a 256-bit value using POLYVAL-based arithmetic.
+///
+/// # Overview
+/// Montgomery reduction is used to efficiently compute modular reduction in finite fields.
+/// This function operates on two 128-bit vectors (`x23` and `x01`) representing a 256-bit input:
+/// `[X3 : X2 : X1 : X0]`. It reduces the value modulo a polynomial `p(x)` defined as:
+/// \[
+///     p(x) = x^{127} + x^{124} + x^{121} + x^{114} + 1
+/// \]
+///
+/// The steps of the Montgomery reduction are as follows:
+/// 1. Compute `[A1:A0]` as the product of the lower half of the input (`X0`) and the polynomial
+///    (`poly`).
+/// 2. Compute `[B1:B0]` using XOR operations on `[A1:A0]` and the original input.
+/// 3. Compute `[C1:C0]` as the product of `[B1:B0]` and the polynomial.
+/// 4. Compute `[D1:D0]` using XOR operations on `[C1:C0]` and `[B1:B0]`.
+/// 5. Compute the final result as `[D1 ⊕ X3 : D0 ⊕ X2]`.
+///
+/// # Parameters
+/// - `x23`: High 128 bits of the input (representing `[X3 : X2]`).
+/// - `x01`: Low 128 bits of the input (representing `[X1 : X0]`).
+///
+/// # Returns
+/// - A 128-bit vector representing the reduced value.
+///
+/// # Steps
+/// The function leverages NEON intrinsic functions for parallel bitwise and polynomial operations.
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn mont_reduce(x23: uint8x16_t, x01: uint8x16_t) -> uint8x16_t {
+    // Define the polynomial used for reduction.
+    // POLY = x^{127} + x^{126} + x^{121} + x^{63} + x^{62} + x^{57}
+    let poly = vreinterpretq_u8_p128(1 << 127 | 1 << 126 | 1 << 121 | 1 << 63 | 1 << 62 | 1 << 57);
+
+    // Compute [A1:A0] = X0 • poly
+    // This multiplies the lower 64 bits of x01 (X0) by the polynomial (poly).
+    let a = pmull(x01, poly);
+
+    // Compute [B1:B0] = [X0 ⊕ A1 : X1 ⊕ A0]
+    // - `vextq_u8(a, a, 8)` extracts the high 64 bits of `a` (A1).
+    // - XOR operations are used to compute:
+    //   - B0 = X0 ⊕ A1
+    //   - B1 = X1 ⊕ A0
+    let b = veorq_u8(x01, vextq_u8(a, a, 8));
+
+    // Compute [C1:C0] = B0 • poly
+    // This multiplies the lower 64 bits of `b` (B0) by the polynomial (poly).
+    let c = pmull2(b, poly);
+
+    // Compute [D1:D0] = [B0 ⊕ C1 : B1 ⊕ C0]
+    // XOR operations are used to combine `[B1:B0]` and `[C1:C0]`.
+    let d = veorq_u8(c, b);
+
+    // Compute the final output [D1 ⊕ X3 : D0 ⊕ X2]
+    // XOR the intermediate result `[D1:D0]` with the upper half of the input `[X3:X2]`.
+    veorq_u8(x23, d)
 }
 
 /// Perform a polynomial multiplication of the low 64 bits of two 128-bit vectors.
@@ -301,6 +360,71 @@ mod tests {
     use super::*;
     use ruint::aliases::U256;
     use std::arch::aarch64::*;
+
+    /// Helper function to precompute the expected result of Montgomery reduction.
+    ///
+    /// This function simulates the Montgomery reduction process in software, step-by-step.
+    /// The inputs are split into 64-bit chunks, and the reduction is performed based on
+    /// the theoretical model of POLYVAL Montgomery reduction.
+    ///
+    /// # Parameters
+    /// - `x23`: The high 128 bits of the input (representing `[X3 : X2]`).
+    /// - `x01`: The low 128 bits of the input (representing `[X1 : X0]`).
+    /// - `poly`: The polynomial used for reduction.
+    ///
+    /// # Returns
+    /// - A 128-bit result representing the reduced value.
+    ///
+    /// # Steps
+    /// The Montgomery reduction process involves:
+    /// 1. Multiplying `X0` with the polynomial (`poly`).
+    /// 2. XORing intermediate results to compute `[B1 : B0]`.
+    /// 3. Multiplying `B0` with the polynomial.
+    /// 4. Computing `[D1 : D0]` by XORing results.
+    /// 5. Combining the final result using `[D1 ⊕ X3 : D0 ⊕ X2]`.
+    fn expected_mont_reduce(x23: u128, x01: u128, poly: u128) -> u128 {
+        // Extract the lower and upper 64-bit halves of `x01` (low 128 bits of input)
+        let x0 = x01 & ((1 << 64) - 1); // Lower 64 bits of x01 (X0)
+        let x1 = x01 >> 64; // Upper 64 bits of x01 (X1)
+
+        // Extract the lower and upper 64-bit halves of `x23` (high 128 bits of input)
+        let x2 = x23 & ((1 << 64) - 1); // Lower 64 bits of x23 (X2)
+        let x3 = x23 >> 64; // Upper 64 bits of x23 (X3)
+
+        // Extract the lower and upper 64 bits of the polynomial
+        let poly_low = poly & ((1 << 64) - 1); // Lower 64 bits of poly
+        let poly_high = poly >> 64; // Upper 64 bits of poly
+
+        // Compute A1:A0 = X0 • poly
+        // Multiply X0 with the polynomial to get A (128-bit product)
+        let a = expected_pmull_result(x0, poly_low).0; // Polynomial multiplication result
+        let a0 = a & ((1 << 64) - 1); // Lower 64 bits of A (A0)
+        let a1 = a >> 64; // Upper 64 bits of A (A1)
+
+        // Compute B1:B0 = [X0 ⊕ A1 : X1 ⊕ A0]
+        // XOR the components to compute intermediate results B0 and B1
+        let b0 = x0 ^ a1; // Lower 64 bits (B0 = X0 ⊕ A1)
+        let b1 = x1 ^ a0; // Upper 64 bits (B1 = X1 ⊕ A0)
+
+        // Compute C1:C0 = B0 • poly
+        // Multiply B0 with the polynomial to get C (128-bit product)
+        let c = expected_pmull_result(b1, poly_high).0; // Polynomial multiplication result
+        let c0 = c & ((1 << 64) - 1); // Lower 64 bits of C (C0)
+        let c1 = c >> 64; // Upper 64 bits of C (C1)
+
+        // Compute D1:D0 = [B0 ⊕ C1 : B1 ⊕ C0]
+        // XOR the components to compute intermediate results D0 and D1
+        let d0 = b0 ^ c0; // Lower 64 bits (D0 = B0 ⊕ C0)
+        let d1 = b1 ^ c1; // Upper 64 bits (D1 = B1 ⊕ C1)
+
+        // Compute output [D1 ⊕ X3 : D0 ⊕ X2]
+        // XOR the intermediate results with X2 and X3 to get the final output
+        let result_high = d1 ^ x3; // Upper 64 bits of the result
+        let result_low = d0 ^ x2; // Lower 64 bits of the result
+
+        // Combine the high and low 64-bit parts into a single 128-bit result
+        (result_high << 64) | result_low
+    }
 
     /// Computes the carry-less polynomial multiplication over GF(2).
     ///
@@ -698,6 +822,68 @@ mod tests {
                 std::mem::transmute::<uint8x16_t, u128>(result_high),
                 expected_high,
                 "Upper 128 bits mismatch"
+            );
+        }
+    }
+
+    #[test]
+    fn test_mont_reduce_simple_case() {
+        unsafe {
+            // Define inputs for x23 (high) and x01 (low)
+            let x23: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0x123456789ABCDEF0),
+                vcreate_u64(0xFEDCBA9876543210),
+            ));
+            let x01: uint8x16_t = vreinterpretq_u8_u64(vcombine_u64(
+                vcreate_u64(0x0FEDCBA987654321),
+                vcreate_u64(0x123456789ABCDEF0),
+            ));
+
+            // Perform Montgomery reduction
+            let result = mont_reduce(x23, x01);
+
+            // Convert result to u128 for validation
+            let result_u128 = std::mem::transmute::<uint8x16_t, u128>(result);
+
+            // Define the polynomial (matches the POLYVAL specification)
+            let poly: u128 = 1 << 127 | 1 << 126 | 1 << 121 | 1 << 63 | 1 << 62 | 1 << 57;
+
+            // Expected result
+            let expected =
+                expected_mont_reduce(std::mem::transmute(x23), std::mem::transmute(x01), poly);
+
+            // Validate the output
+            assert_eq!(
+                result_u128, expected,
+                "Montgomery reduction failed: got {:#x}, expected {:#x}",
+                result_u128, expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_mont_reduce_zero_case() {
+        unsafe {
+            // Zero input case
+            let x23: uint8x16_t =
+                vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(0), vcreate_u64(0)));
+            let x01: uint8x16_t =
+                vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(0), vcreate_u64(0)));
+
+            // Perform Montgomery reduction
+            let result = mont_reduce(x23, x01);
+
+            // Convert result to u128 for validation
+            let result_u128 = std::mem::transmute::<uint8x16_t, u128>(result);
+
+            // Expected result is zero
+            let expected: u128 = 0;
+
+            // Validate the output
+            assert_eq!(
+                result_u128, expected,
+                "Montgomery reduction failed for zero case: got {:#x}, expected {:#x}",
+                result_u128, expected
             );
         }
     }
