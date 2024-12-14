@@ -312,6 +312,31 @@ mod tests {
     }
 
     #[test]
+    fn test_binary_field_zero() {
+        // Create a BinaryField128b instance using the `zero` method
+        let zero = BinaryField128b::zero();
+
+        // Assert that the value is indeed zero
+        assert_eq!(zero.0, 0, "BinaryField128b::zero did not return a zero value");
+
+        // Zero should be the default value for BinaryField128b
+        assert_eq!(
+            zero,
+            BinaryField128b::default(),
+            "BinaryField128b::zero did not match the default value"
+        );
+
+        // Verify that the `is_zero` method returns true for the zero instance
+        assert!(zero.is_zero(), "BinaryField128b::is_zero returned false for a zero value");
+
+        // Create a non-zero BinaryField128b instance
+        let non_zero = BinaryField128b::new(42);
+
+        // Verify that the `is_zero` method returns false for a non-zero instance
+        assert!(!non_zero.is_zero(), "BinaryField128b::is_zero returned true for a non-zero value");
+    }
+
+    #[test]
     fn test_mul_zero() {
         // Case: Multiplying zero with any number should return zero.
         let zero = BinaryField128b::new(0);
