@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 derive_more = { workspace = true, features = ["full"] }
 bytemuck = { workspace = true, features = [
@@ -12,7 +15,4 @@ bytemuck = { workspace = true, features = [
     "must_cast",
 ] }
 num-traits = { workspace = true }
-
-
-[dev-dependencies]
 ruint = { workspace = true }
