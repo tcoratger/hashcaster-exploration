@@ -3,6 +3,12 @@ use std::arch::aarch64::{
     vreinterpretq_u8_p128,
 };
 
+/// Montgomery reduction polynomial `p(x)` defined as:
+/// \[
+///     p(x) = x^{127} + x^{126} + x^{121} + x^{63} + x^{62} + x^{57}
+/// \]
+const POLY: u128 = (1 << 127) | (1 << 126) | (1 << 121) | (1 << 63) | (1 << 62) | (1 << 57);
+
 /// Performs a Karatsuba decomposition for the polynomial multiplication `x * y`.
 ///
 /// The Karatsuba algorithm splits each input (128-bit vectors) into high (`x.hi`, `y.hi`)
@@ -186,7 +192,7 @@ pub(crate) unsafe fn karatsuba2(
 pub(crate) unsafe fn mont_reduce(x23: uint8x16_t, x01: uint8x16_t) -> uint8x16_t {
     // Define the polynomial used for reduction.
     // POLY = x^{127} + x^{126} + x^{121} + x^{63} + x^{62} + x^{57}
-    let poly = vreinterpretq_u8_p128(1 << 127 | 1 << 126 | 1 << 121 | 1 << 63 | 1 << 62 | 1 << 57);
+    let poly = vreinterpretq_u8_p128(POLY);
 
     // Compute [A1:A0] = X0 • poly
     // This multiplies the lower 64 bits of x01 (X0) by the polynomial (poly).
