@@ -1,6 +1,6 @@
 use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
 use num_traits::{One, Zero};
-use std::ops::{Add, Deref, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Deref, Mul, Neg, Sub};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BinaryField128b(u128);
@@ -62,6 +62,13 @@ impl Add<&Self> for BinaryField128b {
     }
 }
 
+impl AddAssign<Self> for BinaryField128b {
+    #[inline(always)]
+    fn add_assign(&mut self, other: Self) {
+        self.0 ^= other.0
+    }
+}
+
 impl Sub<Self> for BinaryField128b {
     type Output = Self;
 
@@ -90,8 +97,23 @@ impl Mul<Self> for BinaryField128b {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: Self) -> Self::Output {
-        // Multiplication in binary fields is AND.
-        Self(self.0 & other.0)
+        unsafe {
+            // Perform Karatsuba decomposition on the operands (self and other).
+            // This breaks each 128-bit input into high and low 64-bit parts and computes:
+            // - `h`: High product (`self.hi * other.hi`)
+            // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
+            // - `l`: Low product (`self.lo * other.lo`)
+            let (h, m, l) = karatsuba1(std::mem::transmute(self.0), std::mem::transmute(other.0));
+
+            // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
+            // - `h`: Combined upper 128 bits.
+            // - `l`: Combined lower 128 bits.
+            let (h, l) = karatsuba2(h, m, l);
+
+            // Perform Montgomery reduction on the 256-bit result (`h`, `l`) to
+            // produce a reduced 128-bit result modulo the field polynomial.
+            std::mem::transmute(mont_reduce(h, l))
+        }
     }
 }
 
@@ -126,6 +148,13 @@ impl Deref for BinaryField128b {
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl From<u128> for BinaryField128b {
+    #[inline(always)]
+    fn from(val: u128) -> Self {
+        Self(val)
     }
 }
 
