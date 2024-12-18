@@ -1,12 +1,14 @@
 use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
 use num_traits::{One, Zero};
-use std::ops::{Add, AddAssign, Deref, Mul, Neg, Sub};
+use std::{
+    arch::aarch64::uint8x16_t,
+    ops::{Add, AddAssign, Deref, Mul, Neg, Sub},
+};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BinaryField128b(u128);
 
 impl BinaryField128b {
-    #[inline(always)]
     pub const fn new(val: u128) -> Self {
         Self(val)
     }
@@ -26,14 +28,13 @@ impl One for BinaryField128b {
     fn one() -> Self {
         // This is the multiplicative identity in binary fields.
         // This means that for all `a` in the field, `a * 1 = a`.
-        Self(257870231182273679343338569694386847745)
+        Self(257_870_231_182_273_679_343_338_569_694_386_847_745)
     }
 }
 
 impl Neg for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     fn neg(self) -> Self::Output {
         // Negation in binary fields of characteristic 2 is a no-op.
         self
@@ -43,7 +44,6 @@ impl Neg for BinaryField128b {
 impl Add<Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: Self) -> Self::Output {
         // Addition in binary fields of characteristic 2 is equivalent to XOR.
@@ -54,7 +54,6 @@ impl Add<Self> for BinaryField128b {
 impl Add<&Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &Self) -> Self::Output {
         // Addition in binary fields of characteristic 2 is equivalent to XOR.
@@ -63,16 +62,15 @@ impl Add<&Self> for BinaryField128b {
 }
 
 impl AddAssign<Self> for BinaryField128b {
-    #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, other: Self) {
-        self.0 ^= other.0
+        self.0 ^= other.0;
     }
 }
 
 impl Sub<Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, other: Self) -> Self::Output {
         // Subtraction in binary fields of characteristic 2 is equivalent to addition (XOR).
@@ -83,7 +81,6 @@ impl Sub<Self> for BinaryField128b {
 impl Sub<&Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, other: &Self) -> Self::Output {
         // Subtraction in binary fields of characteristic 2 is equivalent to addition (XOR).
@@ -94,7 +91,6 @@ impl Sub<&Self> for BinaryField128b {
 impl Mul<Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: Self) -> Self::Output {
         unsafe {
@@ -103,7 +99,10 @@ impl Mul<Self> for BinaryField128b {
             // - `h`: High product (`self.hi * other.hi`)
             // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
             // - `l`: Low product (`self.lo * other.lo`)
-            let (h, m, l) = karatsuba1(std::mem::transmute(self.0), std::mem::transmute(other.0));
+            let (h, m, l) = karatsuba1(
+                std::mem::transmute::<u128, uint8x16_t>(self.0),
+                std::mem::transmute::<u128, uint8x16_t>(other.0),
+            );
 
             // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
             // - `h`: Combined upper 128 bits.
@@ -120,7 +119,6 @@ impl Mul<Self> for BinaryField128b {
 impl Mul<&Self> for BinaryField128b {
     type Output = Self;
 
-    #[inline(always)]
     fn mul(self, other: &Self) -> Self::Output {
         unsafe {
             // Perform Karatsuba decomposition on the operands (self and other).
@@ -128,7 +126,10 @@ impl Mul<&Self> for BinaryField128b {
             // - `h`: High product (`self.hi * other.hi`)
             // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
             // - `l`: Low product (`self.lo * other.lo`)
-            let (h, m, l) = karatsuba1(std::mem::transmute(self.0), std::mem::transmute(other.0));
+            let (h, m, l) = karatsuba1(
+                std::mem::transmute::<u128, uint8x16_t>(self.0),
+                std::mem::transmute::<u128, uint8x16_t>(other.0),
+            );
 
             // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
             // - `h`: Combined upper 128 bits.
@@ -145,14 +146,12 @@ impl Mul<&Self> for BinaryField128b {
 impl Deref for BinaryField128b {
     type Target = u128;
 
-    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl From<u128> for BinaryField128b {
-    #[inline(always)]
     fn from(val: u128) -> Self {
         Self(val)
     }
@@ -368,6 +367,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_mul_zero() {
         // Case: Multiplying zero with any number should return zero.
         let zero = BinaryField128b::new(0);
@@ -384,6 +384,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref, clippy::unreadable_literal)]
     fn test_mul_one() {
         unsafe {
             // Define the "one" value as a 128-bit number.
@@ -418,8 +419,8 @@ mod tests {
             //   `value_simd`.
             // - It returns two 128-bit parts: `x01` (lower 128 bits) and `x23` (upper 128 bits).
             let (x01, x23) = expected_pmull_result(
-                std::mem::transmute(one_simd),
-                std::mem::transmute(value_simd),
+                std::mem::transmute::<uint8x16_t, u128>(one_simd),
+                std::mem::transmute::<uint8x16_t, u128>(value_simd),
             );
 
             // Perform Montgomery reduction on the intermediate result.
@@ -427,8 +428,8 @@ mod tests {
             //   polynomial.
             // - The output is the reduced 128-bit result, which matches the expected product.
             let expected_result: u128 = std::mem::transmute(mont_reduce(
-                std::mem::transmute(x23),
-                std::mem::transmute(x01),
+                std::mem::transmute::<u128, uint8x16_t>(x23),
+                std::mem::transmute::<u128, uint8x16_t>(x01),
             ));
 
             // Assert that the result of `one * value` matches the expected result.
@@ -449,6 +450,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_mul_random() {
         unsafe {
             // Define two random 128-bit numbers as test values.
@@ -480,8 +482,8 @@ mod tests {
             //   `value2_simd`.
             // - It returns two 128-bit parts: `x01` (lower 128 bits) and `x23` (upper 128 bits).
             let (x01, x23) = expected_pmull_result(
-                std::mem::transmute(value1_simd),
-                std::mem::transmute(value2_simd),
+                std::mem::transmute::<uint8x16_t, u128>(value1_simd),
+                std::mem::transmute::<uint8x16_t, u128>(value2_simd),
             );
 
             // Perform Montgomery reduction on the intermediate result.
@@ -489,8 +491,8 @@ mod tests {
             //   polynomial.
             // - The output is the reduced 128-bit result, which matches the expected product.
             let expected_result: u128 = std::mem::transmute(mont_reduce(
-                std::mem::transmute(x23),
-                std::mem::transmute(x01),
+                std::mem::transmute::<u128, uint8x16_t>(x23),
+                std::mem::transmute::<u128, uint8x16_t>(x01),
             ));
 
             // Assert that the result of `value1 * value2` matches the expected result.
@@ -511,6 +513,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::op_ref, clippy::unreadable_literal)]
     fn test_mul_identity() {
         // Define the multiplicative identity (one) as a 128-bit number
         let one = BinaryField128b::one();
@@ -523,7 +526,7 @@ mod tests {
             BinaryField128b::new(0xFEDCBA9876543210), // Another arbitrary value
         ];
 
-        for value in values.iter() {
+        for value in &values {
             // Compute value * one
             let result_a = *value * &one;
             // Compute one * value

@@ -1,3 +1,4 @@
+use crate::boolcheck_trait::CompressedOps;
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::compressed::CompressedPoly;
 use num_traits::{identities::Zero, One};
@@ -15,9 +16,10 @@ pub struct BoolCheckSingle {
     poly_coords: Option<Vec<BinaryField128b>>,
     c: usize,
     challenges: Vec<BinaryField128b>,
-    bits_to_trits_map: Vec<u16>,
+    bit_mapping: Vec<u16>,
     eq_sequence: Vec<Vec<BinaryField128b>>,
     round_polys: Vec<CompressedPoly>,
+    claim: BinaryField128b,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -28,6 +30,8 @@ pub struct BoolCheckSingleBuilder {
 
 impl BoolCheckSingleBuilder {
     pub fn new(c: usize, points: Vec<BinaryField128b>) -> Self {
+        assert!(c < points.len());
+
         Self { c, points }
     }
 
@@ -135,7 +139,7 @@ impl BoolCheckSingleBuilder {
     /// - Returns an extended table as a `Vec<BinaryField128b>` containing the computed values.
     pub fn extend_n_tables<const N: usize, L, Q>(
         &self,
-        tables: [Vec<BinaryField128b>; N],
+        tables: &[Vec<BinaryField128b>; N],
         trit_mapping: &[u16],
         f_lin: L,
         f_quad: Q,
@@ -237,23 +241,27 @@ impl BoolCheckSingleBuilder {
     ///
     /// # Formula
     /// Each polynomial in the sequence is defined recursively:
-    /// \[ eq_k(x) = eq_{k-1}(x) \cdot (1 + m_k \cdot x) \]
+    /// `eq_k(x) = eq_{k-1}(x) \cdot (1 + m_k \cdot x)`
     /// where:
-    /// - \( eq_0(x) = 1 \) is the base case.
-    /// - \( m_k \) is the multiplier for the \(k\)-th point.
+    /// - `eq_0(x) = 1` is the base case.
+    /// - `m_k` is the multiplier for the \(k\)-th point.
     ///
     /// # Parameters
     /// - `self.points`: A vector of `BinaryField128b` elements representing the input points.
+    /// - `skip_first_pt`: A boolean flag to skip the first point in the sequence.
     ///
     /// # Returns
     /// - A vector of vectors (`Vec<Vec<BinaryField128b>>`) where each vector represents the
     ///   coefficients of the equality polynomial at a specific step.
-    pub fn eq_poly_sequence(&self) -> Vec<Vec<BinaryField128b>> {
+    pub fn eq_poly_sequence(&self, skip_first_pt: bool) -> Vec<Vec<BinaryField128b>> {
         // Initialize the result with the base polynomial eq_0(x) = 1.
         let mut ret = vec![vec![BinaryField128b::one()]];
 
+        // In the bool check initialization, the first point is skipped.
+        let iter = if skip_first_pt { &self.points[1..] } else { &self.points }.iter();
+
         // Iterate over the points in reverse order to construct the sequence.
-        for (i, &multiplier) in self.points.iter().rev().enumerate() {
+        for (i, &multiplier) in iter.rev().enumerate() {
             // Retrieve the last computed polynomial (eq_{k-1}).
             let last = &ret[i];
 
@@ -277,6 +285,38 @@ impl BoolCheckSingleBuilder {
 
         // Return the complete sequence of equality polynomials.
         ret
+    }
+
+    pub fn build<const N: usize, F: CompressedOps>(
+        &self,
+        compressor: &F,
+        polynomials: &[Vec<BinaryField128b>; N],
+        claim: BinaryField128b,
+    ) -> BoolCheckSingle {
+        // Ensure all input polynomials have the expected length
+        let expected_poly_len = 1 << self.points.len();
+        for poly in polynomials {
+            assert_eq!(poly.len(), expected_poly_len, "Polynomial length mismatch");
+        }
+
+        // Generate bit and trit mappings
+        let (bit_mapping, trit_mapping) = self.trit_mapping();
+
+        // Return the constructed BoolCheckSingle
+        BoolCheckSingle {
+            c: self.c,
+            bit_mapping,
+            eq_sequence: self.eq_poly_sequence(true),
+            claim,
+            ext: Some(self.extend_n_tables(
+                polynomials,
+                &trit_mapping,
+                |args| compressor.compress_linear(args),
+                |args| compressor.compress_quadratic(args),
+            )),
+            pt: self.points.clone(),
+            ..Default::default()
+        }
     }
 }
 
@@ -367,6 +407,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_extend_n_tables() {
         // Define the size of the input tables
         // Table size is determined as 2^dims. Here, dims = 3, so table size = 8 (2^3).
@@ -387,7 +428,7 @@ mod tests {
         let table3: Vec<BinaryField128b> = (20u128..(20 + (1 << dims))).map(Into::into).collect();
 
         // Combine the three tables into an array.
-        let tables = [table1, table2, table3];
+        let tabs = [table1, table2, table3];
 
         // Compute the ternary mapping for the current value of `c`
         // `trit_mapping` is a precomputed array that determines how table values are combined
@@ -417,7 +458,7 @@ mod tests {
         // Call the `extend_n_tables` function
         // This function extends the input tables using the ternary mapping and applies the linear
         // and quadratic functions to combine the table values hierarchically.
-        let result = bool_check.extend_n_tables(tables, &trit_mapping, f_lin, f_quad);
+        let result = bool_check.extend_n_tables(&tabs, &trit_mapping, f_lin, f_quad);
 
         // Validate the result
         // The result is compared to a hardcoded expected output. The expected output is the result
@@ -457,6 +498,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_eq_poly_sequence() {
         // Define a vector of input points in the field BinaryField128b.
         let points = vec![
@@ -470,7 +512,7 @@ mod tests {
         let bool_check_builder = BoolCheckSingleBuilder { points, ..Default::default() };
 
         // Compute the equality polynomial sequence using the eq_poly_sequence function.
-        let eq_sequence = bool_check_builder.eq_poly_sequence();
+        let eq_sequence = bool_check_builder.eq_poly_sequence(false);
 
         // Assert that the computed equality polynomial sequence matches the expected result.
         // This ensures the function is working as intended.

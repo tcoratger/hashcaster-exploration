@@ -17,9 +17,9 @@ use ruint::aliases::U256;
 /// # Steps
 /// The Montgomery reduction process involves:
 /// 1. Multiplying `X0` with the polynomial (`poly`).
-/// 2. XORing intermediate results to compute `[B1 : B0]`.
+/// 2. `XORing` intermediate results to compute `[B1 : B0]`.
 /// 3. Multiplying `B0` with the polynomial.
-/// 4. Computing `[D1 : D0]` by XORing results.
+/// 4. Computing `[D1 : D0]` by `XORing` results.
 /// 5. Combining the final result using `[D1 ⊕ X3 : D0 ⊕ X2]`.
 pub(crate) fn expected_mont_reduce(x23: u128, x01: u128, poly: u128) -> u128 {
     // Extract the lower and upper 64-bit halves of `x01` (low 128 bits of input)

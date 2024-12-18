@@ -59,7 +59,6 @@ impl<const N: usize> SmallU<N> {
     ///
     /// # Returns
     /// A new [`SmallU`] instance where only the least significant `N` bits are valid.
-    #[inline(always)]
     pub const fn new(val: u8) -> Self {
         // Mask the input value with the maximum possible value (`MAX`)
         // to retain only the least significant `N` bits.
@@ -71,7 +70,6 @@ impl<const N: usize> Deref for SmallU<N> {
     type Target = u8;
 
     /// Returns a reference to the inner `u8` value.
-    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }

@@ -18,9 +18,8 @@ const POLY: u128 = (1 << 127) | (1 << 126) | (1 << 121) | (1 << 63) | (1 << 62) 
 /// - `M = (x.hi ^ x.lo) * (y.hi ^ y.lo)`: Middle product
 ///
 /// The decomposition utilizes the following formula:
-/// \[
-/// x \times y = x_1 \times y_1 \times 10^{2k} + ((x_1 + x_2) \times (y_1 + y_2) - x_1 \times y_1 -
-/// x_2 \times y_2) \times 10^k + x_2 \times y_2 \]
+/// `x \times y = x_1 \times y_1 \times 10^{2k} + ((x_1 + x_2) \times (y_1 + y_2) - x_1 \times y_1 -
+/// x_2 \times y_2) \times 10^k + x_2 \times y_2`
 /// - `H = x_1 × y_1 × 10^{2k}` (high product, computed in this function as `h`)
 /// - `L = x_2 × y_2` (low product, computed as `l`)
 /// - `M = (x_1 + x_2) × (y_1 + y_2) - H - L` (middle product, partially computed here as `m`)
@@ -65,12 +64,12 @@ pub(crate) unsafe fn karatsuba1(
     y: uint8x16_t,
 ) -> (uint8x16_t, uint8x16_t, uint8x16_t) {
     // M = (x.hi ^ x.lo) * (y.hi ^ y.lo)
-    let m = pmull(veorq_u8(x, vextq_u8(x, x, 8)), veorq_u8(y, vextq_u8(y, y, 8)));
+    let mid = pmull(veorq_u8(x, vextq_u8(x, x, 8)), veorq_u8(y, vextq_u8(y, y, 8)));
     // H = x.hi * y.hi
-    let h = pmull2(x, y);
+    let hi = pmull2(x, y);
     // L = x.lo * y.lo
-    let l = pmull(x, y);
-    (h, m, l)
+    let lo = pmull(x, y);
+    (hi, mid, lo)
 }
 
 /// Performs the second step of the Karatsuba algorithm to combine partial products
@@ -412,7 +411,7 @@ mod tests {
             // Combine all terms: x^5 + x^4 + x^3 + 2x^2 + x
             // Simplify using modulo 2 arithmetic: x^5 + x^4 + x^3 + x
             // Binary representation: 0b111010
-            let expected: u128 = 0b111010;
+            let expected: u128 = 0b11_1010;
 
             // Convert the result from `pmull` into a comparable form
             let result_u128: u128 = std::mem::transmute::<uint8x16_t, u128>(result);
@@ -430,7 +429,7 @@ mod tests {
         unsafe {
             // Define the input polynomials
             let v1: u64 = u64::MAX;
-            let v2: u64 = 0xFEDCBA9876543210;
+            let v2: u64 = 0xFEDC_BA98_7654_3210;
 
             // Prepare the input polynomials as `uint8x16_t` vectors
             // Represent the 64-bit polynomial as the lower half of the `uint8x16_t` vector
@@ -455,7 +454,7 @@ mod tests {
             // Assert equality between the computed and expected results
             assert_eq!(
                 result_u128,
-                expected_pmull_result(v1 as u128, v2 as u128).0,
+                expected_pmull_result(u128::from(v1), u128::from(v2)).0,
                 "pmull result did not match the expected polynomial multiplication value"
             );
         }
@@ -501,7 +500,7 @@ mod tests {
             // Combine all terms: x^5 + 2x^4 + x^3 + x^2 + x
             // Simplify using modulo 2 arithmetic: x^5 + x^3 + x^2 + x
             // Binary representation: 0b101110
-            let expected: u128 = 0b101110;
+            let expected: u128 = 0b10_1110;
 
             // Convert the result from `pmull2` into a comparable form
             let result_u128: u128 = std::mem::transmute::<uint8x16_t, u128>(result);
@@ -515,6 +514,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_pmull2() {
         unsafe {
             // Define the input polynomials
@@ -550,13 +550,14 @@ mod tests {
             // Assert equality between the computed and expected results
             assert_eq!(
                 result_u128,
-                expected_pmull_result(v1_high as u128, v2_high as u128).0,
+                expected_pmull_result(u128::from(v1_high), u128::from(v2_high)).0,
                 "pmull2 result did not match the expected polynomial multiplication value"
             );
         }
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_karatsuba1() {
         unsafe {
             // Define input polynomials (128-bit numbers)
@@ -570,7 +571,7 @@ mod tests {
             ));
 
             // Perform Karatsuba decomposition
-            let (h, m, l) = karatsuba1(x, y);
+            let (hi, mid, lo) = karatsuba1(x, y);
 
             // Define individual components of `x` and `y`
             let x_hi: u64 = 0xFEDCBA9876543210; // Upper 64 bits of x
@@ -581,40 +582,37 @@ mod tests {
             // Compute expected values
 
             // High product: x_hi * y_hi
-            let expected_h: u128 = expected_pmull_result(x_hi as u128, y_hi as u128).0;
+            let expected_h: u128 = expected_pmull_result(u128::from(x_hi), u128::from(y_hi)).0;
 
             // Low product: x_lo * y_lo
-            let expected_l: u128 = expected_pmull_result(x_lo as u128, y_lo as u128).0;
+            let expected_l: u128 = expected_pmull_result(u128::from(x_lo), u128::from(y_lo)).0;
 
             // Middle product: (x_hi ^ x_lo) * (y_hi ^ y_lo)
             let xor_x = x_hi ^ x_lo;
             let xor_y = y_hi ^ y_lo;
-            let expected_m: u128 = expected_pmull_result(xor_x as u128, xor_y as u128).0;
+            let expected_m: u128 = expected_pmull_result(u128::from(xor_x), u128::from(xor_y)).0;
 
             // Convert results for comparison
-            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(h);
-            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(m);
-            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(l);
+            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(hi);
+            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(mid);
+            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(lo);
 
             // Assert high product
             assert_eq!(
                 computed_h, expected_h,
-                "High product mismatch: got {:#x}, expected {:#x}",
-                computed_h, expected_h
+                "High product mismatch: got {computed_h:#x}, expected {expected_h:#x}"
             );
 
             // Assert middle product
             assert_eq!(
                 computed_m, expected_m,
-                "Middle product mismatch: got {:#x}, expected {:#x}",
-                computed_m, expected_m
+                "Middle product mismatch: got {computed_m:#x}, expected {expected_m:#x}"
             );
 
             // Assert low product
             assert_eq!(
                 computed_l, expected_l,
-                "Low product mismatch: got {:#x}, expected {:#x}",
-                computed_l, expected_l
+                "Low product mismatch: got {computed_l:#x}, expected {expected_l:#x}"
             );
         }
     }
@@ -633,7 +631,7 @@ mod tests {
             ));
 
             // Perform Karatsuba decomposition
-            let (h, m, l) = karatsuba1(x, y);
+            let (hi, mid, lo) = karatsuba1(x, y);
 
             // Expected results
             // High product (upper 64 bits): 0 * 0 = 0
@@ -642,41 +640,39 @@ mod tests {
             // Low product (lower 64 bits): 0b1011 * 0b0110
             // A(x) = x^3 + x + 1, B(x) = x^2 + x
             // Result: x^5 + x^4 + x^3 + x = 0b111010
-            let expected_l: u128 = 0b111010;
+            let expected_l: u128 = 0b11_1010;
 
             // Middle product: (0 ^ 0b1011) * (0 ^ 0b0110) = 0b1011 * 0b0110
             // Same as low product
             let expected_m: u128 = expected_l;
 
             // Convert results for comparison
-            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(h);
-            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(m);
-            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(l);
+            let computed_h: u128 = std::mem::transmute::<uint8x16_t, u128>(hi);
+            let computed_m: u128 = std::mem::transmute::<uint8x16_t, u128>(mid);
+            let computed_l: u128 = std::mem::transmute::<uint8x16_t, u128>(lo);
 
             // Assert high product
             assert_eq!(
                 computed_h, expected_h,
-                "High product mismatch: got {:#x}, expected {:#x}",
-                computed_h, expected_h
+                "High product mismatch: got {computed_h:#x}, expected {expected_h:#x}"
             );
 
             // Assert middle product
             assert_eq!(
                 computed_m, expected_m,
-                "Middle product mismatch: got {:#x}, expected {:#x}",
-                computed_m, expected_m
+                "Middle product mismatch: got {computed_m:#x}, expected {expected_m:#x}"
             );
 
             // Assert low product
             assert_eq!(
                 computed_l, expected_l,
-                "Low product mismatch: got {:#x}, expected {:#x}",
-                computed_l, expected_l
+                "Low product mismatch: got {computed_l:#x}, expected {expected_l:#x}"
             );
         }
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_karatsuba() {
         unsafe {
             // Define input polynomials (128-bit numbers)
@@ -695,16 +691,16 @@ mod tests {
 
             // Perform the first step of the Karatsuba algorithm
             // Decomposes `x` and `y` into three partial products:
-            // - `h` (high product): x.hi * y.hi
-            // - `m` (middle product): (x.hi ^ x.lo) * (y.hi ^ y.lo)
-            // - `l` (low product): x.lo * y.lo
-            let (h, m, l) = karatsuba1(x, y);
+            // - `hi` (high product): x.hi * y.hi
+            // - `mid` (middle product): (x.hi ^ x.lo) * (y.hi ^ y.lo)
+            // - `lo` (low product): x.lo * y.lo
+            let (hi, mid, lo) = karatsuba1(x, y);
 
             // Perform the second step of the Karatsuba algorithm
-            // Combines the partial products `h`, `m`, and `l` into a 256-bit result:
+            // Combines the partial products `hi`, `mid`, and `lo` into a 256-bit result:
             // - `result_high`: Upper 128 bits of the result
             // - `result_low`: Lower 128 bits of the result
-            let (result_high, result_low) = karatsuba2(h, m, l);
+            let (result_high, result_low) = karatsuba2(hi, mid, lo);
 
             // Compute the expected result using the full polynomial multiplication
             // This function returns both lower and upper 128-bit parts of the result
@@ -730,6 +726,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_mont_reduce_simple_case() {
         unsafe {
             // Define inputs for x23 (high) and x01 (low)
@@ -752,14 +749,16 @@ mod tests {
             let poly: u128 = 1 << 127 | 1 << 126 | 1 << 121 | 1 << 63 | 1 << 62 | 1 << 57;
 
             // Expected result
-            let expected =
-                expected_mont_reduce(std::mem::transmute(x23), std::mem::transmute(x01), poly);
+            let expected = expected_mont_reduce(
+                std::mem::transmute::<uint8x16_t, u128>(x23),
+                std::mem::transmute::<uint8x16_t, u128>(x01),
+                poly,
+            );
 
             // Validate the output
             assert_eq!(
                 result_u128, expected,
-                "Montgomery reduction failed: got {:#x}, expected {:#x}",
-                result_u128, expected
+                "Montgomery reduction failed: got {result_u128:#x}, expected {expected:#x}"
             );
         }
     }
@@ -784,9 +783,9 @@ mod tests {
 
             // Validate the output
             assert_eq!(
-                result_u128, expected,
-                "Montgomery reduction failed for zero case: got {:#x}, expected {:#x}",
-                result_u128, expected
+                result_u128,
+                expected,
+                "Montgomery reduction failed for zero case: got {result_u128:#x}, expected {expected:#x}"
             );
         }
     }
