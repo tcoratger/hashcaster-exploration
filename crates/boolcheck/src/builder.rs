@@ -1,4 +1,4 @@
-use crate::{boolcheck_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
+use crate::{bool_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::univariate::UnivariatePolynomial;
 use num_traits::{identities::Zero, One};

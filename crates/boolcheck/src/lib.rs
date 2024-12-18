@@ -1,8 +1,8 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::compressed::CompressedPoly;
 
-pub mod boolcheck_builder;
-pub mod boolcheck_trait;
+pub mod bool_trait;
+pub mod builder;
 pub mod package;
 
 #[derive(Clone, Debug, Default)]
