@@ -35,8 +35,36 @@ impl BinaryField128b {
         std::mem::transmute(mont_reduce(h, l))
     }
 
+    /// Constructs a basis element of the binary field \( \mathbb{F}_{2^{128}} \).
+    ///
+    /// # Description
+    /// - The `basis` function generates a basis element corresponding to \( x^i \), where \( i \)
+    ///   is the degree of the monomial.
+    /// - In the binary field, each power of \( x \) corresponds to a bit position in the 128-bit
+    ///   representation.
+    ///
+    /// # Parameters
+    /// - `i`: The degree of the basis element (0 ≤ `i` < 128).
+    ///
+    /// # Returns
+    /// - A `BinaryField128b` instance representing the basis element \( x^i \).
+    ///
+    /// # Panics
+    /// - Panics if the input `i` is greater than or equal to 128, as the field is limited to 128
+    ///   bits.
+    ///
+    /// # Example
+    /// ```
+    /// let b0 = BinaryField128b::basis(0); // Represents x^0, or 1
+    /// let b1 = BinaryField128b::basis(1); // Represents x^1, or 2
+    /// let b127 = BinaryField128b::basis(127); // Represents x^127
+    /// ```
     pub const fn basis(i: usize) -> Self {
+        // Ensure the input degree `i` is within the valid range for the field.
         assert!(i < 128);
+
+        // Compute the basis element by left-shifting 1 by `i` positions.
+        // This sets the `i`-th bit in the binary representation.
         Self(1 << i)
     }
 }
@@ -574,5 +602,53 @@ mod tests {
                 result_b.0, value.0
             );
         }
+    }
+
+    #[test]
+    fn test_basis_valid_input() {
+        // Test case for a valid basis element at degree 0.
+        // `basis(0)` represents x^0, which corresponds to 1.
+        let b0 = BinaryField128b::basis(0);
+        // Assert that the underlying value is 1 (binary: 0b1).
+        assert_eq!(b0.0, 1, "basis(0) did not return the expected result: {:#b}", b0.0);
+
+        // Test case for a valid basis element at degree 1.
+        // `basis(1)` represents x^1, which corresponds to 2 (binary: 0b10).
+        let b1 = BinaryField128b::basis(1);
+        // Assert that the underlying value is 2.
+        assert_eq!(b1.0, 2, "basis(1) did not return the expected result: {:#b}", b1.0);
+
+        // Test case for a valid basis element at degree 127 (maximum).
+        // `basis(127)` represents x^127, which corresponds to a 1 followed by 127 zeros.
+        let b127 = BinaryField128b::basis(127);
+        // Assert that the underlying value matches the expected binary representation.
+        assert_eq!(
+            b127.0,
+            1 << 127,
+            "basis(127) did not return the expected result: {:#b}",
+            b127.0
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed")]
+    const fn test_basis_invalid_input() {
+        // Test case for an invalid input exceeding the maximum degree (127).
+        // `basis(128)` should panic because 128 is out of range.
+        BinaryField128b::basis(128);
+    }
+
+    #[test]
+    fn test_basis_combination() {
+        // Construct a polynomial using multiple basis elements.
+        // This represents x^0 + x^1 + x^3 (binary: 0b1011).
+        let poly =
+            BinaryField128b::basis(0) + BinaryField128b::basis(1) + BinaryField128b::basis(3);
+        // Assert that the underlying value matches the expected result.
+        assert_eq!(
+            poly.0, 0b1011,
+            "Combination of basis elements did not produce the expected result: {:#b}",
+            poly.0
+        );
     }
 }
