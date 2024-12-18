@@ -1,8 +1,8 @@
 use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
-use num_traits::{One, Zero};
+use num_traits::{MulAddAssign, One, Zero};
 use std::{
     arch::aarch64::uint8x16_t,
-    ops::{Add, AddAssign, Deref, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Deref, Mul, MulAssign, Neg, Sub},
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -11,6 +11,28 @@ pub struct BinaryField128b(u128);
 impl BinaryField128b {
     pub const fn new(val: u128) -> Self {
         Self(val)
+    }
+
+    /// Performs the core multiplication logic using Karatsuba and Montgomery reduction.
+    unsafe fn mul_impl(lhs: u128, rhs: u128) -> u128 {
+        // Perform Karatsuba decomposition on the operands (self and other).
+        // This breaks each 128-bit input into high and low 64-bit parts and computes:
+        // - `h`: High product (`self.hi * other.hi`)
+        // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
+        // - `l`: Low product (`self.lo * other.lo`)
+        let (h, m, l) = karatsuba1(
+            std::mem::transmute::<u128, uint8x16_t>(lhs),
+            std::mem::transmute::<u128, uint8x16_t>(rhs),
+        );
+
+        // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
+        // - `h`: Combined upper 128 bits.
+        // - `l`: Combined lower 128 bits.
+        let (h, l) = karatsuba2(h, m, l);
+
+        // Perform Montgomery reduction on the 256-bit result (`h`, `l`) to
+        // produce a reduced 128-bit result modulo the field polynomial.
+        std::mem::transmute(mont_reduce(h, l))
     }
 }
 
@@ -88,31 +110,12 @@ impl Sub<&Self> for BinaryField128b {
     }
 }
 
-impl Mul<Self> for BinaryField128b {
+impl Mul for BinaryField128b {
     type Output = Self;
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: Self) -> Self::Output {
-        unsafe {
-            // Perform Karatsuba decomposition on the operands (self and other).
-            // This breaks each 128-bit input into high and low 64-bit parts and computes:
-            // - `h`: High product (`self.hi * other.hi`)
-            // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
-            // - `l`: Low product (`self.lo * other.lo`)
-            let (h, m, l) = karatsuba1(
-                std::mem::transmute::<u128, uint8x16_t>(self.0),
-                std::mem::transmute::<u128, uint8x16_t>(other.0),
-            );
-
-            // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
-            // - `h`: Combined upper 128 bits.
-            // - `l`: Combined lower 128 bits.
-            let (h, l) = karatsuba2(h, m, l);
-
-            // Perform Montgomery reduction on the 256-bit result (`h`, `l`) to
-            // produce a reduced 128-bit result modulo the field polynomial.
-            std::mem::transmute(mont_reduce(h, l))
-        }
+        unsafe { Self(Self::mul_impl(self.0, other.0)) }
     }
 }
 
@@ -120,26 +123,31 @@ impl Mul<&Self> for BinaryField128b {
     type Output = Self;
 
     fn mul(self, other: &Self) -> Self::Output {
-        unsafe {
-            // Perform Karatsuba decomposition on the operands (self and other).
-            // This breaks each 128-bit input into high and low 64-bit parts and computes:
-            // - `h`: High product (`self.hi * other.hi`)
-            // - `m`: Middle product (`(self.hi ^ self.lo) * (other.hi ^ other.lo)`)
-            // - `l`: Low product (`self.lo * other.lo`)
-            let (h, m, l) = karatsuba1(
-                std::mem::transmute::<u128, uint8x16_t>(self.0),
-                std::mem::transmute::<u128, uint8x16_t>(other.0),
-            );
+        unsafe { Self(Self::mul_impl(self.0, other.0)) }
+    }
+}
 
-            // Combine partial products (`h`, `m`, `l`) into a 256-bit result.
-            // - `h`: Combined upper 128 bits.
-            // - `l`: Combined lower 128 bits.
-            let (h, l) = karatsuba2(h, m, l);
+impl MulAssign for BinaryField128b {
+    fn mul_assign(&mut self, other: Self) {
+        *self = unsafe { Self(Self::mul_impl(self.0, other.0)) };
+    }
+}
 
-            // Perform Montgomery reduction on the 256-bit result (`h`, `l`) to
-            // produce a reduced 128-bit result modulo the field polynomial.
-            std::mem::transmute(mont_reduce(h, l))
-        }
+impl MulAssign<&Self> for BinaryField128b {
+    fn mul_assign(&mut self, other: &Self) {
+        *self = unsafe { Self(Self::mul_impl(self.0, other.0)) };
+    }
+}
+
+impl MulAddAssign<Self> for BinaryField128b {
+    fn mul_add_assign(&mut self, a: Self, b: Self) {
+        *self = (*self * a) + b;
+    }
+}
+
+impl MulAddAssign<&Self> for BinaryField128b {
+    fn mul_add_assign(&mut self, a: &Self, b: Self) {
+        *self = (*self * *a) + b;
     }
 }
 

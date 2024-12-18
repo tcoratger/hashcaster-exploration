@@ -42,7 +42,7 @@ const POLY: u128 = (1 << 127) | (1 << 126) | (1 << 121) | (1 << 63) | (1 << 62) 
 /// Ensure the target CPU supports NEON before calling this function.
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// use std::arch::aarch64::*;
 ///
 /// unsafe {
@@ -103,7 +103,7 @@ pub(crate) unsafe fn karatsuba1(
 /// 3. Return the combined 2n-bit product as two 128-bit SIMD vectors.
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// use std::arch::aarch64::*;
 /// unsafe {
 ///     let h = /* High product */;
@@ -255,7 +255,7 @@ pub(crate) unsafe fn mont_reduce(x23: uint8x16_t, x01: uint8x16_t) -> uint8x16_t
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use std::arch::aarch64::*;
 ///
 /// unsafe {
@@ -320,7 +320,7 @@ unsafe fn pmull(a: uint8x16_t, b: uint8x16_t) -> uint8x16_t {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use std::arch::aarch64::*;
 ///
 /// unsafe {

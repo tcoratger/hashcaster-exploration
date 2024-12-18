@@ -81,7 +81,7 @@ pub(crate) fn expected_mont_reduce(x23: u128, x01: u128, poly: u128) -> u128 {
 ///   - `high` is the upper 128 bits of the product.
 ///
 /// # Example
-/// ```
+/// ```rust,ignore
 /// let a = 0b1011; // Polynomial: x^3 + x + 1
 /// let b = 0b0110; // Polynomial: x^2 + x
 /// assert_eq!(expected_pmull_result(a, b), (0b111010, 0)); // x^5 + x^4 + x^3 + x
