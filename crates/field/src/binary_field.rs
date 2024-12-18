@@ -2,7 +2,7 @@ use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
 use num_traits::{MulAddAssign, One, Zero};
 use std::{
     arch::aarch64::uint8x16_t,
-    ops::{Add, AddAssign, Deref, Mul, MulAssign, Neg, Sub},
+    ops::{Add, AddAssign, BitAnd, Deref, Mul, MulAssign, Neg, Sub},
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -33,6 +33,11 @@ impl BinaryField128b {
         // Perform Montgomery reduction on the 256-bit result (`h`, `l`) to
         // produce a reduced 128-bit result modulo the field polynomial.
         std::mem::transmute(mont_reduce(h, l))
+    }
+
+    pub const fn basis(i: usize) -> Self {
+        assert!(i < 128);
+        Self(1 << i)
     }
 }
 
@@ -156,6 +161,22 @@ impl Deref for BinaryField128b {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl BitAnd<Self> for BinaryField128b {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl BitAnd<&Self> for BinaryField128b {
+    type Output = Self;
+
+    fn bitand(self, rhs: &Self) -> Self::Output {
+        Self(self.0 & rhs.0)
     }
 }
 

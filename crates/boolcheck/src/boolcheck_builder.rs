@@ -1,6 +1,6 @@
-use crate::boolcheck_trait::CompressedOps;
+use crate::{boolcheck_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheckSingle};
 use hashcaster_field::binary_field::BinaryField128b;
-use hashcaster_poly::compressed::CompressedPoly;
+use hashcaster_poly::univariate::UnivariatePolynomial;
 use num_traits::{identities::Zero, One};
 use rayon::{
     iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator},
@@ -8,31 +8,18 @@ use rayon::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct BoolCheckSingle {
-    pt: Vec<BinaryField128b>,
-    poly: Vec<BinaryField128b>,
-    polys: Vec<Vec<BinaryField128b>>,
-    ext: Option<Vec<BinaryField128b>>,
-    poly_coords: Option<Vec<BinaryField128b>>,
-    c: usize,
-    challenges: Vec<BinaryField128b>,
-    bit_mapping: Vec<u16>,
-    eq_sequence: Vec<Vec<BinaryField128b>>,
-    round_polys: Vec<CompressedPoly>,
-    claim: BinaryField128b,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct BoolCheckSingleBuilder {
+pub struct BoolCheckSingleBuilder<const M: usize> {
     c: usize,
     points: Vec<BinaryField128b>,
+    boolean_package: BooleanPackage,
+    gammas: Vec<BinaryField128b>,
 }
 
-impl BoolCheckSingleBuilder {
-    pub fn new(c: usize, points: Vec<BinaryField128b>) -> Self {
+impl<const M: usize> BoolCheckSingleBuilder<M> {
+    pub fn new(c: usize, points: Vec<BinaryField128b>, boolean_package: BooleanPackage) -> Self {
         assert!(c < points.len());
 
-        Self { c, points }
+        Self { c, points, boolean_package, gammas: vec![] }
     }
 
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
@@ -287,11 +274,11 @@ impl BoolCheckSingleBuilder {
         ret
     }
 
-    pub fn build<const N: usize, F: CompressedOps>(
-        &self,
-        compressor: &F,
+    pub fn build<const N: usize>(
+        &mut self,
         polynomials: &[Vec<BinaryField128b>; N],
-        claim: BinaryField128b,
+        claim_polynomial: &UnivariatePolynomial,
+        gamma: BinaryField128b,
     ) -> BoolCheckSingle {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
@@ -302,21 +289,157 @@ impl BoolCheckSingleBuilder {
         // Generate bit and trit mappings
         let (bit_mapping, trit_mapping) = self.trit_mapping();
 
+        let mut tmp = BinaryField128b::one();
+        for _ in 0..claim_polynomial.coeffs.len() {
+            self.gammas.push(tmp);
+            tmp *= gamma;
+        }
+
         // Return the constructed BoolCheckSingle
         BoolCheckSingle {
             c: self.c,
             bit_mapping,
             eq_sequence: self.eq_poly_sequence(true),
-            claim,
+            claim: claim_polynomial.evaluate_at(&gamma),
             ext: Some(self.extend_n_tables(
                 polynomials,
                 &trit_mapping,
-                |args| compressor.compress_linear(args),
-                |args| compressor.compress_quadratic(args),
+                |args| self.compress_linear(args),
+                |args| self.compress_quadratic(args),
             )),
             pt: self.points.clone(),
             ..Default::default()
         }
+    }
+
+    pub fn exec_lin_compressed(&self, arg: &[BinaryField128b]) -> [BinaryField128b; M] {
+        match self.boolean_package {
+            BooleanPackage::And => {
+                assert_eq!(M, 1, "Invalid output size for AND package");
+                assert_eq!(arg.len(), 2, "Invalid input size for AND package");
+                [BinaryField128b::zero(); M]
+            }
+        }
+    }
+
+    pub fn exec_quad_compressed(&self, arg: &[BinaryField128b]) -> [BinaryField128b; M] {
+        match self.boolean_package {
+            BooleanPackage::And => {
+                assert_eq!(M, 1, "Invalid output size for AND package");
+                assert_eq!(arg.len(), 2, "Invalid input size for AND package");
+                [arg[0] & arg[1]; M]
+            }
+        }
+    }
+
+    pub fn exec_alg(
+        &self,
+        data: &[BinaryField128b],
+        mut idx_a: usize,
+        offset: usize,
+    ) -> [[BinaryField128b; M]; 3] {
+        match self.boolean_package {
+            BooleanPackage::And => {
+                assert_eq!(M, 1, "Invalid output size for AND package");
+
+                // Double the starting index to account for the structure of the data.
+                idx_a *= 2;
+
+                // Compute the starting index for the second operand in the AND operation.
+                let mut idx_b = idx_a + offset * 128;
+
+                // Initialize the return array with zeros, ensuring the correct size.
+                let mut ret = [[BinaryField128b::zero(); M]; 3];
+
+                // Populate the first element of each sub-array based on the AND operation logic.
+                ret[0][0] = BinaryField128b::basis(0) * data[idx_a] * data[idx_b];
+                ret[1][0] = BinaryField128b::basis(0) * data[idx_a + 1] * data[idx_b + 1];
+                ret[2][0] = BinaryField128b::basis(0) *
+                    (data[idx_a] + data[idx_a + 1]) *
+                    (data[idx_b] + data[idx_b + 1]);
+
+                // Iterate over the remaining 127 basis elements to aggregate evaluations.
+                for i in 1..128 {
+                    // Move to the next indices for both operands in the AND operation.
+                    idx_a += offset;
+                    idx_b += offset;
+
+                    // Add the contributions of the current basis element to the evaluations.
+                    ret[0][0] += BinaryField128b::basis(i) * data[idx_a] * data[idx_b];
+                    ret[1][0] += BinaryField128b::basis(i) * data[idx_a + 1] * data[idx_b + 1];
+                    ret[2][0] += BinaryField128b::basis(i) *
+                        (data[idx_a] + data[idx_a + 1]) *
+                        (data[idx_b] + data[idx_b + 1]);
+                }
+
+                // Return the aggregated evaluations as a 3-element array.
+                ret
+            }
+        }
+    }
+}
+
+impl<const M: usize> CompressedFoldedOps for BoolCheckSingleBuilder<M> {
+    fn compress_linear(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+        // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
+        // computation.
+        let tmp = self.exec_lin_compressed(arg);
+
+        // Initialize the accumulator to zero.
+        let mut acc = BinaryField128b::zero();
+
+        // Iterate over the output size `M` and compute the folded sum using `gammas`.
+        for (i, &t) in tmp.iter().enumerate() {
+            // Multiply the result by the corresponding gamma and accumulate.
+            acc += t * self.gammas[i];
+        }
+
+        // Return the final compressed result.
+        acc
+    }
+
+    fn compress_quadratic(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+        // Compute the intermediate result by delegating to the wrapped `FnPackage`'s quadratic
+        // computation.
+        let tmp = self.exec_quad_compressed(arg);
+
+        // Initialize the accumulator to zero.
+        let mut acc = BinaryField128b::zero();
+
+        // Iterate over the output size `M` and compute the folded sum using `gammas`.
+        for (i, &t) in tmp.iter().enumerate() {
+            // Multiply the result by the corresponding gamma and accumulate.
+            acc += t * self.gammas[i];
+        }
+
+        // Return the final compressed result.
+        acc
+    }
+
+    fn compress_algebraic(
+        &self,
+        data: &[BinaryField128b],
+        start: usize,
+        offset: usize,
+    ) -> [BinaryField128b; 3] {
+        // Compute the intermediate algebraic results by delegating to the wrapped `FnPackage`.
+        let tmp = self.exec_alg(data, start, offset);
+
+        // Initialize the accumulators for each of the 3 output values to zero.
+        let mut acc = [BinaryField128b::zero(); 3];
+
+        // Iterate over the output size `M` and compute the folded sums for each output value.
+        for i in 0..M {
+            // Compress the first output using gammas.
+            acc[0] += tmp[0][i] * self.gammas[i];
+            // Compress the second output using gammas.
+            acc[1] += tmp[1][i] * self.gammas[i];
+            // Compress the third output using gammas.
+            acc[2] += tmp[2][i] * self.gammas[i];
+        }
+
+        // Return the array of compressed results.
+        acc
     }
 }
 
@@ -327,7 +450,8 @@ mod tests {
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check = BoolCheckSingleBuilder { c: 1, ..Default::default() };
+        let bool_check: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { c: 1, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -342,7 +466,8 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check = BoolCheckSingleBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { c: 2, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -361,7 +486,8 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check = BoolCheckSingleBuilder { c: 4, ..Default::default() };
+        let bool_check: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { c: 4, ..Default::default() };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -394,7 +520,8 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 0 (single ternary digit).
-        let bool_check = BoolCheckSingleBuilder { c: 0, ..Default::default() };
+        let bool_check: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { c: 0, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -416,7 +543,8 @@ mod tests {
         // Create a BoolCheckSingleBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check = BoolCheckSingleBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { c: 2, ..Default::default() };
 
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
@@ -509,7 +637,8 @@ mod tests {
         ];
 
         // Create an instance of the BoolCheckSingleBuilder with the given points.
-        let bool_check_builder = BoolCheckSingleBuilder { points, ..Default::default() };
+        let bool_check_builder: BoolCheckSingleBuilder<0> =
+            BoolCheckSingleBuilder { points, ..Default::default() };
 
         // Compute the equality polynomial sequence using the eq_poly_sequence function.
         let eq_sequence = bool_check_builder.eq_poly_sequence(false);

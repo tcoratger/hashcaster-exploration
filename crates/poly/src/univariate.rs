@@ -22,7 +22,7 @@ use num_traits::{MulAddAssign, Zero};
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct UnivariatePolynomial {
     /// The coefficients of the polynomial, stored in increasing order of degree.
-    coeffs: Vec<BinaryField128b>,
+    pub coeffs: Vec<BinaryField128b>,
 }
 
 impl UnivariatePolynomial {

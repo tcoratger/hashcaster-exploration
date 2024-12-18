@@ -1,6 +1,6 @@
 use hashcaster_field::binary_field::BinaryField128b;
 
-/// The `CompressedOps` trait defines an interface for executing compressed linear, quadratic,
+/// The `CompressedFoldedOps` trait defines an interface for executing compressed linear, quadratic,
 /// and algebraic operations over input variables and data.
 ///
 /// # Overview
@@ -14,7 +14,7 @@ use hashcaster_field::binary_field::BinaryField128b;
 ///
 /// # Safety and Concurrency
 /// The trait is constrained by `Send` and `Sync` for safe usage in concurrent environments.
-pub trait CompressedOps: Send + Sync {
+pub trait CompressedFoldedOps: Send + Sync {
     /// Computes the compressed result of a linear operation on the input variables.
     ///
     /// # Parameters
