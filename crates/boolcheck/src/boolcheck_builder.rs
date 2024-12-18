@@ -8,14 +8,14 @@ use rayon::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct BoolCheckSingleBuilder<const M: usize> {
+pub struct BoolCheckBuilder<const M: usize> {
     c: usize,
     points: Vec<BinaryField128b>,
     boolean_package: BooleanPackage,
     gammas: Vec<BinaryField128b>,
 }
 
-impl<const M: usize> BoolCheckSingleBuilder<M> {
+impl<const M: usize> BoolCheckBuilder<M> {
     pub fn new(c: usize, points: Vec<BinaryField128b>, boolean_package: BooleanPackage) -> Self {
         assert!(c < points.len());
 
@@ -379,7 +379,7 @@ impl<const M: usize> BoolCheckSingleBuilder<M> {
     }
 }
 
-impl<const M: usize> CompressedFoldedOps for BoolCheckSingleBuilder<M> {
+impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn compress_linear(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
         // computation.
@@ -449,9 +449,8 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_small_c() {
-        // Create an instance of BoolCheckSingleBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { c: 1, ..Default::default() };
+        // Create an instance of BoolCheckBuilder with c = 1 (two ternary digits: 0, 1, 2).
+        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 1, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -465,9 +464,8 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_medium_c() {
-        // Create an instance of BoolCheckSingleBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { c: 2, ..Default::default() };
+        // Create an instance of BoolCheckBuilder with c = 2 (three ternary digits: 0, 1, 2).
+        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 2, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -486,8 +484,7 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { c: 4, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 4, ..Default::default() };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -519,9 +516,8 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_no_c() {
-        // Create an instance of BoolCheckSingleBuilder with c = 0 (single ternary digit).
-        let bool_check: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { c: 0, ..Default::default() };
+        // Create an instance of BoolCheckBuilder with c = 0 (single ternary digit).
+        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 0, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -540,11 +536,10 @@ mod tests {
         // Table size is determined as 2^dims. Here, dims = 3, so table size = 8 (2^3).
         let dims = 3;
 
-        // Create a BoolCheckSingleBuilder instance
+        // Create a BoolCheckBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 2, ..Default::default() };
 
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
@@ -636,9 +631,9 @@ mod tests {
             BinaryField128b::from(4),
         ];
 
-        // Create an instance of the BoolCheckSingleBuilder with the given points.
-        let bool_check_builder: BoolCheckSingleBuilder<0> =
-            BoolCheckSingleBuilder { points, ..Default::default() };
+        // Create an instance of the BoolCheckBuilder with the given points.
+        let bool_check_builder: BoolCheckBuilder<0> =
+            BoolCheckBuilder { points, ..Default::default() };
 
         // Compute the equality polynomial sequence using the eq_poly_sequence function.
         let eq_sequence = bool_check_builder.eq_poly_sequence(false);
