@@ -1,5 +1,6 @@
 use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
 use num_traits::{MulAddAssign, One, Zero};
+use rand::Rng;
 use std::{
     arch::aarch64::uint8x16_t,
     ops::{Add, AddAssign, BitAnd, Deref, Mul, MulAssign, Neg, Sub},
@@ -66,6 +67,16 @@ impl BinaryField128b {
         // Compute the basis element by left-shifting 1 by `i` positions.
         // This sets the `i`-th bit in the binary representation.
         Self(1 << i)
+    }
+
+    /// Generates a random [`BinaryField128b`] element.
+    ///
+    /// # Returns
+    /// - A random `BinaryField128b` instance, with the internal `u128` value generated uniformly
+    ///   across the entire range of 128 bits.
+    pub fn random() -> Self {
+        // Use the `rand` crate to generate a random `u128` value.
+        Self::new(rand::thread_rng().gen())
     }
 }
 
