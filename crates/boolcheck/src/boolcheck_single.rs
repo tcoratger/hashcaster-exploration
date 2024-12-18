@@ -1,8 +1,8 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::compressed::CompressedPoly;
-use num_traits::identities::Zero;
+use num_traits::{identities::Zero, One};
 use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
+    iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
 
@@ -23,9 +23,14 @@ pub struct BoolCheckSingle {
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckSingleBuilder {
     c: usize,
+    points: Vec<BinaryField128b>,
 }
 
 impl BoolCheckSingleBuilder {
+    pub fn new(c: usize, points: Vec<BinaryField128b>) -> Self {
+        Self { c, points }
+    }
+
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
     /// - **Trit Mapping**: Maps every integer `i` to either a power of 3 or a scaled binary
     ///   equivalent, depending on the digits in its base-3 representation.
@@ -222,6 +227,57 @@ impl BoolCheckSingleBuilder {
         // Return the fully extended table.
         result
     }
+
+    /// Constructs the equality polynomial sequence for a given set of points.
+    ///
+    /// # Description
+    /// The equality polynomial sequence is a recursive construction where each step computes
+    /// a polynomial that evaluates to 1 at a specific subset of points and 0 elsewhere. This
+    /// function calculates the entire sequence of such polynomials for the given points.
+    ///
+    /// # Formula
+    /// Each polynomial in the sequence is defined recursively:
+    /// \[ eq_k(x) = eq_{k-1}(x) \cdot (1 + m_k \cdot x) \]
+    /// where:
+    /// - \( eq_0(x) = 1 \) is the base case.
+    /// - \( m_k \) is the multiplier for the \(k\)-th point.
+    ///
+    /// # Parameters
+    /// - `self.points`: A vector of `BinaryField128b` elements representing the input points.
+    ///
+    /// # Returns
+    /// - A vector of vectors (`Vec<Vec<BinaryField128b>>`) where each vector represents the
+    ///   coefficients of the equality polynomial at a specific step.
+    pub fn eq_poly_sequence(&self) -> Vec<Vec<BinaryField128b>> {
+        // Initialize the result with the base polynomial eq_0(x) = 1.
+        let mut ret = vec![vec![BinaryField128b::one()]];
+
+        // Iterate over the points in reverse order to construct the sequence.
+        for (i, &multiplier) in self.points.iter().rev().enumerate() {
+            // Retrieve the last computed polynomial (eq_{k-1}).
+            let last = &ret[i];
+
+            // Allocate space for the next polynomial (eq_k) with size twice that of eq_{k-1}.
+            let mut incoming = vec![BinaryField128b::zero(); 1 << (i + 1)];
+
+            // Compute the new polynomial using the recurrence relation.
+            // Use parallel processing to handle each coefficient efficiently.
+            incoming.par_chunks_exact_mut(2).zip(last.par_iter()).for_each(|(chunk, &w)| {
+                // Compute the product term.
+                let m = multiplier * w;
+                // Update the first coefficient in the pair.
+                chunk[0] = w + m;
+                // Update the second coefficient in the pair.
+                chunk[1] = m;
+            });
+
+            // Append the newly computed polynomial to the result.
+            ret.push(incoming);
+        }
+
+        // Return the complete sequence of equality polynomials.
+        ret
+    }
 }
 
 #[cfg(test)]
@@ -231,7 +287,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check = BoolCheckSingleBuilder { c: 1 };
+        let bool_check = BoolCheckSingleBuilder { c: 1, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -246,7 +302,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check = BoolCheckSingleBuilder { c: 2 };
+        let bool_check = BoolCheckSingleBuilder { c: 2, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -265,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check = BoolCheckSingleBuilder { c: 4 };
+        let bool_check = BoolCheckSingleBuilder { c: 4, ..Default::default() };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -298,7 +354,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckSingleBuilder with c = 0 (single ternary digit).
-        let bool_check = BoolCheckSingleBuilder { c: 0 };
+        let bool_check = BoolCheckSingleBuilder { c: 0, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -319,7 +375,7 @@ mod tests {
         // Create a BoolCheckSingleBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check = BoolCheckSingleBuilder { c: 2 };
+        let bool_check = BoolCheckSingleBuilder { c: 2, ..Default::default() };
 
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
@@ -396,6 +452,70 @@ mod tests {
                 BinaryField128b::from(299076299051606071403356588563077530034u128),
                 BinaryField128b::from(299076299051606071403356588563077530034u128),
                 BinaryField128b::from(0u128)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_eq_poly_sequence() {
+        // Define a vector of input points in the field BinaryField128b.
+        let points = vec![
+            BinaryField128b::from(1),
+            BinaryField128b::from(2),
+            BinaryField128b::from(3),
+            BinaryField128b::from(4),
+        ];
+
+        // Create an instance of the BoolCheckSingleBuilder with the given points.
+        let bool_check_builder = BoolCheckSingleBuilder { points, ..Default::default() };
+
+        // Compute the equality polynomial sequence using the eq_poly_sequence function.
+        let eq_sequence = bool_check_builder.eq_poly_sequence();
+
+        // Assert that the computed equality polynomial sequence matches the expected result.
+        // This ensures the function is working as intended.
+        assert_eq!(
+            eq_sequence,
+            vec![
+                vec![BinaryField128b::from(257870231182273679343338569694386847745)],
+                vec![
+                    BinaryField128b::from(257870231182273679343338569694386847749),
+                    BinaryField128b::from(4)
+                ],
+                vec![
+                    BinaryField128b::from(276728653372472173290161332362114236431),
+                    BinaryField128b::from(24175334173338157438437990908848766986),
+                    BinaryField128b::from(24175334173338157438437990908848766989),
+                    BinaryField128b::from(24175334173338157438437990908848766985)
+                ],
+                vec![
+                    BinaryField128b::from(262194116391218557050997340512544882712),
+                    BinaryField128b::from(28499219382283035146096761727006801943),
+                    BinaryField128b::from(36391510607255973141463116147421347857),
+                    BinaryField128b::from(12382329933390930187138101121107623963),
+                    BinaryField128b::from(318146307338789859576041968956220637212),
+                    BinaryField128b::from(336838576029515239038751755741412982801),
+                    BinaryField128b::from(323629372821402637551770173079877058582),
+                    BinaryField128b::from(299454038648064480113332182171028291615)
+                ],
+                vec![
+                    BinaryField128b::from(156988152385753943545944842966784802826),
+                    BinaryField128b::from(238399472904936139640581627536708993042),
+                    BinaryField128b::from(103112231144489255218858846742755934222),
+                    BinaryField128b::from(118147824772591482324176031488095027225),
+                    BinaryField128b::from(214143658130290692373901413934757314572),
+                    BinaryField128b::from(247871520449118298941928385465288753181),
+                    BinaryField128b::from(114993504431031574539843754968093818891),
+                    BinaryField128b::from(127368045919134702485539060344707612688),
+                    BinaryField128b::from(138015824183221341818021192535835148297),
+                    BinaryField128b::from(181502608447665156913871231917135757333),
+                    BinaryField128b::from(311457361334396773361093192980979777548),
+                    BinaryField128b::from(30864341024960054608398038725843484701),
+                    BinaryField128b::from(197871324294196201012813621595002109966),
+                    BinaryField128b::from(137763997785582402678037463463867973656),
+                    BinaryField128b::from(30950013923125879264268791915275616264),
+                    BinaryField128b::from(326990117386703710211842172749841694743)
+                ]
             ]
         );
     }
