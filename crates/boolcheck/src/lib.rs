@@ -6,7 +6,7 @@ pub mod boolcheck_trait;
 pub mod package;
 
 #[derive(Clone, Debug, Default)]
-pub struct BoolCheckSingle {
+pub struct BoolCheck {
     pt: Vec<BinaryField128b>,
     poly: Vec<BinaryField128b>,
     polys: Vec<Vec<BinaryField128b>>,

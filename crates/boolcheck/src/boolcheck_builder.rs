@@ -1,4 +1,4 @@
-use crate::{boolcheck_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheckSingle};
+use crate::{boolcheck_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::univariate::UnivariatePolynomial;
 use num_traits::{identities::Zero, One};
@@ -279,7 +279,7 @@ impl<const M: usize> BoolCheckSingleBuilder<M> {
         polynomials: &[Vec<BinaryField128b>; N],
         claim_polynomial: &UnivariatePolynomial,
         gamma: BinaryField128b,
-    ) -> BoolCheckSingle {
+    ) -> BoolCheck {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         for poly in polynomials {
@@ -295,8 +295,8 @@ impl<const M: usize> BoolCheckSingleBuilder<M> {
             tmp *= gamma;
         }
 
-        // Return the constructed BoolCheckSingle
-        BoolCheckSingle {
+        // Return the constructed BoolCheck
+        BoolCheck {
             c: self.c,
             bit_mapping,
             eq_sequence: self.eq_poly_sequence(true),
