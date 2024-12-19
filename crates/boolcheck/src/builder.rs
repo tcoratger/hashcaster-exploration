@@ -1,6 +1,8 @@
 use crate::{bool_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
 use hashcaster_field::binary_field::BinaryField128b;
-use hashcaster_poly::univariate::{UnivariatePolynomial, UnivariatePolynomials};
+use hashcaster_poly::{
+    multinear_lagrangian::MultilinearLagrangianPolynomials, univariate::UnivariatePolynomial,
+};
 use num_traits::{identities::Zero, One};
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
@@ -244,7 +246,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
         BoolCheck {
             c: self.c,
             bit_mapping,
-            eq_sequence: UnivariatePolynomials::new_eq_poly_sequence(&self.points[1..]),
+            eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(&self.points[1..]),
             claim: claim_polynomial.evaluate_at(&gamma),
             ext: Some(self.extend_n_tables(
                 polynomials,
