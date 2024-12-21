@@ -7,7 +7,7 @@ use rayon::{
     },
     slice::ParallelSliceMut,
 };
-use std::ops::{Deref, DerefMut};
+use std::ops::{BitAnd, Deref, DerefMut};
 
 /// A structure representing a multilinear Lagrangian polynomial.
 /// This structure holds the coefficients of the polynomial in a vector.
@@ -168,6 +168,27 @@ impl MultilinearLagrangianPolynomial {
             .zip(Self::new_eq_poly(points).coeffs)
             .map(|(x, y)| *x * y)
             .reduce(BinaryField128b::zero, |a, b| a + b)
+    }
+}
+
+impl From<Vec<BinaryField128b>> for MultilinearLagrangianPolynomial {
+    fn from(coeffs: Vec<BinaryField128b>) -> Self {
+        Self::new(coeffs)
+    }
+}
+
+impl BitAnd for MultilinearLagrangianPolynomial {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        // Ensure the number of coefficients matches between the two polynomials.
+        assert_eq!(self.coeffs.len(), rhs.coeffs.len());
+
+        // Perform element-wise AND operation on the coefficients.
+        let coeffs = self.coeffs.into_iter().zip(rhs.coeffs).map(|(a, b)| a & b).collect();
+
+        // Return the result as a new polynomial.
+        Self::new(coeffs)
     }
 }
 
@@ -477,6 +498,46 @@ mod tests {
                 coeff3 * points[0] * points[1];
 
         // Assert the result matches the expectation.
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_multilinear_lagrangian_bitand() {
+        // Define two simple multilinear polynomials.
+        // Coefficients represent evaluations at points (0, 0), (0, 1), (1, 0), (1, 1).
+        let poly1_coeffs = vec![
+            BinaryField128b::from(1), // p1(0, 0)
+            BinaryField128b::from(0), // p1(0, 1)
+            BinaryField128b::from(1), // p1(1, 0)
+            BinaryField128b::from(1), // p1(1, 1)
+        ];
+        let poly2_coeffs = vec![
+            BinaryField128b::from(1), // p2(0, 0)
+            BinaryField128b::from(1), // p2(0, 1)
+            BinaryField128b::from(0), // p2(1, 0)
+            BinaryField128b::from(1), // p2(1, 1)
+        ];
+
+        // Create two multilinear polynomials with the coefficients.
+        let poly1 = MultilinearLagrangianPolynomial::new(poly1_coeffs);
+        let poly2 = MultilinearLagrangianPolynomial::new(poly2_coeffs);
+
+        // Step 2: Compute the bitwise AND of the two polynomials.
+        let result = poly1 & poly2;
+
+        // Step 3: Manually compute the expected result.
+        // Element-wise AND operation on the coefficients:
+        let expected_coeffs = vec![
+            BinaryField128b::from(1), // 1 & 1 = 1
+            BinaryField128b::from(0), // 0 & 1 = 0
+            BinaryField128b::from(0), // 1 & 0 = 0
+            BinaryField128b::from(1), // 1 & 1 = 1
+        ];
+
+        // Create the expected polynomial.
+        let expected_result = MultilinearLagrangianPolynomial::new(expected_coeffs);
+
+        // Step 4: Assert the result matches the expected polynomial.
         assert_eq!(result, expected_result);
     }
 }

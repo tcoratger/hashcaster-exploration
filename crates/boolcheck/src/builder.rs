@@ -1,7 +1,8 @@
 use crate::{bool_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    multinear_lagrangian::MultilinearLagrangianPolynomials, univariate::UnivariatePolynomial,
+    multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+    univariate::UnivariatePolynomial,
 };
 use num_traits::{identities::Zero, One};
 use rayon::{
@@ -15,13 +16,34 @@ pub struct BoolCheckBuilder<const M: usize> {
     points: Vec<BinaryField128b>,
     boolean_package: BooleanPackage,
     gammas: Vec<BinaryField128b>,
+    claim: BinaryField128b,
 }
 
 impl<const M: usize> BoolCheckBuilder<M> {
-    pub fn new(c: usize, points: Vec<BinaryField128b>, boolean_package: BooleanPackage) -> Self {
+    pub fn new(
+        c: usize,
+        points: Vec<BinaryField128b>,
+        boolean_package: BooleanPackage,
+        claims: [BinaryField128b; M],
+        gamma: BinaryField128b,
+    ) -> Self {
         assert!(c < points.len());
 
-        Self { c, points, boolean_package, gammas: vec![] }
+        let gammas = (0..M)
+            .scan(BinaryField128b::one(), |state, _| {
+                let current = *state;
+                *state *= gamma;
+                Some(current)
+            })
+            .collect();
+
+        Self {
+            c,
+            points,
+            boolean_package,
+            gammas,
+            claim: UnivariatePolynomial::new(claims.into()).evaluate_at(&gamma),
+        }
     }
 
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
@@ -128,7 +150,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
     /// - Returns an extended table as a `Vec<BinaryField128b>` containing the computed values.
     pub fn extend_n_tables<const N: usize, L, Q>(
         &self,
-        tables: &[Vec<BinaryField128b>; N],
+        tables: &[MultilinearLagrangianPolynomial; N],
         trit_mapping: &[u16],
         f_lin: L,
         f_quad: Q,
@@ -222,10 +244,8 @@ impl<const M: usize> BoolCheckBuilder<M> {
     }
 
     pub fn build<const N: usize>(
-        &mut self,
-        polynomials: &[Vec<BinaryField128b>; N],
-        claim_polynomial: &UnivariatePolynomial,
-        gamma: BinaryField128b,
+        &self,
+        polynomials: &[MultilinearLagrangianPolynomial; N],
     ) -> BoolCheck {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
@@ -236,18 +256,12 @@ impl<const M: usize> BoolCheckBuilder<M> {
         // Generate bit and trit mappings
         let (bit_mapping, trit_mapping) = self.trit_mapping();
 
-        let mut tmp = BinaryField128b::one();
-        for _ in 0..claim_polynomial.coeffs.len() {
-            self.gammas.push(tmp);
-            tmp *= gamma;
-        }
-
         // Return the constructed BoolCheck
         BoolCheck {
             c: self.c,
             bit_mapping,
             eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(&self.points[1..]),
-            claim: claim_polynomial.evaluate_at(&gamma),
+            claim: self.claim,
             ext: Some(self.extend_n_tables(
                 polynomials,
                 &trit_mapping,
@@ -490,12 +504,14 @@ mod tests {
 
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
-        let table1: Vec<BinaryField128b> = (0u128..(1 << dims)).map(Into::into).collect();
+        let table1: MultilinearLagrangianPolynomial =
+            (0u128..(1 << dims)).map(Into::into).collect::<Vec<_>>().into();
         // Table2: Contains integers starting at 10 up to 17.
-        let table2: Vec<BinaryField128b> = (10u128..(10 + (1 << dims))).map(Into::into).collect();
-
+        let table2: MultilinearLagrangianPolynomial =
+            (10u128..(10 + (1 << dims))).map(Into::into).collect::<Vec<_>>().into();
         // Table3: Contains integers starting at 20 up to 27.
-        let table3: Vec<BinaryField128b> = (20u128..(20 + (1 << dims))).map(Into::into).collect();
+        let table3: MultilinearLagrangianPolynomial =
+            (20u128..(20 + (1 << dims))).map(Into::into).collect::<Vec<_>>().into();
 
         // Combine the three tables into an array.
         let tabs = [table1, table2, table3];
