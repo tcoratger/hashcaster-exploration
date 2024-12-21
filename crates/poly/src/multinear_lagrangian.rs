@@ -132,6 +132,43 @@ impl MultilinearLagrangianPolynomial {
         // Return the constructed equality polynomial.
         Self { coeffs }
     }
+
+    /// Evaluates the multilinear Lagrangian polynomial at a given point in the Boolean hypercube.
+    ///
+    /// # Arguments
+    /// - `points`: A slice of [`BinaryField128b`] elements representing the evaluation point in the
+    ///   hypercube. The number of elements in `points` corresponds to the dimensions of the
+    ///   hypercube.
+    ///
+    /// # Returns
+    /// - A [`BinaryField128b`] element representing the value of the polynomial at the given point.
+    ///
+    /// # Explanation
+    /// This function evaluates the polynomial by computing a weighted sum of its coefficients.
+    /// The weights are derived from the equality polynomial for the given `points`.
+    /// The equality polynomial encodes the interpolation conditions to ensure correct evaluation
+    /// in the hypercube.
+    ///
+    /// ## Method
+    /// The evaluation is computed as:
+    /// ```text
+    /// result = sum_{x in {0,1}^n} coeffs[x] * eq_poly(x, points)
+    /// ```
+    /// where `coeffs[x]` is the coefficient of the polynomial corresponding to the point `x`,
+    /// and `eq_poly(x, points)` is the equality polynomial for `x` and `points`.
+    pub fn evaluate_at(&self, points: &[BinaryField128b]) -> BinaryField128b {
+        // Ensure the number of coefficients matches the number of points.
+        // The number of coefficients should be 2^n, where n is the length of `points`.
+        assert!(self.coeffs.len() == 1 << points.len());
+
+        // Compute the weighted sum of coefficients.
+        // Each coefficient is multiplied by the corresponding weight from the equality polynomial.
+        self.coeffs
+            .par_iter()
+            .zip(Self::new_eq_poly(points).coeffs)
+            .map(|(x, y)| *x * y)
+            .reduce(BinaryField128b::zero, |a, b| a + b)
+    }
 }
 
 impl Deref for MultilinearLagrangianPolynomial {
@@ -406,5 +443,40 @@ mod tests {
                 &MultilinearLagrangianPolynomial::new_eq_poly(&points[points.len() - i..])
             );
         });
+    }
+
+    #[test]
+    fn test_evaluate() {
+        // Define a simple multilinear polynomial.
+        // Coefficients represent the polynomial's evaluation at the points (0, 0), (0, 1), (1, 0),
+        // (1, 1).
+        let coeff0 = BinaryField128b::random(); // p(0, 0)
+        let coeff1 = BinaryField128b::random(); // p(0, 1)
+        let coeff2 = BinaryField128b::random(); // p(1, 0)
+        let coeff3 = BinaryField128b::random(); // p(1, 1)
+
+        // Create a multilinear polynomial with the coefficients.
+        let polynomial = MultilinearLagrangianPolynomial::new(vec![coeff0, coeff1, coeff2, coeff3]);
+
+        // Define the evaluation points.
+        let points = vec![BinaryField128b::random(), BinaryField128b::random()];
+
+        // Compute the evaluation.
+        let result = polynomial.evaluate_at(&points);
+
+        // Manually compute the expected result.
+        // Using the formula for multilinear polynomial evaluation:
+        // result = p(0, 0) * (1 - pt0) * (1 - pt1)
+        //        + p(0, 1) * (1 - pt1) * pt0
+        //        + p(1, 0) * pt1 * (1 - pt0)
+        //        + p(1, 1) * pt1 * pt0
+        let expected_result =
+            coeff0 * (BinaryField128b::one() - points[0]) * (BinaryField128b::one() - points[1]) +
+                coeff2 * (BinaryField128b::one() - points[0]) * points[1] +
+                coeff1 * points[0] * (BinaryField128b::one() - points[1]) +
+                coeff3 * points[0] * points[1];
+
+        // Assert the result matches the expectation.
+        assert_eq!(result, expected_result);
     }
 }
