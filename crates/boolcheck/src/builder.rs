@@ -262,13 +262,13 @@ impl<const M: usize> BoolCheckBuilder<M> {
             bit_mapping,
             eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(&self.points[1..]),
             claim: self.claim,
-            ext: Some(self.extend_n_tables(
+            extended_table: self.extend_n_tables(
                 polynomials,
                 &trit_mapping,
                 |args| self.compress_linear(args),
                 |args| self.compress_quadratic(args),
-            )),
-            pt: self.points.clone(),
+            ),
+            points: self.points.clone(),
             ..Default::default()
         }
     }

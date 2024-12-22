@@ -204,6 +204,11 @@ impl Deref for MultilinearLagrangianPolynomial {
 pub struct MultilinearLagrangianPolynomials(Vec<MultilinearLagrangianPolynomial>);
 
 impl MultilinearLagrangianPolynomials {
+    /// Returns the polynomial at the specified index in the sequence.
+    pub fn poly_at(&self, index: usize) -> &MultilinearLagrangianPolynomial {
+        &self.0[index]
+    }
+
     /// Constructs the sequence of equality polynomials for a given set of points.
     ///
     /// # Arguments
