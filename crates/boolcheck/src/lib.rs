@@ -417,10 +417,23 @@ mod tests {
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let _boolcheck = boolcheck_builder.build(&[p, q]);
+        let mut boolcheck = boolcheck_builder.build(&[p, q]);
 
         // Initialize the current claim as the initial claim.
         // The current claim will be updated during each round of the protocol.
         let mut current_claim = initial_claim;
+
+        // Empty vector to store random values sent by the verifier at each round.
+        let mut random_values = Vec::new();
+
+        // The loop iterates over the number of variables to perform the rounds of the protocol.
+        for i in 0..num_vars {
+            // Compute the round polynomial for the current round.
+            let round_polynomial = boolcheck.compute_round_polynomial();
+
+            // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
+            let random_value = BinaryField128b::random();
+            random_values.push(random_value);
+        }
     }
 }
