@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use hashcaster_field::binary_field::BinaryField128b;
 use itertools::Itertools;
@@ -27,17 +27,6 @@ impl Deref for Point {
 pub struct Points(Vec<Point>);
 
 impl Points {
-    /// Creates a new collection of points from a vector of field elements.
-    ///
-    /// # Parameters
-    /// - `points`: A vector of `BinaryField128b` field elements.
-    ///
-    /// # Returns
-    /// A `Points` instance representing the collection of points with the given field elements.
-    pub fn new(points: Vec<BinaryField128b>) -> Self {
-        Self(points.into_iter().map(Point).collect())
-    }
-
     /// Computes the evaluation of the equality polynomial for two sets of points.
     ///
     /// # Description
@@ -80,11 +69,29 @@ impl Points {
     }
 }
 
+impl From<Vec<BinaryField128b>> for Points {
+    fn from(points: Vec<BinaryField128b>) -> Self {
+        Self(points.into_iter().map(Point).collect())
+    }
+}
+
+impl From<Vec<Point>> for Points {
+    fn from(points: Vec<Point>) -> Self {
+        Self(points)
+    }
+}
+
 impl Deref for Points {
     type Target = Vec<Point>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Points {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -96,13 +103,13 @@ mod tests {
     #[test]
     fn test_eq_eval() {
         // Define two sets of points in the binary field.
-        let points_a = Points::new(vec![
+        let points_a = Points::from(vec![
             BinaryField128b::from(1),
             BinaryField128b::from(2),
             BinaryField128b::from(3),
         ]);
 
-        let points_b = Points::new(vec![
+        let points_b = Points::from(vec![
             BinaryField128b::from(4),
             BinaryField128b::from(5),
             BinaryField128b::from(6),
@@ -124,7 +131,7 @@ mod tests {
     #[test]
     fn test_eq_eval_identity() {
         // Define identical sets of points in the binary field.
-        let points = Points::new(vec![
+        let points = Points::from(vec![
             BinaryField128b::from(7),
             BinaryField128b::from(8),
             BinaryField128b::from(9),
@@ -142,8 +149,8 @@ mod tests {
     #[test]
     fn test_eq_eval_empty() {
         // Define two empty sets of points.
-        let points_a = Points::new(vec![]);
-        let points_b = Points::new(vec![]);
+        let points_a = Points::default();
+        let points_b = Points::default();
 
         // Perform the eq_eval operation.
         let result = points_a.eq_eval(&points_b);

@@ -1,8 +1,10 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     compressed::CompressedPoly, multinear_lagrangian::MultilinearLagrangianPolynomials,
+    point::Points, univariate::UnivariatePolynomial,
 };
-use num_traits::Zero;
+use num_traits::{One, Zero};
+use package::BooleanPackage;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 pub mod bool_trait;
@@ -11,17 +13,19 @@ pub mod package;
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheck {
-    points: Vec<BinaryField128b>,
+    points: Points,
     poly: Vec<BinaryField128b>,
     polys: Vec<Vec<BinaryField128b>>,
     extended_table: Vec<BinaryField128b>,
     poly_coords: Option<Vec<BinaryField128b>>,
     c: usize,
-    challenges: Vec<BinaryField128b>,
+    challenges: Points,
     bit_mapping: Vec<u16>,
     eq_sequence: MultilinearLagrangianPolynomials,
     round_polys: Vec<CompressedPoly>,
     claim: BinaryField128b,
+    boolean_package: BooleanPackage,
+    gammas: Vec<BinaryField128b>,
 }
 
 impl BoolCheck {
@@ -72,12 +76,7 @@ impl BoolCheck {
         //   extension table only on `3^{c+1} \times 2^{n-c-1}` subset) and cannot proceed further.
         //   This is when we change strategy and compute `P_i(r_0, \ldots, r_c, \mathbf{x}_{>c})`
         //   and `Q_i(r_0, \ldots, r_c, \mathbf{x}_{>c})` (using RESTRICT functionality).
-        if round <= self.c {
-            // Fetch the extended table that was computed during the setup phase.
-            //
-            // The extended table is a table of size `3^{c+1} \times 2^{n-c-1}`.
-            let extended_table = &self.extended_table;
-
+        let poly_deg2 = if round <= self.c {
             // Fetch the equality polynomial for the current round.
             //
             // The equality polynomials for all the points are stored in cache during the setup
@@ -92,40 +91,198 @@ impl BoolCheck {
             // Compute `3^{remaining rounds in the first phase}`.
             let pow3 = 3usize.pow(phase1_dimensions as u32);
 
-            let mut poly_deg2 = (0..(1 << (number_variables - self.c - 1)))
+            // On the `i-th` round (`i ≤ c`), the computation maintains the restriction:
+            // `(P ∧ Q)(r_0,..., r_{i-1}, x_i, ..., x_{n-1})`.
+            //
+            // When responding to a query, the univariate polynomial `U(t)` is computed as:
+            //
+            // ```
+            // U(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(r_{<i}, t, x_{>i}; q),
+            // ```
+            // where `eq` exploits the splitting:
+            // ```
+            //  eq(r_{<i}, t, x_{>i}; q) = eq(r_{<i}, q_{<i}) * eq(t; q_i) * eq(x_{>i}; q_{>i}).
+            // ```
+            //
+            // This factorization allows the computation to avoid directly manipulating
+            // polynomials of degree `3` until the final stage. Specifically:
+            // - Terms `eq(r_{<i}, q_{<i}) * eq(t; q_i)` are independent of `x_{>i}` and can be
+            //   factored out.
+            //
+            // By evicting the independent terms, the computation simplifies to the sum:
+            //
+            // ```
+            //  W(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(x_{>i}; q_{>i}).
+            // ```
+            (0..(1 << (number_variables - self.c - 1)))
                 .into_par_iter()
                 .map(|i| {
-                    // Pre-compute the base index and offset for the current `i`.
+                    // Base index is: `ì * 2^{number of remaining rounds in the first phase}`.
                     let base_index = i << phase1_dimensions;
+
+                    // Base offset is: `i * 3^{remaining rounds in the first phase + 1}`.
                     let base_offset = 3 * (i * pow3);
 
-                    // Prepare
+                    // Intermediate polynomial for the current round.
+                    //
+                    // This polynomial is a degree-2 polynomial.
                     let mut pd2_part = [BinaryField128b::zero(); 3];
 
                     (0..(1 << phase1_dimensions)).for_each(|j| {
-                        let index = base_index + j;
+                        // The offset is a way to locate the correct position in the extended table
+                        // where `(P ∧ Q)(r_{<i}, t, x_{>i})` is stored.
                         let offset = base_offset + 3 * self.bit_mapping[j] as usize;
-                        let multiplier = eq_poly_round[index];
 
+                        // The multiplier is the equality polynomial at the appropriate location
+                        // such that it corresponds to:
+                        // `eq(x_{>i};q_{>i})`.
+                        let multiplier = eq_poly_round[base_index + j];
+
+                        // Compute:
+                        // ```
+                        //  W(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(x_{>i}; q_{>i}).
+                        // ```
+                        // for `t = 0, 1, ∞`.
                         pd2_part
                             .iter_mut()
-                            .zip(&extended_table[offset..offset + 3])
+                            .zip(&self.extended_table[offset..offset + 3])
                             .for_each(|(acc, value)| *acc += *value * multiplier);
                     });
 
                     pd2_part
                 })
                 .reduce(
+                    // Finally, we compute
+                    // ```
+                    //  W(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(x_{>i}; q_{>i}).
+                    // ```
+                    // as a sum of the intermediate polynomials for all `t = 0, 1, ∞`.
                     || [BinaryField128b::zero(); 3],
                     |a, b| [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
-                );
-
-            // Cast polynomial to coefficient form.
-            poly_deg2[1] += poly_deg2[0] + poly_deg2[2];
+                )
         } else {
-        }
+            // During this second phase, after `c` rounds, the prover no longer has the required
+            // data because the extension table was computed only on the `3^{c+1} x 2^{n-c-1}`
+            // subset.
 
-        CompressedPoly::default()
+            // Fetch the equality polynomial for the current round.
+            let eq_poly_round = self.eq_sequence.poly_at(self.points.len() - round - 1);
+
+            // Fetch the number of coefficients in the equality polynomial (Lagrangian polynomial).
+            let half = eq_poly_round.len();
+
+            // At the current round, the equality polynomial should have `2^{n-round-1}`
+            // coefficients.
+            assert_eq!(half, 1 << number_variables - round - 1, "Invalid equality polynomial size");
+
+            let poly_coords = self.poly_coords.as_ref().unwrap();
+
+            (0..half)
+                .into_par_iter()
+                .map(|i| {
+                    self.exec_alg(poly_coords, i, 1 << (number_variables - self.c - 1))
+                        .map(|x| x * eq_poly_round[i])
+                })
+                .reduce(
+                    || [BinaryField128b::zero(); 3],
+                    |[a, b, c], [d, e, f]| [a + d, b + e, c + f],
+                )
+        };
+
+        // We want to compute:
+        // ```
+        // U(t) = eq(r_{<i}; q) eq(t; q) W(t)
+        // ```
+        //
+        // The first step is to compute the equality polynomial `eq(r_{<i}; q)`.
+        let eq_y_multiplier = self.challenges.eq_eval(&self.points[..round].to_vec().into());
+
+        // 1. From the intermediate evaluations of the degree-2 polynomial:
+        // - `P(0), P(1), P(∞)`,
+        // we can construct a degree-2 univariate polynomial in coefficient form.
+        //
+        // 2. We multiply the polynomial by the equality polynomial to obtain:
+        // - `V(t) = eq(r_{<i}; q) W(t)`.
+        let univariate_poly_deg2 =
+            UnivariatePolynomial::from_evaluations_deg2(poly_deg2) * eq_y_multiplier;
+
+        // We then need to compute the equality polynomial `eq(t; q)`.
+        //
+        // This is the equality polynomial for the current round (degree-1 univariate
+        // polynomial).
+        let eq_t = UnivariatePolynomial::new(vec![
+            *self.points[round] + BinaryField128b::one(),
+            BinaryField128b::one(),
+        ]);
+
+        // In the final step, we multiply the univariate polynomial by the equality polynomial:
+        // ```
+        // U(t) = eq(t; q) V(t)
+        // ```
+        let u = univariate_poly_deg2.multiply_degree2_by_degree1(&eq_t);
+
+        // Compress the polynomial to obtain:
+        // - The compressed round polynomial.
+        // - The computed claim.
+        let (ret, computed_claim) = CompressedPoly::compress(&u);
+
+        // Check that the computed claim matches the expected value.
+        assert_eq!(computed_claim, self.claim, "Claim does not match expected value.");
+
+        // Check that the number of cached round polynomials is correct.
+        // It should be equal to the current round.
+        assert_eq!(
+            self.round_polys.len(),
+            round,
+            "The number of cached round polynomials is incorrect."
+        );
+
+        // Cache the computed round polynomial.
+        self.round_polys.push(ret.clone());
+
+        // Return the computed polynomial.
+        ret
+    }
+
+    pub fn exec_alg(
+        &self,
+        data: &[BinaryField128b],
+        mut idx_a: usize,
+        offset: usize,
+    ) -> [BinaryField128b; 3] {
+        match self.boolean_package {
+            BooleanPackage::And => {
+                // Double the starting index to account for the structure of the data.
+                idx_a *= 2;
+
+                // Compute the starting index for the second operand in the AND operation.
+                let mut idx_b = idx_a + offset * 128;
+
+                // Initialize the result accumulators for the three evaluations.
+                let mut acc = [BinaryField128b::zero(); 3];
+
+                for i in 0..128 {
+                    // Precompute the offsets for this iteration.
+                    let offset_a = idx_a + i * offset;
+                    let offset_b = idx_b + i * offset;
+
+                    // Fetch the data elements for this iteration.
+                    let a0 = data[offset_a];
+                    let a1 = data[offset_a + 1];
+                    let b0 = data[offset_b];
+                    let b1 = data[offset_b + 1];
+
+                    // Compute the contributions for this basis element.
+                    let basis = BinaryField128b::basis(i);
+                    acc[0] += basis * a0 * b0;
+                    acc[1] += basis * a1 * b1;
+                    acc[2] += basis * (a0 + a1) * (b0 + b1);
+                }
+
+                // Compress results using gammas.
+                [acc[0] * self.gammas[0], acc[1] * self.gammas[0], acc[2] * self.gammas[0]]
+            }
+        }
     }
 }
 
@@ -133,7 +290,7 @@ impl BoolCheck {
 mod tests {
     use super::*;
     use builder::BoolCheckBuilder;
-    use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
+    use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
     use package::BooleanPackage;
     use std::iter::repeat_with;
 
@@ -147,19 +304,19 @@ mod tests {
         assert_eq!(bool_check.current_round(), 0);
 
         // Add a challenge and test the round count.
-        bool_check.challenges.push(BinaryField128b::from(10));
+        bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
         assert_eq!(bool_check.current_round(), 1);
 
         // Add more challenges and test the updated round count.
         bool_check.challenges.extend(vec![
-            BinaryField128b::from(20),
-            BinaryField128b::from(30),
-            BinaryField128b::from(40),
+            Point::from(BinaryField128b::from(20)),
+            Point::from(BinaryField128b::from(30)),
+            Point::from(BinaryField128b::from(40)),
         ]);
         assert_eq!(bool_check.current_round(), 4);
 
         // Add another challenge and verify the round count again.
-        bool_check.challenges.push(BinaryField128b::from(50));
+        bool_check.challenges.push(BinaryField128b::from(50).into());
         assert_eq!(bool_check.current_round(), 5);
     }
 
@@ -168,18 +325,19 @@ mod tests {
         // Create a BoolCheck instance with a defined number of points (variables).
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
-        let bool_check = BoolCheck { points: points.clone(), ..Default::default() };
+        let bool_check = BoolCheck { points: points.clone().into(), ..Default::default() };
 
         // Assert that the number of variables matches the length of the points vector.
         assert_eq!(bool_check.number_variables(), points.len());
 
         // Test with no points (empty vector).
-        let empty_bool_check = BoolCheck { points: vec![], ..Default::default() };
+        let empty_bool_check = BoolCheck { points: Points::default(), ..Default::default() };
         assert_eq!(empty_bool_check.number_variables(), 0);
 
         // Test with a large number of points.
         let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
-        let large_bool_check = BoolCheck { points: large_points.clone(), ..Default::default() };
+        let large_bool_check =
+            BoolCheck { points: large_points.clone().into(), ..Default::default() };
         assert_eq!(large_bool_check.number_variables(), large_points.len());
     }
 

@@ -268,7 +268,9 @@ impl<const M: usize> BoolCheckBuilder<M> {
                 |args| self.compress_linear(args),
                 |args| self.compress_quadratic(args),
             ),
-            points: self.points.clone(),
+            points: self.points.clone().into(),
+            boolean_package: self.boolean_package.clone(),
+            gammas: self.gammas.clone(),
             ..Default::default()
         }
     }
