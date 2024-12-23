@@ -3,6 +3,8 @@ use std::ops::Deref;
 use hashcaster_field::binary_field::BinaryField128b;
 use num_traits::identities::Zero;
 
+use crate::univariate::UnivariatePolynomial;
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CompressedPoly(Vec<BinaryField128b>);
 
@@ -38,7 +40,7 @@ impl CompressedPoly {
     /// ```
     /// [3, 4, 5, 6]
     /// ```
-    pub fn coeffs(&self, sum: BinaryField128b) -> Vec<BinaryField128b> {
+    pub fn coeffs(&self, sum: BinaryField128b) -> UnivariatePolynomial {
         // Step 1: Extract the constant term `c0`.
         // Example: For P(x) = 3 + 4x + 5x^2 + 6x^3, c0 = 3.
         let c0 = self[0];
@@ -61,7 +63,11 @@ impl CompressedPoly {
         // - Add `c1`,
         // - Append the remaining coefficients from the compressed form.
         // Example: Result = [3, 7, 5, 6].
-        std::iter::once(c0).chain(std::iter::once(c1)).chain(self[1..].iter().copied()).collect()
+        std::iter::once(c0)
+            .chain(std::iter::once(c1))
+            .chain(self[1..].iter().copied())
+            .collect::<Vec<_>>()
+            .into()
     }
 }
 
@@ -165,7 +171,7 @@ mod tests {
     fn test_coeffs_reconstruction_standard_case() {
         // Define a univariate polynomial:
         // P(x) = 1 + 2x + 3x^2 + 4x^3
-        let poly = [
+        let poly = vec![
             BinaryField128b::new(1),
             BinaryField128b::new(2),
             BinaryField128b::new(3),
@@ -179,14 +185,18 @@ mod tests {
         let reconstructed = compressed.coeffs(sum);
 
         // Verify the reconstructed polynomial matches the original
-        assert_eq!(reconstructed, poly, "Reconstructed polynomial does not match the original");
+        assert_eq!(
+            reconstructed,
+            UnivariatePolynomial::new(poly),
+            "Reconstructed polynomial does not match the original"
+        );
     }
 
     #[test]
     fn test_coeffs_all_zero_coefficients() {
         // Define a univariate polynomial:
         // P(x) = 0 + 0x + 0x^2 + 0x^3
-        let poly = [
+        let poly = vec![
             BinaryField128b::new(0),
             BinaryField128b::new(0),
             BinaryField128b::new(0),
@@ -201,7 +211,8 @@ mod tests {
 
         // Verify the reconstructed polynomial matches the original
         assert_eq!(
-            reconstructed, poly,
+            reconstructed,
+            UnivariatePolynomial::new(poly),
             "Reconstructed polynomial does not match the original when all coefficients are zero"
         );
     }
@@ -210,7 +221,7 @@ mod tests {
     fn test_coeffs_large_coefficients() {
         // Define a univariate polynomial:
         // P(x) = 1_000_000 + 2_000_000x + 3_000_000x^2 + 4_000_000x^3
-        let poly = [
+        let poly = vec![
             BinaryField128b::new(1_000_000),
             BinaryField128b::new(2_000_000),
             BinaryField128b::new(3_000_000),
@@ -225,7 +236,8 @@ mod tests {
 
         // Verify the reconstructed polynomial matches the original
         assert_eq!(
-            reconstructed, poly,
+            reconstructed,
+            UnivariatePolynomial::new(poly),
             "Reconstructed polynomial does not match the original for large coefficients"
         );
     }
@@ -248,11 +260,16 @@ mod tests {
 
     #[test]
     fn test_coeffs_empty_coefficients() {
+        // Define an empty univariate polynomial
         let poly: [BinaryField128b; 0] = [];
+
+        // Compress the polynomial (expect a panic)
         let result = std::panic::catch_unwind(|| {
             let (compressed, sum) = CompressedPoly::compress(&poly);
             compressed.coeffs(sum)
         });
+
+        // Verify that the function panicked
         assert!(result.is_err(), "Expected coeffs to panic for an empty polynomial");
     }
 }
