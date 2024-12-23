@@ -175,8 +175,14 @@ impl BoolCheck {
             // coefficients.
             assert_eq!(half, 1 << number_variables - round - 1, "Invalid equality polynomial size");
 
+            // Poly coordinates are required for the computation of `P ∧ Q` in the restricted phase.
             let poly_coords = self.poly_coords.as_ref().unwrap();
 
+            // Here we want to compute (in the restricted phase):
+            //
+            // ```
+            //  W(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(x_{>i}; q_{>i}).
+            // ```
             (0..half)
                 .into_par_iter()
                 .map(|i| {
@@ -252,34 +258,54 @@ impl BoolCheck {
     ) -> [BinaryField128b; 3] {
         match self.boolean_package {
             BooleanPackage::And => {
+                // `idx_a` is the starting index for the first operand in the AND operation (`P`).
                 // Double the starting index to account for the structure of the data.
                 idx_a *= 2;
 
-                // Compute the starting index for the second operand in the AND operation.
-                let mut idx_b = idx_a + offset * 128;
+                // Compute the starting index for the second operand in the AND operation (`Q`).
+                let idx_b = idx_a + offset * 128;
 
-                // Initialize the result accumulators for the three evaluations.
+                // Initialize the result accumulators for the three evaluations. This will hold:
+                // - `W(0) = Σ_{x} P(0,x) * Q(0,x) * eq(x; q)`,
+                // - `W(1) = Σ_{x} P(1,x) * Q(1,x) * eq(x; q)`,
+                // - `W(∞) = Σ_{x} P(∞,x) * Q(∞,x) * eq(x; q)`.
                 let mut acc = [BinaryField128b::zero(); 3];
 
+                // Iterate over the 128 basis elements.
+                // This loop implements the summation over `x_{>c}`:
+                // ```
+                // W(t) = Σ_{x_{>c}} (P ∧ Q)(t, x_{>c}) * eq(x_{>c}; q_{>c}).
+                // ```
                 for i in 0..128 {
                     // Precompute the offsets for this iteration.
+                    // This is used to fetch the polynomials:
+                    // - `P(t, x_{>c})` and `Q(t, x_{>c})` for the `i-th` basis vector of `x_{>c}`.
                     let offset_a = idx_a + i * offset;
                     let offset_b = idx_b + i * offset;
 
                     // Fetch the data elements for this iteration.
+                    // `a_0 = P(t=0, x)`
                     let a0 = data[offset_a];
+                    // `a_1 = P(t=1, x)`
                     let a1 = data[offset_a + 1];
+                    // `b_0 = Q(t=0, x)`
                     let b0 = data[offset_b];
+                    // `b_1 = Q(t=1, x)`
                     let b1 = data[offset_b + 1];
 
                     // Compute the contributions for this basis element.
                     let basis = BinaryField128b::basis(i);
+                    // `W(0)  = Σ_{x} P(0,x) * Q(0,x) * eq(x; q)`
                     acc[0] += basis * a0 * b0;
+                    // `W(1)  = Σ_{x} P(1,x) * Q(1,x) * eq(x; q)`
                     acc[1] += basis * a1 * b1;
+                    // `W(∞)  = Σ_{x} (P(0,x) + P(1,x)) * (Q(0,x) + Q(1,x)) * eq(x; q)`
                     acc[2] += basis * (a0 + a1) * (b0 + b1);
                 }
 
                 // Compress results using gammas.
+                //
+                // Gamma is a folding factor that is used to compress the polynomial.
                 [acc[0] * self.gammas[0], acc[1] * self.gammas[0], acc[2] * self.gammas[0]]
             }
         }
