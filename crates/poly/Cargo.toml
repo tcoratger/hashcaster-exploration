@@ -13,6 +13,7 @@ hashcaster-field = { workspace = true }
 num-traits = { workspace = true }
 rayon = { workspace = true }
 itertools = { workspace = true }
+unroll = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
