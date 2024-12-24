@@ -1,3 +1,5 @@
+use std::arch::aarch64::{int64x2_t, vld1q_s64, vshlq_n_s64};
+
 /// Removes the most significant bit (MSB) from a given number and returns the modified value along
 /// with the MSB's position.
 ///
@@ -81,6 +83,62 @@ pub fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
     ret
 }
 
+/// Shifts each 64-bit element of a 16-byte input array left by a constant number of bits.
+///
+/// # Description
+/// The `v_slli_epi64` function performs a constant left shift operation on each 64-bit integer
+/// element within a 128-bit SIMD vector represented as a 16-byte array. The function is highly
+/// optimized for ARM architectures and uses NEON SIMD intrinsics to achieve efficient vectorized
+/// operations.
+///
+/// # Theory
+/// Left shifting a binary number by `K` bits is equivalent to multiplying the number by \(2^K\),
+/// provided no bits are shifted out of range. This function operates on two 64-bit integers
+/// packed into a single SIMD register (`int64x2_t`), allowing simultaneous processing of both
+/// integers. The operation ensures high throughput by leveraging hardware support for SIMD
+/// operations.
+///
+/// # Parameters
+/// - `K`: A compile-time constant (`const`) representing the number of bits to shift. Must be in
+///   the range `[0, 63]` to ensure valid shifts for 64-bit integers.
+/// - `x`: A 16-byte array representing two packed 64-bit integers to be shifted.
+///
+/// # Returns
+/// A 16-byte array containing the two shifted 64-bit integers.
+///
+/// # Safety
+/// - The function uses `unsafe` because it relies on raw pointer casts and platform-specific NEON
+///   intrinsics.
+/// - Ensure the input is valid for a left shift operation, and the target hardware supports NEON.
+///
+/// # Example
+/// ```rust
+/// let input: [u8; 16] = [
+///     0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
+///     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2
+/// ];
+/// let result = unsafe { v_slli_epi64::<1>(input) };
+/// assert_eq!(
+///     result,
+///     [
+///         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1 << 1 = 2
+///         0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2 << 1 = 4
+///     ]
+/// );
+/// ```
+pub unsafe fn v_slli_epi64<const K: i32>(x: [u8; 16]) -> [u8; 16] {
+    // Load the 16-byte input array into a 128-bit SIMD register as two 64-bit integers.
+    let data = vld1q_s64(x.as_ptr() as *const i64);
+
+    // Perform a left shift operation on each 64-bit integer in the SIMD register.
+    //    - `vshlq_n_s64` shifts all 64-bit integers in the SIMD register by `K` bits to the left.
+    //    - The operation is performed on both integers simultaneously.
+    let result = vshlq_n_s64(data, K);
+
+    // Transmute the result back into a 16-byte array.
+    std::mem::transmute::<int64x2_t, [u8; 16]>(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,5 +219,70 @@ mod tests {
         // Expected result: 0
         let result = cpu_v_movemask_epi8(input);
         assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_v_slli_epi64_basic_shift() {
+        // Example input: 64-bit integers represented in 16 bytes.
+        let input: [u8; 16] = [
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
+            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2
+        ];
+        let expected: [u8; 16] = [
+            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1 << 1 = 2
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2 << 1 = 4
+        ];
+
+        // Call the function with a shift constant of 1.
+        let result = unsafe { v_slli_epi64::<1>(input) };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_v_slli_epi64_zero_shift() {
+        // No shifting should result in the same values.
+        let input: [u8; 16] = [
+            0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 16
+            0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 32
+        ];
+        let expected = input;
+
+        // Call the function with a shift constant of 0.
+        let result = unsafe { v_slli_epi64::<0>(input) };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_v_slli_epi64_edge_cases() {
+        // Test with maximum and minimum values.
+        let input: [u8; 16] = [
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // -1 (all bits set)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, // Smallest i64 (-2^63)
+        ];
+        let expected: [u8; 16] = [
+            0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // -1 << 1
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // -2^63 << 1 (overflows to 0)
+        ];
+
+        // Call the function with a shift constant of 1.
+        let result = unsafe { v_slli_epi64::<1>(input) };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_v_slli_epi64_no_overflow() {
+        // Check that values do not overflow when within safe bounds.
+        let input: [u8; 16] = [
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
+            0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 64
+        ];
+        let expected: [u8; 16] = [
+            0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1 << 3 = 8
+            0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 64 << 3 = 512
+        ];
+
+        // Call the function with a shift constant of 3.
+        let result = unsafe { v_slli_epi64::<3>(input) };
+        assert_eq!(result, expected);
     }
 }
