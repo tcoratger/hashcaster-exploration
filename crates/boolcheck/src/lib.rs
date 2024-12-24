@@ -5,7 +5,10 @@ use hashcaster_poly::{
 };
 use num_traits::{One, Zero};
 use package::BooleanPackage;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    slice::{ParallelSlice, ParallelSliceMut},
+};
 
 pub mod bool_trait;
 pub mod builder;
@@ -310,6 +313,61 @@ impl BoolCheck {
             }
         }
     }
+
+    pub fn bind(&mut self, r: BinaryField128b) {
+        // Compute the current round of the protocol.
+        let round = self.current_round();
+
+        // Compute the number of variables in the polynomial.
+        let number_variables = self.number_variables();
+
+        // In the sumcheck protocol, the number of rounds is limited by the number of variables.
+        assert!(round < number_variables, "Protocol has reached the maximum number of rounds.");
+
+        // Compute the round polynomial for the current round:
+        // - The round polynomial is a univariate polynomial in `r`.
+        // - We first compute the compressed form of the polynomial.
+        // - We then decompress the polynomial to obtain the coefficients.
+        let round_poly = self.compute_round_polynomial().coeffs(self.claim);
+        // Update the current claim:
+        // - We evaluate the round polynomial at the random value `r` provided by the verifier.
+        self.claim = round_poly.evaluate_at(&r);
+
+        // Add the random value sent by the verifier to the list of gammas.
+        self.challenges.push(r.into());
+
+        // Compute `r^2` for future usage in the protocol.
+        let r2 = r * r;
+
+        if round <= self.c {
+            // We compute, by chunk of 3, the new values for the extended table:
+            // ```
+            // P(0, r) = P(0, r) + (P(0, r) + P(1, r) + P(∞, r)) * r + P(∞, r) * r^2
+            // ```
+            self.extended_table = self
+                .extended_table
+                .par_chunks(3)
+                .map(|chunk| chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * r + chunk[2] * r2)
+                .collect();
+        } else {
+            // At each round we halve the number of variables in the hypercube.
+            //
+            // `half` represents `2^{n-round-1} = 2^{n-round} / 2`.
+            let half = 1 << (number_variables - round - 1);
+
+            // Compute the new values for the poly coordinates:
+            self.poly_coords
+                .as_mut()
+                .unwrap()
+                .par_chunks_mut(1 << (number_variables - self.c - 1))
+                .map(|chunk| {
+                    for j in 0..half {
+                        chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * r;
+                    }
+                })
+                .count();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -429,11 +487,30 @@ mod tests {
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for i in 0..num_vars {
             // Compute the round polynomial for the current round.
-            let round_polynomial = boolcheck.compute_round_polynomial();
+            let compressed_round_polynomial = boolcheck.compute_round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let random_value = BinaryField128b::random();
-            random_values.push(random_value);
+            let r = BinaryField128b::random();
+            random_values.push(r);
+
+            // Decompress the round polynomial to obtain the coefficients of the univariate round
+            // polynomial.
+            let round_polynomial = compressed_round_polynomial.coeffs(current_claim);
+
+            // Update the current claim using the round polynomial and the random value.
+            // The round polynomial is a univariate polynomial in `r`:
+            // ```
+            // P(x) = c_0 + c_1 * x + c_2 * x ^ 2 + c_3 * x ^ 3
+            // ```
+            //
+            // Here we compute the updated claim as:
+            // ```
+            // current_claim = c_0 + r * c_1 + r ^ 2 * c_2 + r ^ 3 * c_3
+            // ```
+            current_claim = round_polynomial[0] +
+                r * round_polynomial[1] +
+                r * r * round_polynomial[2] +
+                r * r * r * round_polynomial[3];
         }
     }
 }

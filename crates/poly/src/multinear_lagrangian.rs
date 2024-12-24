@@ -1,3 +1,4 @@
+use crate::utils::drop_top_bit;
 use hashcaster_field::binary_field::BinaryField128b;
 use num_traits::{One, Zero};
 use rayon::{
@@ -39,6 +40,10 @@ pub struct MultilinearLagrangianPolynomial {
 }
 
 impl MultilinearLagrangianPolynomial {
+    pub fn inner(&self) -> Vec<BinaryField128b> {
+        self.coeffs.clone()
+    }
+
     /// Creates a new [`MultilinearLagrangianPolynomial`] with the given coefficients.
     ///
     /// # Arguments
@@ -168,6 +173,67 @@ impl MultilinearLagrangianPolynomial {
             .zip(Self::new_eq_poly(points).coeffs)
             .map(|(x, y)| *x * y)
             .reduce(BinaryField128b::zero, |a, b| a + b)
+    }
+
+    /// Computes the equality sums for the polynomial coefficients.
+    ///
+    /// # Description
+    /// This function computes all possible sums of subsets of polynomial coefficients,
+    /// grouped into blocks of size 8. The sums for each block are computed efficiently
+    /// using a decomposition strategy (`drop_top_bit`) to incrementally calculate the sums.
+    ///
+    /// Each subset of coefficients corresponds to a binary representation of the subset index,
+    /// where each bit in the index determines whether the corresponding coefficient is included
+    /// in the subset. The function ensures efficient calculation by reusing previously computed
+    /// sums to avoid redundant operations.
+    ///
+    /// # Parameters
+    /// - `self`: A reference to the polynomial, where the coefficients are stored as
+    ///   `BinaryField128b` elements. The polynomial is divided into blocks of 8 coefficients each.
+    ///
+    /// # Returns
+    /// A `Vec<BinaryField128b>` containing the computed sums for all subsets of coefficients in
+    /// all blocks of the polynomial. The result includes 256 sums for each block of 8 coefficients.
+    ///
+    /// # Panics
+    /// - If the total number of coefficients in the polynomial (`self.len()`) is not divisible by
+    ///   16.
+    pub fn eq_sums(&self) -> Vec<BinaryField128b> {
+        // Ensure the number of coefficients in the equality polynomial is divisible by 16.
+        let eq_len = self.len();
+        assert_eq!(
+            eq_len % 16,
+            0,
+            "The number of coefficients in the equality polynomial must be divisible by 16."
+        );
+
+        // Preallocate the result vector to store all computed sums.
+        let mut results = Vec::with_capacity(256 * (eq_len / 8));
+
+        // Process the polynomial in blocks of 8 coefficients.
+        for block_start in (0..eq_len).step_by(8) {
+            // Extract the current block of 8 coefficients.
+            let block = &self[block_start..block_start + 8];
+
+            // Initialize an array to store the 256 sums for this block.
+            let mut block_sums = [BinaryField128b::zero(); 256];
+
+            // Iterate over all subsets (from 1 to 255) to compute their sums.
+            for subset in 1..256 {
+                // Use drop_top_bit to decompose the subset index.
+                let (sum_idx, bit_idx) = drop_top_bit(subset);
+
+                // Compute the sum for the current subset by adding:
+                // - The coefficient corresponding to the dropped bit index.
+                // - The previously computed sum for the reduced subset.
+                block_sums[subset] = block[bit_idx] + block_sums[sum_idx];
+            }
+
+            // Append all sums from the current block to the result vector.
+            results.extend_from_slice(&block_sums);
+        }
+
+        results
     }
 }
 
@@ -544,5 +610,59 @@ mod tests {
 
         // Step 4: Assert the result matches the expected polynomial.
         assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_eq_sums() {
+        // Define a set of points to construct the equality polynomial.
+        let points = vec![
+            BinaryField128b::from(1),
+            BinaryField128b::from(2),
+            BinaryField128b::from(3),
+            BinaryField128b::from(4),
+        ];
+
+        // Create the equality polynomial for the points.
+        let polynomial = MultilinearLagrangianPolynomial::new_eq_poly(&points);
+
+        // Compute the equality sums.
+        let eq_sums = polynomial.eq_sums();
+
+        // Initialize a vector to store all subset sums.
+        let mut expected_sums = Vec::new();
+
+        // The polynomial is divided into blocks of 8 coefficients,
+        // as each equality block in `eq_sums` corresponds to 8 coefficients.
+        for block_start in (0..polynomial.len()).step_by(8) {
+            // Extract the current block of 8 coefficients from the polynomial.
+            let block = &polynomial[block_start..block_start + 8];
+
+            // Initialize an array to store sums for all 256 subsets of the block.
+            let mut block_sums = [BinaryField128b::zero(); 256];
+
+            // Compute all possible sums of the coefficients in the block.
+            for subset in 0..256 {
+                // Initialize the sum for the current subset.
+                let mut sum = BinaryField128b::zero();
+
+                // Iterate through the 8 bits of the subset index.
+                for bit in 0..8 {
+                    // Check if the `bit`-th coefficient is part of the current subset.
+                    if (subset & (1 << bit)) != 0 {
+                        // Add the `bit`-th coefficient to the subset sum.
+                        sum += block[bit];
+                    }
+                }
+
+                // Store the computed sum in the array.
+                block_sums[subset] = sum;
+            }
+
+            // Append the subset sums from the block to the overall result vector.
+            expected_sums.extend(block_sums);
+        }
+
+        // Assert the computed equality sums match the expected result.
+        assert_eq!(eq_sums, expected_sums);
     }
 }
