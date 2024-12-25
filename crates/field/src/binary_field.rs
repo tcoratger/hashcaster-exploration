@@ -12,11 +12,13 @@ use std::{
 pub struct BinaryField128b(u128);
 
 impl BinaryField128b {
+    /// Constructs a new [`BinaryField128b`] instance from a given `u128` value.
     pub const fn new(val: u128) -> Self {
         Self(val)
     }
 
-    pub fn into_inner(self) -> u128 {
+    /// Returns the inner `u128` value of the [`BinaryField128b`] instance.
+    pub const fn into_inner(self) -> u128 {
         self.0
     }
 

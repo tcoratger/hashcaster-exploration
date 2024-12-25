@@ -346,45 +346,38 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ) -> [[BinaryField128b; M]; 3] {
         match self.boolean_package {
             BooleanPackage::And => {
-                // Ensure the expected size is `M = 1` for valid operation.
+                // Ensure the output size is valid for the AND package.
                 assert_eq!(M, 1, "Invalid output size for AND package");
 
-                // Double the starting index to account for the 2-element pairs in operations.
+                // Initialize the indices for the first and second operands.
                 let mut idx_a = idx_a * 2;
-                // Compute the starting index for the second operand, based on the offset and bit
-                // width.
+                // Calculate the index for the second operand with the specified offset.
                 let mut idx_b = idx_a + offset * 128;
-
-                // Initialize the result array with zeros.
                 let mut ret = [[BinaryField128b::zero(); M]; 3];
 
-                // Iterate over 128 basis elements to aggregate evaluations.
+                // Iterate over the 128 basis elements of the binary field.
                 for i in 0..128 {
-                    // Retrieve the basis element `ϕ_i` for the current iteration.
+                    // Calculate the basis element for the current iteration.
                     let basis = BinaryField128b::basis(i);
 
-                    // Extract values from the data slice for the current indices.
+                    // Extract the elements from the data slices.
                     let a = data[idx_a];
                     let b = data[idx_b];
                     let a_next = data[idx_a + 1];
                     let b_next = data[idx_b + 1];
 
-                    // Compute quadratic contributions for `ret[0]`:
                     // `Σ (ϕ_i * a * b)`
                     ret[0][0] += basis * a * b;
-                    // Compute quadratic contributions for `ret[1]`:
                     // `Σ (ϕ_i * a_next * b_next)`
                     ret[1][0] += basis * a_next * b_next;
-                    // Compute combined quadratic contributions for `ret[2]`:
                     // `Σ (ϕ_i * (a + a_next) * (b + b_next))`
                     ret[2][0] += basis * (a + a_next) * (b + b_next);
 
-                    // Increment indices to process the next pair of elements.
+                    // Move to the next indices
                     idx_a += offset;
                     idx_b += offset;
                 }
 
-                // Return the aggregated results as a 2D array.
                 ret
             }
         }
@@ -637,60 +630,39 @@ mod tests {
     #[test]
     fn test_exec_alg_and() {
         // Generate two random field elements as input.
-        // These are 128-bit random values sampled from the binary field.
         let a1 = BinaryField128b::random();
         let a2 = BinaryField128b::random();
 
-        // Define the input array `a` as a pair of the generated random field elements.
         let a = [a1, a2];
-
-        // Define the input array `b` with:
-        // - The first element of `a` shifted right by 1 bit.
-        // - The second element of `a` shifted right by 1 bit.
         let b = [
             BinaryField128b::from(a1.into_inner() >> 1),
             BinaryField128b::from(a2.into_inner() >> 1),
         ];
-
-        // Define the input array `c` with:
-        // - The first element of `a` intact,
-        // - The second element shifted right by 1 bit.
         let c = [a1, BinaryField128b::from(a2.into_inner() >> 1)];
-
-        // Define the input array `d` with:
-        // - The first element shifted right by 1 bit,
-        // - The second element intact.
         let d = [BinaryField128b::from(a1.into_inner() >> 1), a2];
 
-        // Create an instance of `BoolCheckBuilder` configured for the `And` operation.
         let bool_check_builder =
             BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
 
-        // Prepare the input data for the algebraic implementation:
-        // - Convert each binary field element in `a` into its 128-bit binary representation.
-        // - For each bit position `i` (0 to 127), extract the `i`-th bit and convert it into a
-        //   `BinaryField128b` element.
-        // - Flatten the resulting nested structure into a single vector of binary field elements.
+        // Prepare input for the algebraic implementation.
+        // - Take the array of input field elements.
+        // - Transform each binary field element into 128 components, representing the bitwise
+        //   values of the element.
+        // - Flatten the resulting array of arrays into a single array.
         let mut input_coords = a
             .iter()
-            .map(|x| (0..128).map(|i| BinaryField128b::from((x.into_inner() >> i) & 1 != 0)))
-            .flatten()
+            .flat_map(|x| (0..128).map(|i| BinaryField128b::from((x.into_inner() >> i) & 1 != 0)))
             .collect::<Vec<_>>();
 
-        // Append a zero element to the input vector as padding.
         input_coords.push(BinaryField128b::zero());
 
-        // Execute the algebraic implementation to compute the result for the `And` operation.
         let rhs = bool_check_builder.exec_alg(&input_coords, 0, 1);
 
-        // Compute the quadratic compressed result for `a`, `b`, `c`, and `d`.
         let a_quad = bool_check_builder.exec_quad_compressed(&a);
         let b_quad = bool_check_builder.exec_quad_compressed(&b);
         let c_quad = bool_check_builder.exec_quad_compressed(&c);
         let d_quad = bool_check_builder.exec_quad_compressed(&d);
 
-        // Verify the results of the algebraic implementation.
-        assert_eq!(rhs.len(), 3);
         assert_eq!(rhs[0], a_quad);
         assert_eq!(rhs[1], b_quad);
         assert_eq!(rhs[2], [a_quad[0] + b_quad[0] + c_quad[0] + d_quad[0]]);

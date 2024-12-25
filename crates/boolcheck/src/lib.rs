@@ -527,6 +527,9 @@ mod tests {
                 r * round_polynomial[1] +
                 r * r * round_polynomial[2] +
                 r * r * r * round_polynomial[3];
+
+            // Bind the random value `r` to the Boolean check for the next round.
+            boolcheck.bind(r);
         }
     }
 }
