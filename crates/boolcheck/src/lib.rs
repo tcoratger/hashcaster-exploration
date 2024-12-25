@@ -371,6 +371,18 @@ impl BoolCheck {
                 })
                 .count();
         }
+
+        // Transition to phase 2 if the current round equals `c + 1`.
+        if self.current_round() == self.c + 1 {
+            // At the end of the first phase, we do not need the extended table anymore.
+            self.extended_table = Vec::new();
+
+            // Restrict the polynomial coordinates based on the accumulated challenges.
+            self.poly_coords = Some(
+                MultilinearLagrangianPolynomials::from(self.polys.clone())
+                    .restrict(&self.challenges, number_variables),
+            );
+        }
     }
 }
 
@@ -455,7 +467,7 @@ mod tests {
         let p_and_q = p.clone() & q.clone();
 
         // The prover compute the initial claim for the AND operation at the points in `points`.
-        let initial_claim = p_and_q.evaluate_at(&points);
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Set a phase switch parameter, which controls the folding phases.
         let phase_switch = 5;
@@ -469,7 +481,7 @@ mod tests {
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
             phase_switch,
-            points,
+            points.into(),
             BooleanPackage::And,
             [initial_claim],
             gamma,
@@ -489,7 +501,7 @@ mod tests {
         let mut random_values = Vec::new();
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
-        for i in 0..num_vars {
+        for _i in 0..num_vars {
             // Compute the round polynomial for the current round.
             let compressed_round_polynomial = boolcheck.compute_round_polynomial();
 

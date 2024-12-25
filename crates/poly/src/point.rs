@@ -81,6 +81,12 @@ impl From<Vec<Point>> for Points {
     }
 }
 
+impl From<&[Point]> for Points {
+    fn from(points: &[Point]) -> Self {
+        Self(points.to_vec())
+    }
+}
+
 impl Deref for Points {
     type Target = Vec<Point>;
 

@@ -2,6 +2,7 @@ use crate::{bool_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck}
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+    point::Points,
     univariate::UnivariatePolynomial,
 };
 use num_traits::{identities::Zero, One};
@@ -13,7 +14,7 @@ use rayon::{
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckBuilder<const M: usize> {
     c: usize,
-    points: Vec<BinaryField128b>,
+    points: Points,
     boolean_package: BooleanPackage,
     gammas: Vec<BinaryField128b>,
     claim: BinaryField128b,
@@ -22,7 +23,7 @@ pub struct BoolCheckBuilder<const M: usize> {
 impl<const M: usize> BoolCheckBuilder<M> {
     pub fn new(
         c: usize,
-        points: Vec<BinaryField128b>,
+        points: Points,
         boolean_package: BooleanPackage,
         claims: [BinaryField128b; M],
         gamma: BinaryField128b,
@@ -260,7 +261,9 @@ impl<const M: usize> BoolCheckBuilder<M> {
         BoolCheck {
             c: self.c,
             bit_mapping,
-            eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(&self.points[1..]),
+            eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(
+                &self.points[1..].into(),
+            ),
             claim: self.claim,
             extended_table: self.extend_n_tables(
                 polynomials,
@@ -268,7 +271,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
                 |args| self.compress_linear(args),
                 |args| self.compress_quadratic(args),
             ),
-            points: self.points.clone().into(),
+            points: self.points.clone(),
             boolean_package: self.boolean_package.clone(),
             gammas: self.gammas.clone(),
             ..Default::default()

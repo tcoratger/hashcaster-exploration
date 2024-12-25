@@ -1,4 +1,7 @@
-use crate::utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64};
+use crate::{
+    point::Points,
+    utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
+};
 use bytemuck::cast_slice;
 use hashcaster_field::binary_field::BinaryField128b;
 use num_traits::{One, Zero};
@@ -112,7 +115,7 @@ impl MultilinearLagrangianPolynomial {
     ///   relationships.
     /// - The result captures the equality polynomial over the domain, supporting evaluation in
     ///   multilinear extensions and related computations.
-    pub fn new_eq_poly(points: &[BinaryField128b]) -> Self {
+    pub fn new_eq_poly(points: &Points) -> Self {
         // Initialize the coefficients with a single 1 (neutral element for multiplication).
         let mut coeffs = vec![BinaryField128b::one()];
 
@@ -129,7 +132,7 @@ impl MultilinearLagrangianPolynomial {
             left.par_iter_mut().zip(right.par_iter_mut()).for_each(|(left_val, right_val)| {
                 // Compute the new coefficient in `right` as the product of `left_val` and the
                 // current point.
-                *right_val = *left_val * point;
+                *right_val = *left_val * **point;
                 // Update the existing coefficient in `left` by adding the computed `right_val`.
                 *left_val += *right_val;
             });
@@ -162,7 +165,7 @@ impl MultilinearLagrangianPolynomial {
     /// ```
     /// where `coeffs[x]` is the coefficient of the polynomial corresponding to the point `x`,
     /// and `eq_poly(x, points)` is the equality polynomial for `x` and `points`.
-    pub fn evaluate_at(&self, points: &[BinaryField128b]) -> BinaryField128b {
+    pub fn evaluate_at(&self, points: &Points) -> BinaryField128b {
         // Ensure the number of coefficients matches the number of points.
         // The number of coefficients should be 2^n, where n is the length of `points`.
         assert!(self.coeffs.len() == 1 << points.len());
@@ -301,13 +304,13 @@ impl MultilinearLagrangianPolynomials {
     /// This sequence is useful in efficiently constructing multilinear extensions, where each
     /// polynomial in the sequence serves as a building block for interpolating functions over
     /// the Boolean hypercube \( \{0, 1\}^n \).
-    pub fn new_eq_poly_sequence(points: &[BinaryField128b]) -> Self {
+    pub fn new_eq_poly_sequence(points: &Points) -> Self {
         // Start with the base case: eq_0(x) = 1.
         let mut polynomials =
             vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::one()])];
 
         // Iterate over the points in reverse order.
-        for (i, &multiplier) in points.iter().rev().enumerate() {
+        for (i, multiplier) in points.iter().rev().enumerate() {
             // Reference the previously computed polynomial in the sequence.
             let previous = &polynomials[i];
 
@@ -319,7 +322,7 @@ impl MultilinearLagrangianPolynomials {
             new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
                 |(chunk, &prev_coeff)| {
                     // Calculate the updated coefficients.
-                    let multiplied = multiplier * prev_coeff;
+                    let multiplied = **multiplier * prev_coeff;
                     chunk[0] = prev_coeff + multiplied; // Update the first coefficient.
                     chunk[1] = multiplied; // Update the second coefficient.
                 },
@@ -386,7 +389,7 @@ impl MultilinearLagrangianPolynomials {
     /// # Panics
     /// - If the number of coefficients in a polynomial does not match `2^dims`.
     /// - If the number of challenges exceeds `dims`.
-    pub fn restrict(&self, challenges: &[BinaryField128b], dims: usize) -> Vec<BinaryField128b> {
+    pub fn restrict(&self, challenges: &Points, dims: usize) -> Vec<BinaryField128b> {
         // Ensure that all input polynomials have the correct length of 2^n.
         // Panics if this condition is violated.
         self.iter().for_each(|poly| assert_eq!(poly.len(), 1 << dims));
@@ -490,6 +493,18 @@ impl MultilinearLagrangianPolynomials {
     }
 }
 
+impl From<Vec<MultilinearLagrangianPolynomial>> for MultilinearLagrangianPolynomials {
+    fn from(polys: Vec<MultilinearLagrangianPolynomial>) -> Self {
+        Self(polys)
+    }
+}
+
+impl From<Vec<Vec<BinaryField128b>>> for MultilinearLagrangianPolynomials {
+    fn from(coeffs: Vec<Vec<BinaryField128b>>) -> Self {
+        Self(coeffs.into_iter().map(MultilinearLagrangianPolynomial::new).collect())
+    }
+}
+
 impl Deref for MultilinearLagrangianPolynomials {
     type Target = Vec<MultilinearLagrangianPolynomial>;
 
@@ -516,7 +531,7 @@ mod tests {
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
 
         // Compute the equality polynomial for the given points.
-        let result = MultilinearLagrangianPolynomial::new_eq_poly(&points);
+        let result = MultilinearLagrangianPolynomial::new_eq_poly(&points.into());
 
         // Assert that the computed equality polynomial matches the expected result.
         assert_eq!(
@@ -547,7 +562,7 @@ mod tests {
         let points = vec![pt1, pt2];
 
         // Compute the equality polynomial for the given points.
-        let result = MultilinearLagrangianPolynomial::new_eq_poly(&points);
+        let result = MultilinearLagrangianPolynomial::new_eq_poly(&points.into());
 
         // Evaluate the equality polynomial at the given points.
         let expected_eq_poly =
@@ -573,7 +588,7 @@ mod tests {
         ];
 
         // Compute the equality polynomial sequence using the eq_poly_sequence function.
-        let eq_sequence = MultilinearLagrangianPolynomials::new_eq_poly_sequence(&points);
+        let eq_sequence = MultilinearLagrangianPolynomials::new_eq_poly_sequence(&points.into());
 
         // Assert that the computed equality polynomial sequence matches the expected result.
         // This ensures the function is working as intended.
@@ -638,11 +653,10 @@ mod tests {
         for _ in 0..iterations {
             // Step 1: Generate random points for the test.
             let num_points = rng.gen_range(2..6); // Random number of points between 2 and 5.
-            let points: Vec<BinaryField128b> =
-                (0..num_points).map(|_| BinaryField128b::random()).collect();
+            let points: Vec<_> = (0..num_points).map(|_| BinaryField128b::random()).collect();
 
             // Step 2: Compute the equality polynomial using `new_eq_poly`.
-            let result = MultilinearLagrangianPolynomial::new_eq_poly(&points);
+            let result = MultilinearLagrangianPolynomial::new_eq_poly(&points.clone().into());
 
             // Step 3: Reconstruct the equality polynomial manually to verify correctness.
             let mut expected_eq_poly = BinaryField128b::zero();
@@ -671,7 +685,7 @@ mod tests {
     #[test]
     fn test_eq_poly_sequence_cross_check() {
         // Generate a random vector of 20 points in the finite field.
-        let points: Vec<BinaryField128b> = (0..20).map(|_| BinaryField128b::random()).collect();
+        let points = Points::from((0..20).map(|_| BinaryField128b::random()).collect::<Vec<_>>());
 
         // Compute the equality polynomial sequence for the points.
         let eq_sequence = MultilinearLagrangianPolynomials::new_eq_poly_sequence(&points);
@@ -689,7 +703,7 @@ mod tests {
         eq_sequence.iter().enumerate().skip(1).for_each(|(i, poly)| {
             assert_eq!(
                 poly,
-                &MultilinearLagrangianPolynomial::new_eq_poly(&points[points.len() - i..])
+                &MultilinearLagrangianPolynomial::new_eq_poly(&points[points.len() - i..].into())
             );
         });
     }
@@ -708,7 +722,7 @@ mod tests {
         let polynomial = MultilinearLagrangianPolynomial::new(vec![coeff0, coeff1, coeff2, coeff3]);
 
         // Define the evaluation points.
-        let points = vec![BinaryField128b::random(), BinaryField128b::random()];
+        let points = Points::from(vec![BinaryField128b::random(), BinaryField128b::random()]);
 
         // Compute the evaluation.
         let result = polynomial.evaluate_at(&points);
@@ -719,11 +733,12 @@ mod tests {
         //        + p(0, 1) * (1 - pt1) * pt0
         //        + p(1, 0) * pt1 * (1 - pt0)
         //        + p(1, 1) * pt1 * pt0
-        let expected_result =
-            coeff0 * (BinaryField128b::one() - points[0]) * (BinaryField128b::one() - points[1]) +
-                coeff2 * (BinaryField128b::one() - points[0]) * points[1] +
-                coeff1 * points[0] * (BinaryField128b::one() - points[1]) +
-                coeff3 * points[0] * points[1];
+        let expected_result = coeff0 *
+            (BinaryField128b::one() - *points[0]) *
+            (BinaryField128b::one() - *points[1]) +
+            coeff2 * (BinaryField128b::one() - *points[0]) * *points[1] +
+            coeff1 * *points[0] * (BinaryField128b::one() - *points[1]) +
+            coeff3 * *points[0] * *points[1];
 
         // Assert the result matches the expectation.
         assert_eq!(result, expected_result);
@@ -772,12 +787,12 @@ mod tests {
     #[test]
     fn test_eq_sums() {
         // Define a set of points to construct the equality polynomial.
-        let points = vec![
+        let points = Points::from(vec![
             BinaryField128b::from(1),
             BinaryField128b::from(2),
             BinaryField128b::from(3),
             BinaryField128b::from(4),
-        ];
+        ]);
 
         // Create the equality polynomial for the points.
         let polynomial = MultilinearLagrangianPolynomial::new_eq_poly(&points);
