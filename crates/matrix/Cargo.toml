@@ -1,0 +1,11 @@
+[package]
+name = "hashcaster-matrix"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hashcaster-field = { workspace = true }

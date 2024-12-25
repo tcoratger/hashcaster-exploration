@@ -384,6 +384,35 @@ impl BoolCheck {
             );
         }
     }
+
+    pub fn finish(&self) -> BoolCheckOutput {
+        // Compute the number of variables in the polynomial.
+        let number_variables = self.number_variables();
+        // The number of rounds should match the number of variables for the protocol to end.
+        assert_eq!(number_variables, self.current_round(), "Protocol has not reached the end.");
+
+        // Decompose the `BoolCheck` instance to extract the required fields.
+        let Self { poly_coords, round_polys, c, .. } = self;
+
+        // Unwrap the polynomial coordinates, ensuring they are initialized.
+        let poly_coords = poly_coords.clone().unwrap();
+
+        // Compute the evaluations on the Frobenius subdomain.
+        let base_index = 1 << (number_variables - c - 1);
+        let mut frob_evals: Vec<_> =
+            (0..128 * self.polys.len()).map(|i| poly_coords[i * base_index]).collect();
+
+        BoolCheckOutput::default()
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BoolCheckOutput {
+    /// A vector containing the evaluations of the polynomials on a Frobenius subdomain.
+    pub frob_evals: Vec<BinaryField128b>,
+
+    /// A vector of compressed polynomials computed during the protocol's rounds.
+    pub round_polys: Vec<CompressedPoly>,
 }
 
 #[cfg(test)]
