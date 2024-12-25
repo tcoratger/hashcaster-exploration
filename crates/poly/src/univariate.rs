@@ -73,9 +73,9 @@ impl UnivariatePolynomial {
     ///
     /// # Parameters
     /// - `evaluations`: An array of three evaluations:
-    ///   - `evaluations[0]` is the evaluation at t = 0 (W(0) = c_0).
-    ///   - `evaluations[1]` is the evaluation at t = 1 (W(1) = c_0 + c_1 + c_2).
-    ///   - `evaluations[2]` is the evaluation at t = ∞ (W(∞) = c_2).
+    ///   - `evaluations[0]` is the evaluation at t = 0 (`W(0) = c_0`).
+    ///   - `evaluations[1]` is the evaluation at t = 1 (`W(1) = c_0 + c_1 + c_2`).
+    ///   - `evaluations[2]` is the evaluation at t = ∞ (`W(∞) = c_2`).
     ///
     /// # Returns
     /// A `UnivariatePolynomial` instance with coefficients `[c_0, c_1, c_2]`, where:
@@ -112,25 +112,26 @@ impl UnivariatePolynomial {
     ///
     /// # Formula
     /// Given:
-    /// - `self` = \( c_0 + c_1 \cdot x + c_2 \cdot x^2 \)
-    /// - `other` = \( d_0 + d_1 \cdot x \),
+    /// - `self` = `c_0 + c_1 \cdot x + c_2 \cdot x^2`
+    /// - `other` = `d_0 + d_1 \cdot x`,
     ///
     /// The result is:
-    /// \[
+    /// ```
     /// \text{result} = (c_0 + c_1 \cdot x + c_2 \cdot x^2) \cdot (d_0 + d_1 \cdot x)
-    /// \]
+    /// ```
     ///
     /// Expanding:
-    /// \[
+    /// ```
     /// \text{result} = c_0 \cdot d_0
     ///              + (c_0 \cdot d_1 + c_1 \cdot d_0) \cdot x
     ///              + (c_1 \cdot d_1 + c_2 \cdot d_0) \cdot x^2
     ///              + c_2 \cdot d_1 \cdot x^3
-    /// \]
+    /// ```
     ///
     /// # Panics
     /// - If `self` is not a degree-2 polynomial.
     /// - If `other` is not a degree-1 polynomial.
+    #[must_use]
     pub fn multiply_degree2_by_degree1(&self, other: &Self) -> Self {
         // Ensure the input polynomials are of the expected degrees.
         assert_eq!(self.len(), 3, "Expected lhs to be a degree 2 polynomial");
@@ -283,7 +284,7 @@ mod tests {
         let point = Point::from(BinaryField128b::from(2));
 
         // Multiply the polynomial by the point
-        let result_poly = poly.clone() * point;
+        let result_poly = poly * point;
 
         // Expected coefficients after multiplication
         let expected_coeffs = vec![
@@ -310,7 +311,7 @@ mod tests {
         let point = Point::from(BinaryField128b::from(3));
 
         // Multiply the polynomial by a reference to the point
-        let result_poly = poly.clone() * &point;
+        let result_poly = poly * &point;
 
         // Expected coefficients after multiplication
         let expected_coeffs = vec![

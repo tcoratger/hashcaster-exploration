@@ -15,7 +15,7 @@ use std::arch::aarch64::{int64x2_t, vld1q_s64, vshlq_n_s64};
 /// A tuple `(usize, usize)` containing:
 /// - The value of `x` with the MSB cleared.
 /// - The zero-based position of the MSB in the binary representation of `x`.
-pub(crate) fn drop_top_bit(x: usize) -> (usize, usize) {
+pub(crate) const fn drop_top_bit(x: usize) -> (usize, usize) {
     // Compute the index of the most significant bit.
     let s = x.leading_zeros() as usize ^ (usize::BITS as usize - 1);
     // Return x with the top bit cleared and its position.
@@ -68,7 +68,7 @@ pub(crate) fn drop_top_bit(x: usize) -> (usize, usize) {
 /// This function can be used in scenarios where hardware SIMD instructions are unavailable,
 /// or in testing environments to verify the behavior of such instructions.
 #[unroll::unroll_for_loops]
-pub fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
+pub(crate) const fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
     // Initialize the result variable to store the combined MSB mask.
     let mut ret = 0;
     // Iterate through the 16-byte array in reverse order (from the last byte to the first).
@@ -126,17 +126,21 @@ pub fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
 ///     ]
 /// );
 /// ```
-pub unsafe fn v_slli_epi64<const K: i32>(x: [u8; 16]) -> [u8; 16] {
-    // Load the 16-byte input array into a 128-bit SIMD register as two 64-bit integers.
-    let data = vld1q_s64(x.as_ptr() as *const i64);
+pub(crate) fn v_slli_epi64<const K: i32>(x: [u8; 16]) -> [u8; 16] {
+    unsafe {
+        // Load safely the 16-byte input array into a 128-bit SIMD register as two 64-bit integers.
+        #[allow(clippy::cast_ptr_alignment)]
+        let data = vld1q_s64(x.as_ptr().cast::<i64>());
 
-    // Perform a left shift operation on each 64-bit integer in the SIMD register.
-    //    - `vshlq_n_s64` shifts all 64-bit integers in the SIMD register by `K` bits to the left.
-    //    - The operation is performed on both integers simultaneously.
-    let result = vshlq_n_s64(data, K);
+        // Perform a left shift operation on each 64-bit integer in the SIMD register.
+        //    - `vshlq_n_s64` shifts all 64-bit integers in the SIMD register by `K` bits to the
+        //      left.
+        //    - The operation is performed on both integers simultaneously.
+        let result = vshlq_n_s64(data, K);
 
-    // Transmute the result back into a 16-byte array.
-    std::mem::transmute::<int64x2_t, [u8; 16]>(result)
+        // Transmute the result back into a 16-byte array.
+        std::mem::transmute::<int64x2_t, [u8; 16]>(result)
+    }
 }
 
 #[cfg(test)]
@@ -189,33 +193,59 @@ mod tests {
     fn test_cpu_v_movemask_epi8_standard_cases() {
         // Standard test case 1: Alternate high bits
         let input = [
-            0b10000000, 0b00000000, 0b10000000, 0b00000000, 0b10000000, 0b00000000, 0b10000000,
-            0b00000000, 0b10000000, 0b00000000, 0b10000000, 0b00000000, 0b10000000, 0b00000000,
-            0b10000000, 0b00000000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0000_0000,
         ];
         // Updated Expected Result:
         // 0101010101010101 in binary = 0b0101010101010101 = 21845 in decimal
         let result = cpu_v_movemask_epi8(input);
-        assert_eq!(result, 0b0101010101010101);
+        assert_eq!(result, 0b0101_0101_0101_0101);
     }
 
     #[test]
     fn test_cpu_v_movemask_epi8_all_ones() {
         // All high bits set
         let input = [
-            0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000,
-            0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000, 0b10000000,
-            0b10000000, 0b10000000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
+            0b1000_0000,
         ];
         // Expected result: 1111111111111111 in binary = 0b1111111111111111 = 65535 in decimal
         let result = cpu_v_movemask_epi8(input);
-        assert_eq!(result, 0b1111111111111111);
+        assert_eq!(result, 0b1111_1111_1111_1111);
     }
 
     #[test]
     fn test_cpu_v_movemask_epi8_all_zeros() {
         // No high bits set
-        let input = [0b00000000; 16];
+        let input = [0b0000_0000; 16];
         // Expected result: 0
         let result = cpu_v_movemask_epi8(input);
         assert_eq!(result, 0);
@@ -234,7 +264,7 @@ mod tests {
         ];
 
         // Call the function with a shift constant of 1.
-        let result = unsafe { v_slli_epi64::<1>(input) };
+        let result = v_slli_epi64::<1>(input);
         assert_eq!(result, expected);
     }
 
@@ -248,7 +278,7 @@ mod tests {
         let expected = input;
 
         // Call the function with a shift constant of 0.
-        let result = unsafe { v_slli_epi64::<0>(input) };
+        let result = v_slli_epi64::<0>(input);
         assert_eq!(result, expected);
     }
 
@@ -265,7 +295,7 @@ mod tests {
         ];
 
         // Call the function with a shift constant of 1.
-        let result = unsafe { v_slli_epi64::<1>(input) };
+        let result = v_slli_epi64::<1>(input);
         assert_eq!(result, expected);
     }
 
@@ -282,7 +312,7 @@ mod tests {
         ];
 
         // Call the function with a shift constant of 3.
-        let result = unsafe { v_slli_epi64::<3>(input) };
+        let result = v_slli_epi64::<3>(input);
         assert_eq!(result, expected);
     }
 }

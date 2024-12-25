@@ -1,4 +1,5 @@
 use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
+use bytemuck::{Pod, Zeroable};
 use num_traits::{MulAddAssign, One, Zero};
 use rand::Rng;
 use std::{
@@ -6,7 +7,8 @@ use std::{
     ops::{Add, AddAssign, BitAnd, Deref, Mul, MulAssign, Neg, Sub},
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct BinaryField128b(u128);
 
 impl BinaryField128b {

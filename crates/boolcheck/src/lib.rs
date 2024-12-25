@@ -43,7 +43,7 @@ impl BoolCheck {
     /// Returns the number of evaluation points for the polynomials in the protocol.
     ///
     /// For examples, the multilinear polynomial `p` can be written as:
-    /// p(x) = p_0 + p_1*x_1 + p_2*x_2 + ... + p_n*x_n
+    /// `p(x) = p_0 + p_1*x_1 + p_2*x_2 + ... + p_n*x_n`
     ///
     /// The number of variables in the polynomial is `n`.
     pub fn number_variables(&self) -> usize {
@@ -176,7 +176,11 @@ impl BoolCheck {
 
             // At the current round, the equality polynomial should have `2^{n-round-1}`
             // coefficients.
-            assert_eq!(half, 1 << number_variables - round - 1, "Invalid equality polynomial size");
+            assert_eq!(
+                half,
+                1 << (number_variables - round - 1),
+                "Invalid equality polynomial size"
+            );
 
             // Poly coordinates are required for the computation of `P ∧ Q` in the restricted phase.
             let poly_coords = self.poly_coords.as_ref().unwrap();

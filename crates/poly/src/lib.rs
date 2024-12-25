@@ -2,4 +2,4 @@ pub mod compressed;
 pub mod multinear_lagrangian;
 pub mod point;
 pub mod univariate;
-mod utils;
+pub mod utils;

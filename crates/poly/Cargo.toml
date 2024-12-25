@@ -14,6 +14,7 @@ num-traits = { workspace = true }
 rayon = { workspace = true }
 itertools = { workspace = true }
 unroll = { workspace = true }
+bytemuck = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
