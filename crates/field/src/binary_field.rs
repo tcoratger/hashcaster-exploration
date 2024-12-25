@@ -16,6 +16,10 @@ impl BinaryField128b {
         Self(val)
     }
 
+    pub fn into_inner(self) -> u128 {
+        self.0
+    }
+
     /// Performs the core multiplication logic using Karatsuba and Montgomery reduction.
     unsafe fn mul_impl(lhs: u128, rhs: u128) -> u128 {
         // Perform Karatsuba decomposition on the operands (self and other).
@@ -224,6 +228,16 @@ impl BitAnd<&Self> for BinaryField128b {
 impl From<u128> for BinaryField128b {
     fn from(val: u128) -> Self {
         Self(val)
+    }
+}
+
+impl From<bool> for BinaryField128b {
+    fn from(val: bool) -> Self {
+        if val {
+            Self::one()
+        } else {
+            Self::zero()
+        }
     }
 }
 
