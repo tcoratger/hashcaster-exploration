@@ -101,11 +101,125 @@ impl Matrix {
             }
         }
     }
+
+    /// Applies a 128x128 matrix in column form to a 128-bit vector.
+    ///
+    /// This function computes the product of a binary matrix (128x128) and a binary vector (128
+    /// bits) using operations in GF(2) (binary field arithmetic). Each bit in the resulting
+    /// vector is determined by XOR-ing the appropriate entries of the matrix columns based on
+    /// the bits in the input vector.
+    ///
+    /// ### Parameters
+    /// - `self`: A reference to the `Matrix`, where each column of the 128x128 binary matrix is
+    ///   represented as a `u128`. Each bit in a column represents a row.
+    /// - `vec`: A 128-bit unsigned integer (`u128`), where each bit represents an element of the
+    ///   input vector.
+    ///
+    /// ### Returns
+    /// A 128-bit unsigned integer (`u128`), representing the resulting vector after applying the
+    /// matrix to the input vector.
+    ///
+    /// ### Example
+    /// Let's take a simple 4x4 matrix and a 4-bit vector for illustration purposes (even though the
+    /// actual implementation works with 128x128 matrices and 128-bit vectors):
+    ///
+    /// Matrix (in column form):
+    /// ```text
+    /// Column 0: 1011 (binary)
+    /// Column 1: 1100 (binary)
+    /// Column 2: 0111 (binary)
+    /// Column 3: 1001 (binary)
+    /// ```
+    ///
+    /// Vector:
+    /// ```text
+    /// vec = 1010 (binary)
+    /// ```
+    ///
+    /// Steps to compute the result:
+    /// - Start with a result vector `ret = 0000` (binary).
+    /// - For each bit in `vec`:
+    ///   - If `vec[0] = 1`, XOR `ret` with Column 0: `ret = 0000 XOR 1011 = 1011`.
+    ///   - If `vec[1] = 0`, skip Column 1.
+    ///   - If `vec[2] = 1`, XOR `ret` with Column 2: `ret = 1011 XOR 0111 = 1100`.
+    ///   - If `vec[3] = 0`, skip Column 3.
+    ///
+    /// Final result:
+    /// ```text
+    /// ret = 1100 (binary)
+    /// ```
+    pub fn apply(&self, vec: u128) -> u128 {
+        // Initialize the result vector as 0.
+        let mut ret = 0;
+
+        // Iterate over each column of the matrix and check the corresponding bit in the input
+        // vector.
+        for (i, &col) in self.cols.iter().enumerate() {
+            // Extract the i-th bit of the vector and create a mask.
+            // - Creates `!0` if the bit is 1,
+            // - Creates `0` otherwise.
+            let mask = (vec >> i & 1).wrapping_neg();
+
+            // XOR the column into the result if the bit is set.
+            ret ^= col & mask;
+        }
+
+        // Return the accumulated result vector.
+        ret
+    }
+
+    pub fn triang(&mut self, i: usize, j: usize) {
+        self.cols[j] ^= self.cols[i];
+    }
+
+    pub fn inverse(&self) -> Option<Self> {
+        let mut a = self.clone();
+        let mut b = Self::diag();
+
+        for i in 0..128 {
+            // Recherche un pivot valide pour la colonne `i`
+            if (a.cols[i] >> i) & 1 == 0 {
+                let pivot = (i + 1..128).find(|&j| (a.cols[j] >> i) & 1 != 0)?;
+                a.cols.swap(i, pivot);
+                b.cols.swap(i, pivot);
+            }
+
+            // Elimination pour mettre les éléments en-dessous de la diagonale à zéro
+            let row_mask = a.cols[i];
+            let inv_mask = b.cols[i];
+            for j in i + 1..128 {
+                if (a.cols[j] >> i) & 1 != 0 {
+                    a.cols[j] ^= row_mask;
+                    b.cols[j] ^= inv_mask;
+                }
+            }
+        }
+
+        // Elimination pour mettre les éléments au-dessus de la diagonale à zéro
+        for i in (1..128).rev() {
+            let row_mask = a.cols[i];
+            let inv_mask = b.cols[i];
+            for j in 0..i {
+                if (a.cols[j] >> i) & 1 != 0 {
+                    a.cols[j] ^= row_mask;
+                    b.cols[j] ^= inv_mask;
+                }
+            }
+        }
+
+        Some(b)
+    }
+}
+
+fn u128_to_bits(x: u128) -> Vec<bool> {
+    (0..128).map(|i| (x >> i) & 1 != 0).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytemuck::cast;
+    use rand::{rngs::OsRng, Rng, RngCore};
 
     #[test]
     fn test_diag() {
@@ -202,5 +316,127 @@ mod tests {
                 assert_eq!(matrix.cols[i], 1 << i, "Column {i} should remain unchanged.");
             }
         }
+    }
+
+    #[test]
+    fn test_invert_matrix() {
+        let rng = &mut OsRng;
+        let mut matrix = Matrix::diag();
+        // generate (kind of) random invertible matrix by applying a lot of triangular transforms
+        // and swaps
+        for _ in 0..100_000 {
+            let r = rng.next_u64() as usize;
+            let r1 = r % (1 << 4);
+            let r2 = (r >> 4) & 127;
+            let r3 = (r >> 32) & 127;
+            if r1 == 0 {
+                matrix.swap_cols(r2, r3);
+            } else {
+                if r2 != r3 {
+                    matrix.triang(r2, r3);
+                }
+            }
+        }
+        let test_vector = rng.gen();
+        let inv = matrix.inverse().unwrap();
+
+        assert_eq!(matrix.apply(inv.apply(test_vector)), test_vector,);
+        // assert_eq!(inv.compose(&matrix), Matrix::diag(),)
+    }
+
+    #[test]
+    fn test_apply_single_column_active() {
+        // Matrix with only the first column set (all bits active in the first column).
+        let matrix = {
+            let mut cols = [0; 128];
+            // First column has bits [1, 1, 1, 1]
+            cols[0] = 0b1111;
+            Matrix::new(cols)
+        };
+
+        // Input vector with only the first bit active.
+        // Binary: [1, 0, 0, 0, ...]
+        let vec = 0b1;
+
+        // Expected result: The first column of the matrix.
+        // Only the first column contributes.
+        let expected = 0b1111;
+
+        // Apply the matrix to the vector and check the result.
+        let result = matrix.apply(vec);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_apply_multiple_columns_active() {
+        // Matrix with specific columns set.
+        let matrix = {
+            let mut cols = [0; 128];
+            // First column: [1, 0, 1, 0]
+            cols[0] = 0b1010;
+            // Second column: [0, 1, 0, 1]
+            cols[1] = 0b0101;
+            Matrix::new(cols)
+        };
+
+        // Input vector with the first two bits active.
+        // Binary: [1, 1, 0, 0, ...]
+        let vec = 0b11;
+
+        // Expected result: XOR of the first and second columns.
+        // 0b1010 XOR 0b0101 = 0b1111.
+        let expected = 0b1111;
+
+        // Apply the matrix to the vector and check the result.
+        let result = matrix.apply(vec);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_apply_no_columns_active() {
+        // Matrix with arbitrary values (doesn't matter since vec = 0).
+        let matrix = {
+            let mut cols = [0; 128];
+            // Arbitrary column data.
+            cols[0] = 0b1010;
+            cols[1] = 0b0101;
+            Matrix::new(cols)
+        };
+
+        // Input vector with no bits active.
+        // Binary: [0, 0, 0, 0, ...]
+        let vec = 0b0;
+
+        // Expected result: All bits in the output are 0.
+        let expected = 0b0;
+
+        // Apply the matrix to the vector and check the result.
+        let result = matrix.apply(vec);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_apply_edge_case() {
+        // Matrix with the first and last columns set.
+        let matrix = {
+            let mut cols = [0; 128];
+            // First column: [1, 0, 1, 0]
+            cols[0] = 0b1010;
+            // Last column: [1, 1, 1, 1]
+            cols[127] = 0b1111;
+            Matrix::new(cols)
+        };
+
+        // Input vector with the first and last bits active.
+        // Binary: [1, 0, ..., 0, 1]
+        let vec = 0b1 | (1 << 127);
+
+        // Expected result: XOR of the first and last columns.
+        // 0b1010 XOR 0b1111 = 0b0101.
+        let expected = 0b101;
+
+        // Apply the matrix to the vector and check the result.
+        let result = matrix.apply(vec);
+        assert_eq!(result, expected);
     }
 }
