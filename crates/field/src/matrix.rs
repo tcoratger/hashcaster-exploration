@@ -86,7 +86,7 @@ mod tests {
 
         // Check that each element is a power of 2
         for (i, col) in diag_matrix.cols.iter().enumerate() {
-            assert_eq!(*col, 1 << i, "Column {} did not match expected value.", i);
+            assert_eq!(*col, 1 << i, "Column {i} did not match expected value.");
         }
     }
 }
