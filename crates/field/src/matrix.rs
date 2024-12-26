@@ -168,45 +168,92 @@ impl Matrix {
         ret
     }
 
+    /// Performs a triangular XOR operation on two columns of the matrix.
+    ///
+    /// This function modifies the `j`-th column of the matrix by XOR-ing it with the `i`-th column:
+    /// ```text
+    /// self.cols[j] = self.cols[j] XOR self.cols[i]
+    /// ```
+    ///
+    /// ### Parameters
+    /// - `i`: The index of the source column used for the XOR operation.
+    /// - `j`: The index of the target column that will be updated.
+    ///
+    /// ### Purpose
+    /// This operation is commonly used in Gaussian elimination to eliminate elements below or above
+    /// the pivot in a specific column, as part of transforming the matrix into row echelon form.
+    ///
+    /// ### Examples
+    /// - **Eliminating a column**: Given two columns:
+    /// ```text Column i: 1010 Column j: 1100 ```
+    ///   After calling `triang(0, 1)`, column `j` becomes:
+    /// ```text Column j: 1100 XOR 1010 = 0110 ```
     pub fn triang(&mut self, i: usize, j: usize) {
         self.cols[j] ^= self.cols[i];
     }
 
+    /// Computes the inverse of a 128x128 binary matrix, if it exists.
+    ///
+    /// This function uses Gaussian elimination over the binary field (GF(2)) to compute the inverse
+    /// of the given matrix. The process consists of two main phases:
+    /// 1. Forward elimination: Converts the matrix into an upper triangular form.
+    /// 2. Backward elimination: Converts the matrix into a diagonal (identity) form.
+    ///
+    /// If the matrix is invertible, the inverse is returned. Otherwise, `None` is returned.
+    ///
+    /// ### Returns
+    /// - `Some(Self)`: The inverse of the matrix, represented as a `Matrix` struct.
+    /// - `None`: If the matrix is not invertible.
     pub fn inverse(&self) -> Option<Self> {
+        // Clone the original matrix `self` into `a`, which will be manipulated during the process.
         let mut a = self.clone();
+
+        // Create an identity matrix `b`, which will be transformed into the inverse of `a`.
         let mut b = Self::diag();
 
+        // Phase 1: Forward elimination to create an upper triangular matrix
         for i in 0..128 {
-            // Recherche un pivot valide pour la colonne `i`
+            // Check if the pivot (diagonal element) in column `i` is 0.
             if (a.cols[i] >> i) & 1 == 0 {
+                // Search for a row below with a 1 in the current column.
                 let pivot = (i + 1..128).find(|&j| (a.cols[j] >> i) & 1 != 0)?;
+
+                // Swap the current row with the pivot row in both `a` and `b`.
                 a.cols.swap(i, pivot);
                 b.cols.swap(i, pivot);
             }
 
-            // Elimination pour mettre les éléments en-dessous de la diagonale à zéro
-            let row_mask = a.cols[i];
-            let inv_mask = b.cols[i];
+            // The `i`-th row is now the pivot row. Use it to eliminate entries below the pivot.
+            let row_mask = a.cols[i]; // The pivot row in `a`.
+            let inv_mask = b.cols[i]; // The corresponding row in `b`.
             for j in i + 1..128 {
+                // If the `j`-th row in column `i` has a 1:
+                // - Eliminate it by XORing with the pivot row.
                 if (a.cols[j] >> i) & 1 != 0 {
-                    a.cols[j] ^= row_mask;
-                    b.cols[j] ^= inv_mask;
+                    a.cols[j] ^= row_mask; // Eliminate the element in `a`.
+                    b.cols[j] ^= inv_mask; // Apply the same transformation to `b`.
                 }
             }
         }
 
-        // Elimination pour mettre les éléments au-dessus de la diagonale à zéro
+        // Phase 2: Backward elimination to reduce to the identity matrix
         for i in (1..128).rev() {
-            let row_mask = a.cols[i];
-            let inv_mask = b.cols[i];
+            // The `i`-th row is now the pivot row. Use it to eliminate entries above the pivot.
+            let row_mask = a.cols[i]; // The pivot row in `a`.
+            let inv_mask = b.cols[i]; // The corresponding row in `b`.
             for j in 0..i {
+                // If the `j`-th row in column `i` has a 1:
+                // - Eliminate it by XORing with the pivot row.
                 if (a.cols[j] >> i) & 1 != 0 {
-                    a.cols[j] ^= row_mask;
-                    b.cols[j] ^= inv_mask;
+                    a.cols[j] ^= row_mask; // Eliminate the element in `a`.
+                    b.cols[j] ^= inv_mask; // Apply the same transformation to `b`.
                 }
             }
         }
 
+        // At this point:
+        // - `a` has been transformed into the identity matrix,
+        // - `b` is now the inverse of the original matrix.
         Some(b)
     }
 }
@@ -320,28 +367,52 @@ mod tests {
 
     #[test]
     fn test_invert_matrix() {
+        // Create a random number generator using OsRng.
         let rng = &mut OsRng;
+
+        // Initialize the matrix as a diagonal matrix (identity matrix).
+        // This ensures the starting matrix is invertible.
         let mut matrix = Matrix::diag();
-        // generate (kind of) random invertible matrix by applying a lot of triangular transforms
-        // and swaps
+
+        // Apply 100,000 random triangular transforms and swaps to generate
+        // a random invertible matrix.
         for _ in 0..100_000 {
+            // Generate a random u64 value and cast it to usize for indexing.
             let r = rng.next_u64() as usize;
+
+            // Extract components from the random value:
+            // - r1 determines the type of operation (swap or XOR).
+            // - r2 and r3 are indices for selecting columns to operate on.
             let r1 = r % (1 << 4);
             let r2 = (r >> 4) & 127;
             let r3 = (r >> 32) & 127;
+
             if r1 == 0 {
+                // If r1 is 0, perform a column swap between r2 and r3.
                 matrix.swap_cols(r2, r3);
             } else {
+                // Otherwise, perform a triangular XOR operation if r2 != r3.
                 if r2 != r3 {
                     matrix.triang(r2, r3);
                 }
             }
         }
-        let test_vector = rng.gen();
+
+        // Generate a random 128-bit test vector.
+        let test_vector = rng.gen::<u128>();
+
+        // Compute the inverse of the matrix.
+        // If the matrix is not invertible, this will panic due to unwrap.
         let inv = matrix.inverse().unwrap();
 
-        assert_eq!(matrix.apply(inv.apply(test_vector)), test_vector,);
-        // assert_eq!(inv.compose(&matrix), Matrix::diag(),)
+        // Verify that applying the inverse matrix to the test vector,
+        // then applying the original matrix, results in the original vector.
+        assert_eq!(matrix.apply(inv.apply(test_vector)), test_vector);
+
+        // Optionally, verify that the composition of the matrix and its inverse
+        // produces the identity matrix.
+        // This line is commented out but can be uncommented for additional checks.
+        // assert_eq!(inv.compose(&matrix), Matrix::diag());
     }
 
     #[test]
