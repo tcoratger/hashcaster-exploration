@@ -106,10 +106,11 @@ impl BinaryField128b {
     /// ### Returns
     /// - A new `BinaryField128b` instance representing the result of \( x^{2^k} \), where \( x \)
     ///   is the input.
+    #[must_use]
     pub fn frobenius(&self, k: i32) -> Self {
         // Normalize `k` to the range [0, 127].
         // Ensures the Frobenius map behaves cyclically with a period of 128.
-        let k = ((k % 128 + 128) % 128) as usize;
+        let k = k.rem_euclid(128) as usize;
 
         // Retrieve the precomputed Frobenius matrix for `k`.
         let matrix = &FROBENIUS[k];

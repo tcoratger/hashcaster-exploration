@@ -1,5 +1,5 @@
 /// An iterator over the set bits in a `u64`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BitIterator(u64);
 
 impl BitIterator {
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_random_bit_pattern() {
         // Test with a random bit pattern
-        let mut iter = BitIterator::new(0b1100101);
+        let mut iter = BitIterator::new(0b110_0101);
         // First set bit is at position 0
         assert_eq!(iter.next(), Some(0));
         // Next set bit is at position 2
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_trailing_zeros_optimization() {
         // Test behavior with leading zeros
-        let mut iter = BitIterator::new(0b10000000);
+        let mut iter = BitIterator::new(0b1000_0000);
         // The only set bit is at position 7
         assert_eq!(iter.next(), Some(7));
         // No more bits

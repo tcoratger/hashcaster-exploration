@@ -14,11 +14,10 @@ pub mod tests {
     use frobenius::FROBENIUS;
     use frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE;
     use matrix::Matrix;
-    use num_traits::{One, Zero};
 
     pub fn u128_from_bits(bits: &[bool]) -> u128 {
         assert!(bits.len() <= 128, "Bit array length exceeds u128 capacity");
-        bits.iter().enumerate().fold(0, |acc, (i, &bit)| acc | ((bit as u128) << i))
+        bits.iter().enumerate().fold(0, |acc, (i, &bit)| acc | ((u128::from(bit)) << i))
     }
 
     #[test]
@@ -70,6 +69,7 @@ pub mod tests {
     }
 
     #[test]
+    #[allow(clippy::large_stack_frames)]
     fn test_frobenius_cobasis_precompute_table_transpose() {
         // Fetch the precomputed Frobenius cobasis table
         let table = COBASIS_FROBENIUS;
@@ -80,9 +80,9 @@ pub mod tests {
         // Compute the expected transpose of the Frobenius cobasis table
         let expected_table_transpose: [[u128; 128]; 128] = {
             let mut table_transpose = [[0; 128]; 128];
-            for i in 0..128 {
-                for j in 0..128 {
-                    table_transpose[j][i] = table[i][j];
+            for (i, t) in table.iter().enumerate() {
+                for (j, tt) in table_transpose.iter_mut().enumerate() {
+                    tt[i] = t[j];
                 }
             }
             table_transpose

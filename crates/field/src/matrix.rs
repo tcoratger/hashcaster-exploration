@@ -184,10 +184,9 @@ impl Matrix {
     /// the pivot in a specific column, as part of transforming the matrix into row echelon form.
     ///
     /// ### Examples
-    /// - **Eliminating a column**: Given two columns:
-    /// ```text Column i: 1010 Column j: 1100 ```
-    ///   After calling `triang(0, 1)`, column `j` becomes:
-    /// ```text Column j: 1100 XOR 1010 = 0110 ```
+    /// - **Eliminating a column**: Given two columns: ```text Column i: 1010 Column j: 1100 ```
+    ///   After calling `triang(0, 1)`, column `j` becomes: ```text Column j: 1100 XOR 1010 =
+    ///   0110```
     pub fn triang(&mut self, i: usize, j: usize) {
         self.cols[j] ^= self.cols[i];
     }
@@ -265,7 +264,6 @@ fn u128_to_bits(x: u128) -> Vec<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytemuck::cast;
     use rand::{rngs::OsRng, Rng, RngCore};
 
     #[test]
