@@ -1,4 +1,8 @@
-use crate::backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce};
+use crate::{
+    backend::karatsuba::{karatsuba1, karatsuba2, mont_reduce},
+    bit_iterator::BitIterator,
+    frobenius::FROBENIUS,
+};
 use bytemuck::{Pod, Zeroable};
 use num_traits::{MulAddAssign, One, Zero};
 use rand::Rng;
@@ -85,6 +89,52 @@ impl BinaryField128b {
     pub fn random() -> Self {
         // Use the `rand` crate to generate a random `u128` value.
         Self::new(rand::thread_rng().gen())
+    }
+
+    /// **Performs the Frobenius map computation in GF(2^128).**
+    ///
+    /// ### Description
+    /// - The Frobenius map is a field automorphism in finite fields of characteristic 2.
+    /// - It maps an element `x` to `x^(2^k)`, where `k` is the specified parameter.
+    /// - This implementation leverages precomputed Frobenius tables (`FROBENIUS`) for high
+    ///   efficiency.
+    ///
+    /// ### Parameters
+    /// - `self`: The field element to which the Frobenius map will be applied.
+    /// - `k`: The number of iterations of the Frobenius map. Can be positive or negative.
+    ///
+    /// ### Returns
+    /// - A new `BinaryField128b` instance representing the result of \( x^{2^k} \), where \( x \)
+    ///   is the input.
+    pub fn frobenius(&self, k: i32) -> Self {
+        // Normalize `k` to the range [0, 127].
+        // Ensures the Frobenius map behaves cyclically with a period of 128.
+        let k = ((k % 128 + 128) % 128) as usize;
+
+        // Retrieve the precomputed Frobenius matrix for `k`.
+        let matrix = &FROBENIUS[k];
+
+        // Initialize the result accumulator and extract the raw value of `self`.
+        let mut ret = 0u128;
+        // Extract the internal `u128` value of `self`.
+        let raw = self.into_inner();
+
+        // Process the lower 64 bits of `raw`.
+        // Iterate over each set bit in the lower half of the input (64 bits).
+        for tz in BitIterator::new(raw as u64) {
+            // XOR the transformation result into the accumulator.
+            ret ^= matrix[tz];
+        }
+
+        // Process the upper 64 bits of `raw`.
+        // Similar to the lower bits but offsets the matrix index by 64.
+        for tz in BitIterator::new((raw >> 64) as u64) {
+            // XOR the transformation result for upper bits.
+            ret ^= matrix[tz + 64];
+        }
+
+        // Return the computed result as a new `BinaryField128b` instance.
+        Self::new(ret)
     }
 }
 
@@ -679,5 +729,29 @@ mod tests {
             "Combination of basis elements did not produce the expected result: {:#b}",
             poly.0
         );
+    }
+
+    #[test]
+    fn test_frobenius() {
+        // Generate a random field element in GF(2^128).
+        let a = BinaryField128b::random();
+
+        // Initialize a variable `apow` with the same value as `a`.
+        // This variable will be used to compute successive powers of `a` using repeated squaring.
+        let mut apow = a;
+
+        // Iterate over the range 0 to 127.
+        // The Frobenius map is periodic with a cycle length of 128, so we test all powers in this
+        // range.
+        for i in 0..128 {
+            // Assert that the result of applying the Frobenius map to `a` matches `apow`.
+            // - `a.frobenius(i)` computes \( a^{2^i} \) using the precomputed Frobenius tables.
+            // - `apow` is expected to represent \( a^{2^i} \), calculated using repeated squaring.
+            assert_eq!(a.frobenius(i), apow);
+
+            // Update `apow` by squaring its current value for the next iteration.
+            // This step computes \( apow = apow^2 \), which is equivalent to \( a^{2^{i+1}} \).
+            apow *= apow;
+        }
     }
 }
