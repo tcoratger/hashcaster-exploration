@@ -14,6 +14,12 @@ pub mod tests {
     use frobenius::FROBENIUS;
     use frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE;
     use matrix::Matrix;
+    use num_traits::{One, Zero};
+
+    pub fn u128_from_bits(bits: &[bool]) -> u128 {
+        assert!(bits.len() <= 128, "Bit array length exceeds u128 capacity");
+        bits.iter().enumerate().fold(0, |acc, (i, &bit)| acc | ((bit as u128) << i))
+    }
 
     #[test]
     fn test_frobenius_precompute_table() {
@@ -85,4 +91,36 @@ pub mod tests {
         // Ensure the precomputed Frobenius cobasis transpose table matches the expected transpose
         assert_eq!(table_transpose, expected_table_transpose);
     }
+
+    // #[test]
+    // fn test_frobenius_cobasis() {
+    //     let mut matrix = vec![vec![false; 128]; 128];
+    //     for i in 0..128 {
+    //         let b_i = BinaryField128b::basis(i);
+
+    //         // compute pi_i linear function
+    //         for j in 0..128 {
+    //             let b_j = BinaryField128b::basis(j);
+    //             let mut x = b_j * b_i;
+
+    //             let mut s = BinaryField128b::zero();
+    //             for k in 0..128 {
+    //                 s += x;
+    //                 x *= x;
+    //             }
+
+    //             if s == BinaryField128b::one() {
+    //                 matrix[i][j] = true;
+    //             }
+    //         }
+    //     }
+
+    //     let mut matrix_columns = [0; 128];
+    //     for i in 0..128 {
+    //         matrix_columns[i] = u128_from_bits(&matrix[i]);
+    //     }
+
+    //     let matrix = Matrix::new(matrix_columns);
+    //     let ret = matrix.inverse().unwrap().cols;
+    // }
 }

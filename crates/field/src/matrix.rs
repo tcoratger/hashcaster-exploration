@@ -70,6 +70,37 @@ impl Matrix {
         // Create and return the matrix with the diagonal columns.
         Self::new(cols)
     }
+
+    /// Swaps two columns in the matrix.
+    ///
+    /// This function exchanges the contents of the `i`-th and `j`-th columns of the matrix.
+    /// The operation is performed in place and is efficient even for large matrices.
+    ///
+    /// # Parameters
+    /// - `i`: The index of the first column to be swapped.
+    /// - `j`: The index of the second column to be swapped.
+    ///
+    /// # Panics
+    /// - This function does not explicitly check for out-of-bounds indices. Passing indices outside
+    ///   the range `[0, 127]` for the 128x128 matrix will result in undefined behavior.
+    ///
+    /// # Safety
+    /// - The function uses `unsafe` code to bypass Rust's borrowing rules, ensuring efficient
+    ///   swapping. However, it guarantees correctness as long as the indices `i` and `j` are valid.
+    ///
+    /// # Complexity
+    /// - \(O(1)\): The swap is performed in constant time.
+    pub fn swap_cols(&mut self, i: usize, j: usize) {
+        // Check if the indices are different to avoid unnecessary operations.
+        if i != j {
+            // Unsafe block is required for `std::ptr::swap` to allow mutable access
+            // to two separate elements of the same array without violating borrowing rules.
+            unsafe {
+                // Perform the swap between the `i`-th and `j`-th columns.
+                std::ptr::swap(&mut self.cols[i], &mut self.cols[j]);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -87,6 +118,89 @@ mod tests {
         // Check that each element is a power of 2
         for (i, col) in diag_matrix.cols.iter().enumerate() {
             assert_eq!(*col, 1 << i, "Column {i} did not match expected value.");
+        }
+    }
+
+    #[test]
+    fn test_swap_cols_basic() {
+        let mut matrix = Matrix::diag();
+
+        // Swap two columns
+        matrix.swap_cols(0, 1);
+
+        // Check that the columns have been swapped
+        assert_eq!(matrix.cols[0], 1 << 1, "Column 0 should contain the value of Column 1.");
+        assert_eq!(matrix.cols[1], 1 << 0, "Column 1 should contain the value of Column 0.");
+    }
+
+    #[test]
+    fn test_swap_cols_noop() {
+        let mut matrix = Matrix::diag();
+
+        // Swap a column with itself
+        matrix.swap_cols(3, 3);
+
+        // Ensure the matrix remains unchanged
+        for i in 0..128 {
+            assert_eq!(matrix.cols[i], 1 << i, "Column {i} should remain unchanged.");
+        }
+    }
+
+    #[test]
+    fn test_swap_cols_random_indices() {
+        let mut matrix = Matrix::diag();
+
+        // Swap two arbitrary columns
+        matrix.swap_cols(5, 10);
+
+        // Check that the swap was successful
+        assert_eq!(matrix.cols[5], 1 << 10, "Column 5 should contain the value of Column 10.");
+        assert_eq!(matrix.cols[10], 1 << 5, "Column 10 should contain the value of Column 5.");
+
+        // Ensure other columns remain unchanged
+        for i in 0..128 {
+            if i != 5 && i != 10 {
+                assert_eq!(matrix.cols[i], 1 << i, "Column {i} should remain unchanged.");
+            }
+        }
+    }
+
+    #[test]
+    fn test_swap_cols_edge_indices() {
+        let mut matrix = Matrix::diag();
+
+        // Swap the first and last columns
+        matrix.swap_cols(0, 127);
+
+        // Check that the swap was successful
+        assert_eq!(matrix.cols[0], 1 << 127, "Column 0 should contain the value of Column 127.");
+        assert_eq!(matrix.cols[127], 1 << 0, "Column 127 should contain the value of Column 0.");
+
+        // Ensure other columns remain unchanged
+        for i in 1..127 {
+            assert_eq!(matrix.cols[i], 1 << i, "Column {i} should remain unchanged.");
+        }
+    }
+
+    #[test]
+    fn test_swap_cols_multiple_swaps() {
+        let mut matrix = Matrix::diag();
+
+        // Perform multiple swaps
+        matrix.swap_cols(0, 5);
+        matrix.swap_cols(5, 10);
+        matrix.swap_cols(10, 0);
+
+        // Check the final state of the swapped columns
+        assert_eq!(matrix.cols[0], 1);
+        assert_eq!(matrix.cols[5], 1 << 10);
+        assert_eq!(matrix.cols[10], 1 << 5);
+
+        // Ensure other columns remain unchanged
+        for i in 0..128 {
+            if i != 0 && i != 5 && i != 10 {
+                assert_eq!(matrix.cols[i], 1 << i, "Column {i} should remain unchanged.");
+            }
         }
     }
 }
