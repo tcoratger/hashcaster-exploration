@@ -12,6 +12,7 @@ pub mod tests {
     use crate::frobenius_cobasis::{COBASIS, COBASIS_FROBENIUS};
     use binary_field::BinaryField128b;
     use frobenius::FROBENIUS;
+    use frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE;
     use matrix::Matrix;
 
     #[test]
@@ -60,5 +61,28 @@ pub mod tests {
 
         // Ensure the cobasis returns to its initial state
         assert_eq!(cobasis, Matrix::new(COBASIS), "Basis did not return to its original state");
+    }
+
+    #[test]
+    fn test_frobenius_cobasis_precompute_table_transpose() {
+        // Fetch the precomputed Frobenius cobasis table
+        let table = COBASIS_FROBENIUS;
+
+        // Fetch the precomputed Frobenius cobasis transpose table
+        let table_transpose = COBASIS_FROBENIUS_TRANSPOSE;
+
+        // Compute the expected transpose of the Frobenius cobasis table
+        let expected_table_transpose: [[u128; 128]; 128] = {
+            let mut table_transpose = [[0; 128]; 128];
+            for i in 0..128 {
+                for j in 0..128 {
+                    table_transpose[j][i] = table[i][j];
+                }
+            }
+            table_transpose
+        };
+
+        // Ensure the precomputed Frobenius cobasis transpose table matches the expected transpose
+        assert_eq!(table_transpose, expected_table_transpose);
     }
 }
