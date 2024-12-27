@@ -257,10 +257,6 @@ impl Matrix {
     }
 }
 
-fn u128_to_bits(x: u128) -> Vec<bool> {
-    (0..128).map(|i| (x >> i) & 1 != 0).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
