@@ -16,8 +16,11 @@ pub mod tests {
     use matrix::Matrix;
     use num_traits::{One, Zero};
 
+    /// Converts a slice of booleans to a `u128` integer.
     pub fn u128_from_bits(bits: &[bool]) -> u128 {
+        // Ensure the bit array length does not exceed the capacity of a `u128`.
         assert!(bits.len() <= 128, "Bit array length exceeds u128 capacity");
+        // Fold the bits into a `u128` integer, setting each bit from the slice.
         bits.iter().enumerate().fold(0, |acc, (i, &bit)| acc | ((u128::from(bit)) << i))
     }
 
