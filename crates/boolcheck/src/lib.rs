@@ -17,19 +17,19 @@ pub mod package;
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheck {
-    points: Points,
-    poly: Vec<BinaryField128b>,
-    polys: Vec<Vec<BinaryField128b>>,
-    extended_table: Vec<BinaryField128b>,
+    pub points: Points,
+    pub poly: Vec<BinaryField128b>,
+    pub polys: Vec<Vec<BinaryField128b>>,
+    pub extended_table: Vec<BinaryField128b>,
     poly_coords: Option<Evaluations>,
-    c: usize,
-    challenges: Points,
-    bit_mapping: Vec<u16>,
-    eq_sequence: MultilinearLagrangianPolynomials,
-    round_polys: Vec<CompressedPoly>,
-    claim: BinaryField128b,
-    boolean_package: BooleanPackage,
-    gammas: Vec<BinaryField128b>,
+    pub c: usize,
+    pub challenges: Points,
+    pub bit_mapping: Vec<u16>,
+    pub eq_sequence: MultilinearLagrangianPolynomials,
+    pub round_polys: Vec<CompressedPoly>,
+    pub claim: BinaryField128b,
+    pub boolean_package: BooleanPackage,
+    pub gammas: Vec<BinaryField128b>,
 }
 
 impl BoolCheck {
@@ -594,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_round_polynomial() {
+    fn test_compute_imaginary_round() {
         // Set the number of variables for the test.
         let num_vars = 3;
 
@@ -617,7 +617,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Set a phase switch parameter, which controls the folding phases.
-        let phase_switch = 1;
+        let phase_switch = 2;
 
         // Generate a folding challenge `gamma`
         let gamma = BinaryField128b::new(1234);
@@ -639,6 +639,40 @@ mod tests {
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
         let mut boolcheck = boolcheck_builder.build(&[p, q]);
+
+        // Validate the initial extended table.
+        assert_eq!(
+            boolcheck.extended_table,
+            vec![
+                BinaryField128b::new(0),
+                BinaryField128b::new(1),
+                BinaryField128b::new(1),
+                BinaryField128b::new(2),
+                BinaryField128b::new(3),
+                BinaryField128b::new(1),
+                BinaryField128b::new(2),
+                BinaryField128b::new(2),
+                BinaryField128b::new(0),
+                BinaryField128b::new(4),
+                BinaryField128b::new(5),
+                BinaryField128b::new(1),
+                BinaryField128b::new(6),
+                BinaryField128b::new(7),
+                BinaryField128b::new(1),
+                BinaryField128b::new(2),
+                BinaryField128b::new(2),
+                BinaryField128b::new(0),
+                BinaryField128b::new(4),
+                BinaryField128b::new(4),
+                BinaryField128b::new(0),
+                BinaryField128b::new(4),
+                BinaryField128b::new(4),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+            ]
+        );
 
         // Compute the round polynomial for an imaginary round.
         let compressed_round_polynomial = boolcheck.compute_round_polynomial();
@@ -666,5 +700,48 @@ mod tests {
                 BinaryField128b::new(1)
             ])
         );
+
+        // Generate an imaginary random challenge (fixed for testing purposes).
+        let r = BinaryField128b::new(5678);
+
+        // Update the current claim using the round polynomial and the random value.
+        let current_claim = round_polynomial[0] +
+            r * round_polynomial[1] +
+            r * r * round_polynomial[2] +
+            r * r * r * round_polynomial[3];
+
+        // Verify the correctness of the updated claim.
+        assert_eq!(current_claim, BinaryField128b::new(284181495769767592368287233794578256034));
+
+        // Bind the random value `r` to the Boolean check for the next round.
+        boolcheck.bind(r);
+
+        // Validate the updated extended table after the first imaginary round.
+        assert_eq!(
+            boolcheck.extended_table,
+            vec![
+                BinaryField128b::new(144961788882111902000582228079393390932),
+                BinaryField128b::new(144961788882111902000582228079393390934),
+                BinaryField128b::new(2),
+                BinaryField128b::new(144961788882111902000582228079393390928),
+                BinaryField128b::new(144961788882111902000582228079393390930),
+                BinaryField128b::new(2),
+                BinaryField128b::new(4),
+                BinaryField128b::new(4),
+                BinaryField128b::new(0),
+            ]
+        );
+
+        // Validate the update of the boolcheck claim.
+        assert_eq!(boolcheck.claim, BinaryField128b::new(284181495769767592368287233794578256034));
+
+        // Verify that the challenge has been integrated inside the boolcheck.
+        assert_eq!(
+            boolcheck.challenges,
+            Points::from(vec![Point::from(BinaryField128b::new(5678))])
+        );
+
+        // Verify the correctness of the round polynomial cache.
+        assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
     }
 }
