@@ -640,8 +640,6 @@ mod tests {
         // - the folding challenge `gamma`.
         let mut boolcheck = boolcheck_builder.build(&[p, q]);
 
-        let start = std::time::Instant::now();
-
         // Compute the round polynomial for an imaginary round.
         let compressed_round_polynomial = boolcheck.compute_round_polynomial();
 
@@ -649,6 +647,20 @@ mod tests {
         assert_eq!(
             compressed_round_polynomial,
             CompressedPoly::new(vec![
+                BinaryField128b::new(332514690820570361331092984923254947853),
+                BinaryField128b::new(1),
+                BinaryField128b::new(1)
+            ])
+        );
+
+        // Decompress the imaginary round polynomial to obtain the coefficients.
+        let round_polynomial = compressed_round_polynomial.coeffs(initial_claim);
+
+        // Verify the decompressed round polynomial.
+        assert_eq!(
+            round_polynomial,
+            UnivariatePolynomial::new(vec![
+                BinaryField128b::new(332514690820570361331092984923254947853),
                 BinaryField128b::new(332514690820570361331092984923254947853),
                 BinaryField128b::new(1),
                 BinaryField128b::new(1)
