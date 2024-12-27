@@ -6,7 +6,7 @@ use num_traits::One;
 
 /// A point represented as a field element in a binary field.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Point(BinaryField128b);
+pub struct Point(pub BinaryField128b);
 
 impl From<BinaryField128b> for Point {
     fn from(field_element: BinaryField128b) -> Self {

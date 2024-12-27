@@ -400,17 +400,24 @@ impl BoolCheck {
 
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - c - 1);
-        let mut frob_evals: Vec<_> =
-            (0..128 * self.polys.len()).map(|i| poly_coords[i * base_index]).collect();
+        let mut frob_evals: Vec<Evaluations> = self
+            .polys
+            .iter()
+            .map(|_| (0..128).map(|i| poly_coords[i * base_index]).collect::<Vec<_>>().into())
+            .collect();
 
-        BoolCheckOutput::default()
+        // For each chunk of 128 evaluations, apply the twist operation.
+        frob_evals.iter_mut().for_each(|evals| evals.twist());
+
+        // Return the `BoolCheckOutput`
+        BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckOutput {
     /// A vector containing the evaluations of the polynomials on a Frobenius subdomain.
-    pub frob_evals: Vec<BinaryField128b>,
+    pub frob_evals: Vec<Evaluations>,
 
     /// A vector of compressed polynomials computed during the protocol's rounds.
     pub round_polys: Vec<CompressedPoly>,
@@ -511,7 +518,7 @@ mod tests {
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
             phase_switch,
-            points.into(),
+            points.clone().into(),
             BooleanPackage::And,
             [initial_claim],
             gamma,
@@ -561,5 +568,91 @@ mod tests {
             // Bind the random value `r` to the Boolean check for the next round.
             boolcheck.bind(r);
         }
+
+        // Finish the protocol and obtain the output.
+        let BoolCheckOutput { frob_evals, round_polys } = boolcheck.finish();
+
+        // Flatten the Frobenius evaluations into a single vector.
+        let mut frob_evals: Vec<BinaryField128b> =
+            frob_evals.iter().flat_map(|eval| eval.clone().into_inner()).collect();
+
+        // Add a zero element to the end of the evaluations for padding.
+        frob_evals.push(BinaryField128b::zero());
+
+        let bool_check_builder =
+            BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
+
+        let and_algebraic = bool_check_builder.exec_alg(&frob_evals, 0, 1);
+
+        let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
+        let random_values: Points =
+            random_values.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
+
+        let expected_claim = and_algebraic[0][0] * points.eq_eval(&random_values).0;
+
+        assert_eq!(current_claim, expected_claim);
+    }
+
+    #[test]
+    fn test_compute_round_polynomial() {
+        // Set the number of variables for the test.
+        let num_vars = 3;
+
+        // Generate a vector `points` of `num_vars` field elements in `BinaryField128b`.
+        let points: Vec<_> = (0..num_vars).map(BinaryField128b::new).collect();
+
+        // Generate a vector `p` with 2^num_vars elements.
+        let p: MultilinearLagrangianPolynomial =
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+
+        // Generate another vector `q` with 2^num_vars elements.
+        let q: MultilinearLagrangianPolynomial =
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        // The result is stored in `p_and_q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // The prover compute the initial claim for the AND operation at the points in `points`.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter, which controls the folding phases.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance with:
+        // - the phase switch parameter (c),
+        // - the points at which the AND operation is evaluated,
+        // - the Boolean package (AND operation for this test).
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.clone().into(),
+            BooleanPackage::And,
+            [initial_claim],
+            gamma,
+        );
+
+        // Build the Boolean check with the following parameters:
+        // - the multilinear polynomials `p` and `q` used in the AND operation,
+        // - the initial claim for the AND operation,
+        // - the folding challenge `gamma`.
+        let mut boolcheck = boolcheck_builder.build(&[p, q]);
+
+        let start = std::time::Instant::now();
+
+        // Compute the round polynomial for an imaginary round.
+        let compressed_round_polynomial = boolcheck.compute_round_polynomial();
+
+        // Verify the compressed round polynomial.
+        assert_eq!(
+            compressed_round_polynomial,
+            CompressedPoly::new(vec![
+                BinaryField128b::new(332514690820570361331092984923254947853),
+                BinaryField128b::new(1),
+                BinaryField128b::new(1)
+            ])
+        );
     }
 }

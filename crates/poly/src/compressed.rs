@@ -9,6 +9,10 @@ use crate::univariate::UnivariatePolynomial;
 pub struct CompressedPoly(Vec<BinaryField128b>);
 
 impl CompressedPoly {
+    pub const fn new(coeffs: Vec<BinaryField128b>) -> Self {
+        Self(coeffs)
+    }
+
     pub fn compress(poly: &[BinaryField128b]) -> (Self, BinaryField128b) {
         let sum = poly.iter().skip(1).fold(BinaryField128b::zero(), |a, b| a + b);
         (Self(std::iter::once(&poly[0]).chain(&poly[2..]).copied().collect()), sum)

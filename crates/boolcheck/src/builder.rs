@@ -13,11 +13,11 @@ use rayon::{
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckBuilder<const M: usize> {
-    c: usize,
-    points: Points,
-    boolean_package: BooleanPackage,
-    gammas: Vec<BinaryField128b>,
-    claim: BinaryField128b,
+    pub c: usize,
+    pub points: Points,
+    pub boolean_package: BooleanPackage,
+    pub gammas: Vec<BinaryField128b>,
+    pub claim: BinaryField128b,
 }
 
 impl<const M: usize> BoolCheckBuilder<M> {

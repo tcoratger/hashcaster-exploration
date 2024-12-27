@@ -14,6 +14,11 @@ impl Evaluations {
         Self(evaluations)
     }
 
+    /// Consumes the `Evaluations` instance and returns the inner vector of evaluations.
+    pub fn into_inner(self) -> Vec<BinaryField128b> {
+        self.0
+    }
+
     /// Computes the evaluation of the `pi` function at a given index `i`.
     ///
     /// # Theory
@@ -137,6 +142,12 @@ impl Evaluations {
 impl From<Vec<BinaryField128b>> for Evaluations {
     fn from(evaluations: Vec<BinaryField128b>) -> Self {
         Self(evaluations)
+    }
+}
+
+impl From<&[BinaryField128b]> for Evaluations {
+    fn from(evaluations: &[BinaryField128b]) -> Self {
+        Self(evaluations.to_vec())
     }
 }
 
