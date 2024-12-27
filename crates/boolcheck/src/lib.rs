@@ -407,7 +407,7 @@ impl BoolCheck {
             .collect();
 
         // For each chunk of 128 evaluations, apply the twist operation.
-        frob_evals.iter_mut().for_each(|evals| evals.twist());
+        frob_evals.iter_mut().for_each(hashcaster_poly::evaluation::Evaluations::twist);
 
         // Return the `BoolCheckOutput`
         BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
@@ -429,7 +429,6 @@ mod tests {
     use builder::BoolCheckBuilder;
     use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
     use package::BooleanPackage;
-    use std::iter::repeat_with;
 
     #[test]
     fn test_current_rounds() {
@@ -485,19 +484,19 @@ mod tests {
 
         // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
         // This represents a set of random variables that will be used in the test.
-        let points: Vec<_> = repeat_with(BinaryField128b::random).take(num_vars).collect();
+        let points: Vec<_> = (0..num_vars).map(|_| BinaryField128b::random()).collect();
 
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
         let p: MultilinearLagrangianPolynomial =
-            repeat_with(BinaryField128b::random).take(1 << num_vars).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
         let q: MultilinearLagrangianPolynomial =
-            repeat_with(BinaryField128b::random).take(1 << num_vars).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -594,6 +593,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_compute_imaginary_round() {
         // Set the number of variables for the test.
         let num_vars = 3;
@@ -628,7 +628,7 @@ mod tests {
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
             phase_switch,
-            points.clone().into(),
+            points.into(),
             BooleanPackage::And,
             [initial_claim],
             gamma,

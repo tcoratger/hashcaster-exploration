@@ -122,6 +122,7 @@ impl Evaluations {
     /// 2. Use the `pi` function to reconstruct the evaluations from the twisted form.
     pub fn untwist(&mut self) {
         // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
+        #[allow(clippy::cast_possible_wrap)]
         for i in 0..128 {
             self[i] = self[i].frobenius(i as i32);
         }
@@ -130,8 +131,8 @@ impl Evaluations {
         let mut untwisted = [BinaryField128b::zero(); 128];
 
         // Compute the untwisted evaluations using the `pi` function.
-        for i in 0..128 {
-            untwisted[i] = self.pi(i);
+        for (i, ut) in untwisted.iter_mut().enumerate() {
+            *ut = self.pi(i);
         }
 
         // Replace the current evaluations with the untwisted evaluations.
@@ -226,8 +227,8 @@ mod tests {
         orbit[5] = BinaryField128b::one();
         let orbit: Evaluations = orbit.into();
 
-        for i in 0..128 {
-            let expected = BinaryField128b::new(COBASIS_FROBENIUS_TRANSPOSE[i][5]);
+        for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
+            let expected = BinaryField128b::new(cobasis[5]);
             assert_eq!(orbit.pi(i), expected, "Failed for index {i}");
         }
     }
@@ -239,8 +240,8 @@ mod tests {
             .collect::<Vec<_>>()
             .into();
 
-        for i in 0..128 {
-            let expected = COBASIS_FROBENIUS_TRANSPOSE[i]
+        for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
+            let expected = cobasis
                 .iter()
                 .enumerate()
                 .filter(|(j, _)| j % 2 == 0) // Only include contributions from even indices.
@@ -256,9 +257,9 @@ mod tests {
         let orbit: Evaluations =
             (0..128).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
-        for i in 0..128 {
+        for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
-                .map(|j| BinaryField128b::new(COBASIS_FROBENIUS_TRANSPOSE[i][j]) * orbit[j])
+                .map(|j| BinaryField128b::new(cobasis[j]) * orbit[j])
                 .fold(BinaryField128b::zero(), |acc, x| acc + x);
 
             assert_eq!(orbit.pi(i), expected, "Failed for index {i}");
