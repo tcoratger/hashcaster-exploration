@@ -1,7 +1,8 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    compressed::CompressedPoly, multinear_lagrangian::MultilinearLagrangianPolynomials,
-    point::Points, univariate::UnivariatePolynomial,
+    compressed::CompressedPoly, evaluation::Evaluations,
+    multinear_lagrangian::MultilinearLagrangianPolynomials, point::Points,
+    univariate::UnivariatePolynomial,
 };
 use num_traits::{One, Zero};
 use package::BooleanPackage;
@@ -20,7 +21,7 @@ pub struct BoolCheck {
     poly: Vec<BinaryField128b>,
     polys: Vec<Vec<BinaryField128b>>,
     extended_table: Vec<BinaryField128b>,
-    poly_coords: Option<Vec<BinaryField128b>>,
+    poly_coords: Option<Evaluations>,
     c: usize,
     challenges: Points,
     bit_mapping: Vec<u16>,
@@ -259,7 +260,7 @@ impl BoolCheck {
 
     pub fn exec_alg(
         &self,
-        data: &[BinaryField128b],
+        data: &Evaluations,
         mut idx_a: usize,
         offset: usize,
     ) -> [BinaryField128b; 3] {

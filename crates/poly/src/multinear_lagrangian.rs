@@ -1,4 +1,5 @@
 use crate::{
+    evaluation::Evaluations,
     point::Points,
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
@@ -389,7 +390,7 @@ impl MultilinearLagrangianPolynomials {
     /// # Panics
     /// - If the number of coefficients in a polynomial does not match `2^dims`.
     /// - If the number of challenges exceeds `dims`.
-    pub fn restrict(&self, challenges: &Points, dims: usize) -> Vec<BinaryField128b> {
+    pub fn restrict(&self, challenges: &Points, dims: usize) -> Evaluations {
         // Ensure that all input polynomials have the correct length of 2^n.
         // Panics if this condition is violated.
         self.iter().for_each(|poly| assert_eq!(poly.len(), 1 << dims));
@@ -488,8 +489,8 @@ impl MultilinearLagrangianPolynomials {
                 });
         });
 
-        // Return the final result vector.
-        ret
+        // Return the final evaluations.
+        Evaluations::new(ret)
     }
 }
 
