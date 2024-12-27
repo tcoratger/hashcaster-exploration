@@ -56,6 +56,21 @@ impl Evaluations {
         })
     }
 
+    /// Applies the "twist" transformation to the evaluations.
+    ///
+    /// # Theory
+    /// The twist transformation maps the evaluations of a polynomial into
+    /// an inverse Frobenius orbit. This involves applying successive squarings
+    /// (Frobenius map: \( x \mapsto x^2 \)) and reconstructing the evaluations
+    /// using a weighted sum with a fixed basis.
+    ///
+    /// ## Steps
+    /// 1. Perform successive squarings of all evaluations.
+    /// 2. Use a basis to compute weighted sums of the squared values to form the twisted
+    ///    evaluations.
+    /// 3. Reverse the order of the twisted evaluations to align them with the inverse Frobenius
+    ///    orbit.
+    /// 4. Replace the original evaluations with the twisted evaluations.
     pub fn twist(&mut self) {
         // Create a vector to store the twisted evaluations.
         // This will hold the new evaluations of P in the inverse Frobenius orbit.
@@ -88,14 +103,35 @@ impl Evaluations {
         self.clone_from_slice(&twisted_evals);
     }
 
-    // pub fn untwist(&mut self) {
-    //     for i in 0..128 {
-    //         self[i] = self[i].frobenius(i as i32);
-    //     }
+    /// Reverts the "twist" transformation by applying the inverse.
+    ///
+    /// # Theory
+    /// The untwist transformation reverts the evaluations back to their
+    /// original space by:
+    /// 1. Applying the Frobenius transformation to each element.
+    /// 2. Using the `pi` function to reconstruct the original evaluations based on a dual basis
+    ///    representation.
+    ///
+    /// ## Steps
+    /// 1. Apply the Frobenius map \( x \mapsto x^{2^i} \) to align the elements.
+    /// 2. Use the `pi` function to reconstruct the evaluations from the twisted form.
+    pub fn untwist(&mut self) {
+        // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
+        for i in 0..128 {
+            self[i] = self[i].frobenius(i as i32);
+        }
 
-    //     let untwisted: Vec<_> = (0..128).map(|i| pi(i, &twisted_evals)).collect();
-    //     self.copy_from_slice(&untwisted);
-    // }
+        // Use a fixed-size array to store the untwisted evaluations.
+        let mut untwisted = [BinaryField128b::zero(); 128];
+
+        // Compute the untwisted evaluations using the `pi` function.
+        for i in 0..128 {
+            untwisted[i] = self.pi(i);
+        }
+
+        // Replace the current evaluations with the untwisted evaluations.
+        self.copy_from_slice(&untwisted);
+    }
 }
 
 impl From<Vec<BinaryField128b>> for Evaluations {
@@ -216,5 +252,57 @@ mod tests {
 
             assert_eq!(orbit.pi(i), expected, "Failed for index {i}");
         }
+    }
+
+    #[test]
+    fn twist_untwist() {
+        // Generate a random set of 128 evaluations.
+        let lhs: Evaluations =
+            Evaluations::from((0..128).map(|_| BinaryField128b::random()).collect::<Vec<_>>());
+
+        // Clone `lhs` to create an independent copy for transformation.
+        let mut rhs = lhs.clone();
+
+        // Apply `twist` followed by `untwist` to `rhs`.
+        rhs.twist();
+        rhs.untwist();
+
+        // Assert that `rhs` matches the original `lhs`.
+        assert_eq!(lhs, rhs, "Twist followed by untwist did not restore the original evaluations.");
+
+        // Apply `untwist` followed by `twist` to `rhs`.
+        rhs.untwist();
+        rhs.twist();
+
+        // Assert that `rhs` matches the original `lhs` again.
+        assert_eq!(lhs, rhs, "Untwist followed by twist did not restore the original evaluations.");
+    }
+
+    #[test]
+    fn test_twist_all_zeros() {
+        // All evaluations are initially zero.
+        let mut evaluations: Evaluations = vec![BinaryField128b::zero(); 128].into();
+
+        // Apply the `twist` transformation.
+        evaluations.twist();
+
+        // Assert that all evaluations remain zero after the transformation.
+        evaluations.iter().for_each(|&val| {
+            assert_eq!(val, BinaryField128b::zero(), "Twist failed for all-zero input.");
+        });
+    }
+
+    #[test]
+    fn test_untwist_all_zeros() {
+        // All evaluations are initially zero.
+        let mut evaluations: Evaluations = vec![BinaryField128b::zero(); 128].into();
+
+        // Apply the `untwist` transformation.
+        evaluations.untwist();
+
+        // Assert that all evaluations remain zero after the transformation.
+        evaluations.iter().for_each(|&val| {
+            assert_eq!(val, BinaryField128b::zero(), "Untwist failed for all-zero input.");
+        });
     }
 }
