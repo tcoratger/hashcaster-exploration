@@ -405,7 +405,10 @@ impl BoolCheck {
         let mut frob_evals: Vec<Evaluations> = self
             .polys
             .iter()
-            .map(|_| (0..128).map(|i| poly_coords[i * base_index]).collect::<Vec<_>>().into())
+            .enumerate()
+            .map(|(i, _)| {
+                (0..128).map(|j| poly_coords[(i * 128 + j) * base_index]).collect::<Vec<_>>().into()
+            })
             .collect();
 
         // For each chunk of 128 evaluations, apply the twist operation.
@@ -571,7 +574,7 @@ mod tests {
         }
 
         // Finish the protocol and obtain the output.
-        let BoolCheckOutput { mut frob_evals, round_polys } = boolcheck.finish();
+        let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
         // Untwist each Frobenius evaluation
         frob_evals.iter_mut().for_each(|frob_eval| frob_eval.untwist());
