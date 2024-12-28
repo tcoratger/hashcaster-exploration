@@ -11,9 +11,15 @@ use rayon::{
         IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
         IntoParallelRefMutIterator, ParallelIterator,
     },
-    slice::ParallelSliceMut,
+    slice::{ParallelSlice, ParallelSliceMut},
 };
-use std::ops::{BitAnd, Deref, DerefMut};
+use std::{
+    ops::{BitAnd, Deref, DerefMut},
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc, Mutex,
+    },
+};
 
 /// A structure representing a multilinear Lagrangian polynomial.
 /// This structure holds the coefficients of the polynomial in a vector.
@@ -427,66 +433,61 @@ impl MultilinearLagrangianPolynomials {
         // - `n` is the number of input polynomials.
         let mut ret = vec![BinaryField128b::zero(); num_chunks * 128 * self.len()];
 
+        // Create an atomic pointer to the `ret` vector for shared mutable access.
+        let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
+
         // Iterate over each polynomial in the input set.
         self.iter().enumerate().for_each(|(q, poly)| {
+            // Compute the starting index for the current polynomial in the result vector.
+            let ret_chunk_start = q * 128 * num_chunks;
+
             // Iterate over chunks in parallel using `par_iter` for efficiency.
-            (0..num_chunks)
-                .into_par_iter()
-                .map(|i| {
-                    // Allocate a thread-local buffer to store intermediate results for this chunk.
-                    let mut local_ret = vec![BinaryField128b::zero(); 128];
+            (0..num_chunks).into_par_iter().for_each(|i| {
+                // Process the equality polynomial sums in blocks of size 16.
+                for j in 0..eq_len / 16 {
+                    // Retrieve two segments of precomputed sums (`v0` and `v1`):
+                    // - `v0` corresponds to lower 8 bits.
+                    // - `v1` corresponds to upper 8 bits.
+                    let b1 = j * 512;
+                    let b2 = b1 + 256;
+                    let b3 = b2 + 256;
+                    let v0 = &eq_sums[b1..b2];
+                    let v1 = &eq_sums[b2..b3];
 
-                    // Process the equality polynomial sums in blocks of size 16.
-                    for j in 0..eq_len / 16 {
-                        // Retrieve two segments of precomputed sums (`v0` and `v1`):
-                        // - `v0` corresponds to lower 8 bits.
-                        // - `v1` corresponds to upper 8 bits.
-                        let b1 = j * 512;
-                        let b2 = b1 + 256;
-                        let b3 = b2 + 256;
-                        let v0 = &eq_sums[b1..b2];
-                        let v1 = &eq_sums[b2..b3];
+                    // Extract a block of coefficients from the current polynomial.
+                    // This block corresponds to 16 bytes.
+                    let bytearr = cast_slice::<BinaryField128b, [u8; 16]>(
+                        &poly[i * chunk_size + j * 16..i * chunk_size + (j + 1) * 16],
+                    );
 
-                        // Extract a block of coefficients from the current polynomial.
-                        // This block corresponds to 16 bytes.
-                        let bytearr = cast_slice::<BinaryField128b, [u8; 16]>(
-                            &poly[i * chunk_size + j * 16..i * chunk_size + (j + 1) * 16],
-                        );
+                    // Process each byte in the extracted block.
+                    for s in 0..16 {
+                        // Extract the `s`-th byte from each element in the block.
+                        let mut t = [0u8; 16];
+                        for (idx, val) in bytearr.iter().enumerate() {
+                            t[idx] = val[s];
+                        }
 
-                        // Process each byte in the extracted block.
-                        for s in 0..16 {
-                            // Extract the `s`-th byte from each element in the block.
-                            let mut t = [0u8; 16];
-                            for (idx, val) in bytearr.iter().enumerate() {
-                                t[idx] = val[s];
+                        // Process the 8 bits of the extracted byte, applying bitwise masks.
+                        for u in 0..8 {
+                            // Compute the bit mask for the current state of the array.
+                            #[allow(clippy::cast_sign_loss)]
+                            let bits = cpu_v_movemask_epi8(t) as usize;
+
+                            // Update the result vector using the computed sums.
+                            unsafe {
+                                *ret_ptr
+                                    .load(Ordering::SeqCst)
+                                    .add(ret_chunk_start + (s * 8 + 7 - u) * num_chunks + i) +=
+                                    v0[bits & 255] + v1[(bits >> 8) & 255];
                             }
 
-                            // Process the 8 bits of the extracted byte, applying bitwise masks.
-                            for u in 0..8 {
-                                // Compute the bit mask for the current state of the array.
-                                #[allow(clippy::cast_sign_loss)]
-                                let bits = cpu_v_movemask_epi8(t) as usize;
-
-                                // Update the local result buffer using the precomputed sums.
-                                local_ret[s * 8 + 7 - u] += v0[bits & 255] + v1[(bits >> 8) & 255];
-
-                                // Shift the array `t` left by one bit for the next iteration.
-                                t = v_slli_epi64::<1>(t);
-                            }
+                            // Shift the array `t` left by one bit for the next iteration.
+                            t = v_slli_epi64::<1>(t);
                         }
                     }
-
-                    // Return the computed chunk result.
-                    local_ret
-                })
-                .collect::<Vec<_>>()
-                .iter()
-                .for_each(|local_ret| {
-                    for (idx, &value) in local_ret.iter().enumerate() {
-                        // Update the global result vector with the chunk results.
-                        ret[q * 128 * num_chunks + idx] += value;
-                    }
-                });
+                }
+            });
         });
 
         // Return the final evaluations.
@@ -837,5 +838,422 @@ mod tests {
 
         // Assert the computed equality sums match the expected result.
         assert_eq!(eq_sums, expected_sums);
+    }
+
+    #[test]
+    fn test_restrict() {
+        // Define the number of variables
+        let num_vars: usize = 4;
+        // Define the number of variables to restrict
+        let num_vars_to_restrict = 4;
+
+        // Define the restriction points.
+        let points: Points =
+            (0..num_vars_to_restrict as u128).map(BinaryField128b::new).collect::<Vec<_>>().into();
+
+        // Define three multilinear polynomials.
+        let poly0: MultilinearLagrangianPolynomial =
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+        let poly1: MultilinearLagrangianPolynomial =
+            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 1)).collect::<Vec<_>>().into();
+        let poly2: MultilinearLagrangianPolynomial =
+            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 2)).collect::<Vec<_>>().into();
+
+        // Create a sequence of multilinear polynomials.
+        let polys = MultilinearLagrangianPolynomials(vec![poly0, poly1, poly2]);
+
+        // Restrict the polynomials to the given points.
+        let restricted_polynomials = polys.restrict(&points, num_vars);
+
+        // Verify the restricted evaluations match the expected results.
+        assert_eq!(
+            restricted_polynomials,
+            Evaluations::new(vec![
+                BinaryField128b::new(0),
+                BinaryField128b::new(1),
+                BinaryField128b::new(2),
+                BinaryField128b::new(3),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(257870231182273679343338569694386847745),
+                BinaryField128b::new(1),
+                BinaryField128b::new(2),
+                BinaryField128b::new(3),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(257870231182273679343338569694386847744),
+                BinaryField128b::new(3),
+                BinaryField128b::new(305763977405398929388903867835113013248),
+                BinaryField128b::new(225730887183604071602915146884576182279),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0),
+                BinaryField128b::new(0)
+            ])
+        );
     }
 }

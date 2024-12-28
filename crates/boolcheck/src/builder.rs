@@ -271,6 +271,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
                 |args| self.compress_linear(args),
                 |args| self.compress_quadratic(args),
             ),
+            polys: polynomials.to_vec(),
             points: self.points.clone(),
             boolean_package: self.boolean_package.clone(),
             gammas: self.gammas.clone(),

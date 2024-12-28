@@ -1,7 +1,9 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    compressed::CompressedPoly, evaluation::Evaluations,
-    multinear_lagrangian::MultilinearLagrangianPolynomials, point::Points,
+    compressed::CompressedPoly,
+    evaluation::Evaluations,
+    multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+    point::Points,
     univariate::UnivariatePolynomial,
 };
 use num_traits::{One, Zero};
@@ -19,7 +21,7 @@ pub mod package;
 pub struct BoolCheck {
     pub points: Points,
     pub poly: Vec<BinaryField128b>,
-    pub polys: Vec<Vec<BinaryField128b>>,
+    pub polys: Vec<MultilinearLagrangianPolynomial>,
     pub extended_table: Vec<BinaryField128b>,
     poly_coords: Option<Evaluations>,
     pub c: usize,
@@ -490,13 +492,13 @@ mod tests {
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
         let p: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into();
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
         let q: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into();
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -569,26 +571,38 @@ mod tests {
         }
 
         // Finish the protocol and obtain the output.
-        let BoolCheckOutput { frob_evals, round_polys } = boolcheck.finish();
+        let BoolCheckOutput { mut frob_evals, round_polys } = boolcheck.finish();
+
+        // Untwist each Frobenius evaluation
+        frob_evals.iter_mut().for_each(|frob_eval| frob_eval.untwist());
 
         // Flatten the Frobenius evaluations into a single vector.
         let mut frob_evals: Vec<BinaryField128b> =
             frob_evals.iter().flat_map(|eval| eval.clone().into_inner()).collect();
 
         // Add a zero element to the end of the evaluations for padding.
+        // TODO: hack to be removed in the future
         frob_evals.push(BinaryField128b::zero());
 
+        // Construct a BoolCheck builder to use `exec_alg`
+        // TODO: hack to be removed in the future
         let bool_check_builder =
             BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
 
+        // Compute algebraic AND
         let and_algebraic = bool_check_builder.exec_alg(&frob_evals, 0, 1);
 
+        // Transform vector of Field elements to Points
         let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
+
+        // Transform random values to Points
         let random_values: Points =
             random_values.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
 
+        // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&random_values).0;
 
+        // Validate the expected claim against the current claim
         assert_eq!(current_claim, expected_claim);
     }
 
@@ -743,5 +757,39 @@ mod tests {
 
         // Verify the correctness of the round polynomial cache.
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
+
+        // Test an imaginary algorithm execution.
+        let alg_res = boolcheck.exec_alg(
+            &(0..4 * 128).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into(),
+            0,
+            1,
+        );
+
+        // Verify the result of the imaginary algorithm execution.
+        assert_eq!(
+            alg_res,
+            [
+                BinaryField128b::new(307232209640963015187300467897455873283),
+                BinaryField128b::new(194822172689813899653668252817418647041),
+                BinaryField128b::new(67733890487442795093175766325246739159)
+            ]
+        );
+
+        assert_eq!(
+            boolcheck.polys,
+            vec![
+                MultilinearLagrangianPolynomial::from(vec![
+                    BinaryField128b::new(0),
+                    BinaryField128b::new(1),
+                    BinaryField128b::new(2),
+                    BinaryField128b::new(3),
+                    BinaryField128b::new(4),
+                    BinaryField128b::new(5),
+                    BinaryField128b::new(6),
+                    BinaryField128b::new(7)
+                ]);
+                2
+            ]
+        );
     }
 }
