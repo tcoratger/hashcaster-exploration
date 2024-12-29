@@ -495,13 +495,13 @@ mod tests {
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
         let p: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
         let q: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -577,7 +577,7 @@ mod tests {
         let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
         // Untwist each Frobenius evaluation
-        frob_evals.iter_mut().for_each(|frob_eval| frob_eval.untwist());
+        frob_evals.iter_mut().for_each(hashcaster_poly::evaluation::Evaluations::untwist);
 
         // Flatten the Frobenius evaluations into a single vector.
         let mut frob_evals: Vec<BinaryField128b> =
@@ -589,11 +589,11 @@ mod tests {
 
         // Construct a BoolCheck builder to use `exec_alg`
         // TODO: hack to be removed in the future
-        let bool_check_builder =
+        let bc_builder =
             BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
 
         // Compute algebraic AND
-        let and_algebraic = bool_check_builder.exec_alg(&frob_evals, 0, 1);
+        let and_algebraic = bc_builder.exec_alg(&frob_evals, 0, 1);
 
         // Transform vector of Field elements to Points
         let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
@@ -610,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::unreadable_literal)]
+    #[allow(clippy::unreadable_literal, clippy::too_many_lines)]
     fn test_compute_imaginary_round() {
         // Set the number of variables for the test.
         let num_vars = 3;
@@ -763,7 +763,7 @@ mod tests {
 
         // Test an imaginary algorithm execution.
         let alg_res = boolcheck.exec_alg(
-            &(0..4 * 128).map(|i| BinaryField128b::new(i)).collect::<Vec<_>>().into(),
+            &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>().into(),
             0,
             1,
         );

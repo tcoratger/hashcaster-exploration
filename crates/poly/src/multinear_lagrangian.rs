@@ -11,14 +11,11 @@ use rayon::{
         IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
         IntoParallelRefMutIterator, ParallelIterator,
     },
-    slice::{ParallelSlice, ParallelSliceMut},
+    slice::ParallelSliceMut,
 };
 use std::{
     ops::{BitAnd, Deref, DerefMut},
-    sync::{
-        atomic::{AtomicPtr, Ordering},
-        Arc, Mutex,
-    },
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 /// A structure representing a multilinear Lagrangian polynomial.
@@ -841,6 +838,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal, clippy::too_many_lines)]
     fn test_restrict() {
         // Define the number of variables
         let num_vars: usize = 4;
@@ -849,7 +847,7 @@ mod tests {
 
         // Define the restriction points.
         let points: Points =
-            (0..num_vars_to_restrict as u128).map(BinaryField128b::new).collect::<Vec<_>>().into();
+            (0..num_vars_to_restrict).map(BinaryField128b::new).collect::<Vec<_>>().into();
 
         // Define three multilinear polynomials.
         let poly0: MultilinearLagrangianPolynomial =
@@ -860,10 +858,10 @@ mod tests {
             (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 2)).collect::<Vec<_>>().into();
 
         // Create a sequence of multilinear polynomials.
-        let polys = MultilinearLagrangianPolynomials(vec![poly0, poly1, poly2]);
+        let polynomials = MultilinearLagrangianPolynomials(vec![poly0, poly1, poly2]);
 
         // Restrict the polynomials to the given points.
-        let restricted_polynomials = polys.restrict(&points, num_vars);
+        let restricted_polynomials = polynomials.restrict(&points, num_vars);
 
         // Verify the restricted evaluations match the expected results.
         assert_eq!(
