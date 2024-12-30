@@ -358,7 +358,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         acc
     }
 
-    fn compress_algebraic(
+    fn exec_alg(
         &self,
         data: &[BinaryField128b],
         start: usize,
@@ -380,7 +380,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
             acc[2] += tmp[2][i] * self.gammas[i];
         }
 
-        // Return the array of compressed results.
+        // Return the array of results.
         acc
     }
 }

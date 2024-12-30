@@ -63,7 +63,7 @@ pub trait CompressedFoldedOps: Send + Sync {
     /// This method evaluates algebraic transformations on subsets of the input data using a defined
     /// stride, compressing the results into three components. It supports transformations for
     /// advanced boolean algebra scenarios.
-    fn compress_algebraic(
+    fn exec_alg(
         &self,
         data: &[BinaryField128b],
         start: usize,
