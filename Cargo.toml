@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.83"
 
 [workspace]
-members = ["crates/boolcheck", "crates/field", "crates/poly"]
+members = ["crates/boolcheck", "crates/field", "crates/poly", "crates/lincheck"]
 
 [workspace.lints]
 rust.missing_debug_implementations = "warn"
@@ -41,6 +41,7 @@ module_name_repetitions = "allow"
 hashcaster-field = { path = "crates/field" }
 hashcaster-boolcheck = { path = "crates/boolcheck" }
 hashcaster-poly = { path = "crates/poly" }
+hashcaster-lincheck = { path = "crates/lincheck" }
 
 derive_more = "1.0"
 bytemuck = "1.0"

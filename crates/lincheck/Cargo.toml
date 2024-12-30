@@ -1,0 +1,12 @@
+[package]
+name = "hashcaster-lincheck"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hashcaster-field = { workspace = true }
+hashcaster-poly = { workspace = true }

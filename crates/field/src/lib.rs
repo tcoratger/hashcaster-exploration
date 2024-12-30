@@ -4,6 +4,7 @@ pub mod bit_iterator;
 pub mod frobenius;
 pub mod frobenius_cobasis;
 pub mod matrix;
+pub mod matrix_lin;
 pub mod small_uint;
 
 #[cfg(test)]
