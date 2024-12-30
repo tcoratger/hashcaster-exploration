@@ -309,7 +309,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ///
     /// # Returns
     /// A 2D array `[3][M]` containing aggregated results of algebraic operations.
-    pub fn compute_algebraic_operations(
+    pub fn compute_algebraic(
         &self,
         data: &[BinaryField128b],
         idx_a: usize,
@@ -365,7 +365,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         offset: usize,
     ) -> [BinaryField128b; 3] {
         // Compute the intermediate algebraic results by delegating to the wrapped `FnPackage`.
-        let tmp = self.compute_algebraic_operations(data, start, offset);
+        let tmp = self.compute_algebraic(data, start, offset);
 
         // Initialize the accumulators for each of the 3 output values to zero.
         let mut acc = [BinaryField128b::zero(); 3];

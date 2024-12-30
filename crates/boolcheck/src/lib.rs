@@ -200,12 +200,8 @@ impl BoolCheck {
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.compute_algebraic_operations(
-                        poly_coords,
-                        i,
-                        1 << (number_variables - self.c - 1),
-                    )
-                    .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic(poly_coords, i, 1 << (number_variables - self.c - 1))
+                        .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(
                     || [BinaryField128b::zero(); 3],
@@ -268,7 +264,7 @@ impl BoolCheck {
         ret
     }
 
-    pub fn compute_algebraic_operations(
+    pub fn compute_algebraic(
         &self,
         data: &Evaluations,
         idx_a: usize,
@@ -728,7 +724,7 @@ mod tests {
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
 
         // Test an imaginary algorithm execution.
-        let alg_res = boolcheck.compute_algebraic_operations(
+        let alg_res = boolcheck.compute_algebraic(
             &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>().into(),
             0,
             1,
