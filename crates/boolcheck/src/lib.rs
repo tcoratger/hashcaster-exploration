@@ -1,3 +1,5 @@
+use algebraic::AlgebraicOps;
+use and::AndPackage;
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     compressed::CompressedPoly,
@@ -13,6 +15,8 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
+pub mod algebraic;
+pub mod and;
 pub mod bool_trait;
 pub mod builder;
 pub mod package;
@@ -196,8 +200,12 @@ impl BoolCheck {
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.exec_alg(poly_coords, i, 1 << (number_variables - self.c - 1))
-                        .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic_operations(
+                        poly_coords,
+                        i,
+                        1 << (number_variables - self.c - 1),
+                    )
+                    .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(
                     || [BinaryField128b::zero(); 3],
@@ -260,63 +268,21 @@ impl BoolCheck {
         ret
     }
 
-    pub fn exec_alg(
+    pub fn compute_algebraic_operations(
         &self,
         data: &Evaluations,
-        mut idx_a: usize,
+        idx_a: usize,
         offset: usize,
     ) -> [BinaryField128b; 3] {
         match self.boolean_package {
             BooleanPackage::And => {
-                // `idx_a` is the starting index for the first operand in the AND operation (`P`).
-                // Double the starting index to account for the structure of the data.
-                idx_a *= 2;
-
-                // Compute the starting index for the second operand in the AND operation (`Q`).
-                let idx_b = idx_a + offset * 128;
-
-                // Initialize the result accumulators for the three evaluations. This will hold:
-                // - `W(0) = Σ_{x} P(0,x) * Q(0,x) * eq(x; q)`,
-                // - `W(1) = Σ_{x} P(1,x) * Q(1,x) * eq(x; q)`,
-                // - `W(∞) = Σ_{x} P(∞,x) * Q(∞,x) * eq(x; q)`.
-                let mut acc = [BinaryField128b::zero(); 3];
-
-                // Iterate over the 128 basis elements.
-                // This loop implements the summation over `x_{>c}`:
-                // ```
-                // W(t) = Σ_{x_{>c}} (P ∧ Q)(t, x_{>c}) * eq(x_{>c}; q_{>c}).
-                // ```
-                for i in 0..128 {
-                    // Precompute the offsets for this iteration.
-                    // This is used to fetch the polynomials:
-                    // - `P(t, x_{>c})` and `Q(t, x_{>c})` for the `i-th` basis vector of `x_{>c}`.
-                    let offset_a = idx_a + i * offset;
-                    let offset_b = idx_b + i * offset;
-
-                    // Fetch the data elements for this iteration.
-                    // `a_0 = P(t=0, x)`
-                    let a0 = data[offset_a];
-                    // `a_1 = P(t=1, x)`
-                    let a1 = data[offset_a + 1];
-                    // `b_0 = Q(t=0, x)`
-                    let b0 = data[offset_b];
-                    // `b_1 = Q(t=1, x)`
-                    let b1 = data[offset_b + 1];
-
-                    // Compute the contributions for this basis element.
-                    let basis = BinaryField128b::basis(i);
-                    // `W(0)  = Σ_{x} P(0,x) * Q(0,x) * eq(x; q)`
-                    acc[0] += basis * a0 * b0;
-                    // `W(1)  = Σ_{x} P(1,x) * Q(1,x) * eq(x; q)`
-                    acc[1] += basis * a1 * b1;
-                    // `W(∞)  = Σ_{x} (P(0,x) + P(1,x)) * (Q(0,x) + Q(1,x)) * eq(x; q)`
-                    acc[2] += basis * (a0 + a1) * (b0 + b1);
-                }
+                // Compute the AND operation using the `AndPackage`.
+                let acc = AndPackage::<1>.algebraic(data, idx_a, offset);
 
                 // Compress results using gammas.
                 //
                 // Gamma is a folding factor that is used to compress the polynomial.
-                [acc[0] * self.gammas[0], acc[1] * self.gammas[0], acc[2] * self.gammas[0]]
+                [acc[0][0] * self.gammas[0], acc[1][0] * self.gammas[0], acc[2][0] * self.gammas[0]]
             }
         }
     }
@@ -589,13 +555,8 @@ mod tests {
         // TODO: hack to be removed in the future
         frob_evals.push(BinaryField128b::zero());
 
-        // Construct a BoolCheck builder to use `exec_alg`
-        // TODO: hack to be removed in the future
-        let bc_builder =
-            BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
-
         // Compute algebraic AND
-        let and_algebraic = bc_builder.exec_alg(&frob_evals, 0, 1);
+        let and_algebraic = AndPackage::<1>.algebraic(&frob_evals, 0, 1);
 
         // Transform vector of Field elements to Points
         let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
@@ -767,7 +728,7 @@ mod tests {
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
 
         // Test an imaginary algorithm execution.
-        let alg_res = boolcheck.exec_alg(
+        let alg_res = boolcheck.compute_algebraic_operations(
             &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>().into(),
             0,
             1,

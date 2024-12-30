@@ -1,4 +1,7 @@
-use crate::{bool_trait::CompressedFoldedOps, package::BooleanPackage, BoolCheck};
+use crate::{
+    algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
+    package::BooleanPackage, BoolCheck,
+};
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
@@ -279,108 +282,49 @@ impl<const M: usize> BoolCheckBuilder<M> {
         }
     }
 
-    pub fn exec_lin_compressed(&self, arg: &[BinaryField128b]) -> [BinaryField128b; M] {
+    /// Computes a linear compression of the given data slice.
+    ///
+    /// # Parameters
+    /// - `data`: Input slice of binary field elements.
+    ///
+    /// # Returns
+    /// A compressed result as an array of size `[BinaryField128b; M]`.
+    pub fn compute_linear_compression(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
         match self.boolean_package {
-            BooleanPackage::And => {
-                assert_eq!(M, 1, "Invalid output size for AND package");
-                assert_eq!(arg.len(), 2, "Invalid input size for AND package");
-                [BinaryField128b::zero(); M]
-            }
+            BooleanPackage::And => AndPackage::<M>.linear_compressed(data),
         }
     }
 
-    pub fn exec_quad_compressed(&self, arg: &[BinaryField128b]) -> [BinaryField128b; M] {
+    /// Computes a quadratic compression of the given data slice.
+    ///
+    /// # Parameters
+    /// - `data`: Input slice of binary field elements.
+    ///
+    /// # Returns
+    /// A compressed result as an array of size `[BinaryField128b; M]`.
+    pub fn compute_quadratic_compression(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
         match self.boolean_package {
-            BooleanPackage::And => {
-                assert_eq!(M, 1, "Invalid output size for AND package");
-                assert_eq!(arg.len(), 2, "Invalid input size for AND package");
-                [arg[0] & arg[1]; M]
-            }
+            BooleanPackage::And => AndPackage::<M>.quadratic_compressed(data),
         }
     }
 
-    /// Executes an algebraic evaluation of bitwise operations across two arrays of binary field
-    /// elements.
+    /// Performs an algebraic evaluation on binary field elements.
     ///
-    /// This function computes three aggregated results (`ret[0]`, `ret[1]`, `ret[2]`) based on
-    /// pairwise operations on elements from two data slices. It iterates over 128 basis elements
-    /// of a binary field, performing the following operations:
+    /// # Parameters
+    /// - `data`: Input slice of binary field elements.
+    /// - `idx_a`: Starting index for the first operand.
+    /// - `offset`: Step size for computing indices.
     ///
-    /// - `ret[0]`: Quadratic evaluation of corresponding elements from both slices.
-    /// - `ret[1]`: Quadratic evaluation of the next pair of elements from both slices.
-    /// - `ret[2]`: Combined quadratic evaluation of the sums of consecutive elements from both
-    ///   slices.
-    ///
-    /// ### Parameters:
-    /// - `data`: A slice of `BinaryField128b` elements representing input data.
-    /// - `idx_a`: The starting index for the first operand in the slice.
-    /// - `offset`: The stride (step size) to compute indices for the second operand.
-    ///
-    /// ### Returns:
-    /// A 2D array of size `[3][M]`, where each row corresponds to the aggregated results:
-    /// - `ret[0][0]`: Aggregated result of pairwise operations on `a` and `b`.
-    /// - `ret[1][0]`: Aggregated result of pairwise operations on `a_next` and `b_next`.
-    /// - `ret[2][0]`: Aggregated result of combined operations on `(a + a_next)` and `(b +
-    ///   b_next)`.
-    ///
-    /// ### Constraints:
-    /// - `M` must be equal to `1`, enforced via an `assert_eq!` macro.
-    /// - The function is specific to the `BooleanPackage::And` operation.
-    ///
-    /// ### Mathematical Formulation:
-    /// For basis element `ϕ_i`, and elements `a`, `a_next`, `b`, `b_next`:
-    /// ```text
-    /// ret[0][0] = Σ (ϕ_i * a * b)
-    /// ret[1][0] = Σ (ϕ_i * a_next * b_next)
-    /// ret[2][0] = Σ (ϕ_i * (a + a_next) * (b + b_next))
-    /// ```
-    /// where the summation `Σ` runs over all 128 basis elements (`i = 0..127`).
-    ///
-    /// ### Complexity:
-    /// - **Time Complexity**: `O(128)` iterations with constant-time arithmetic operations.
-    /// - **Space Complexity**: O(1) additional storage.
-    pub fn exec_alg(
+    /// # Returns
+    /// A 2D array `[3][M]` containing aggregated results of algebraic operations.
+    pub fn compute_algebraic_operations(
         &self,
         data: &[BinaryField128b],
         idx_a: usize,
         offset: usize,
     ) -> [[BinaryField128b; M]; 3] {
         match self.boolean_package {
-            BooleanPackage::And => {
-                // Ensure the output size is valid for the AND package.
-                assert_eq!(M, 1, "Invalid output size for AND package");
-
-                // Initialize the indices for the first and second operands.
-                let mut idx_a = idx_a * 2;
-                // Calculate the index for the second operand with the specified offset.
-                let mut idx_b = idx_a + offset * 128;
-                let mut ret = [[BinaryField128b::zero(); M]; 3];
-
-                // Iterate over the 128 basis elements of the binary field.
-                for i in 0..128 {
-                    // Calculate the basis element for the current iteration.
-                    let basis = BinaryField128b::basis(i);
-
-                    // Extract the elements from the data slices.
-                    let a = data[idx_a];
-                    let b = data[idx_b];
-                    let a_next = data[idx_a + 1];
-                    let b_next = data[idx_b + 1];
-
-                    // `Σ (ϕ_i * a * b)`
-                    ret[0][0] += basis * a * b;
-                    // `Σ (ϕ_i * a_next * b_next)`
-                    ret[1][0] += basis * a_next * b_next;
-                    // `Σ (ϕ_i * (a + a_next) * (b + b_next))`
-                    ret[2][0] += basis * (a + a_next) * (b + b_next);
-
-                    // Move to the next indices
-                    idx_a += offset;
-                    idx_b += offset;
-                }
-
-                ret
-            }
+            BooleanPackage::And => AndPackage::<M>.algebraic(data, idx_a, offset),
         }
     }
 }
@@ -389,7 +333,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn compress_linear(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
         // computation.
-        let tmp = self.exec_lin_compressed(arg);
+        let tmp = self.compute_linear_compression(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
@@ -407,7 +351,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn compress_quadratic(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s quadratic
         // computation.
-        let tmp = self.exec_quad_compressed(arg);
+        let tmp = self.compute_quadratic_compression(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
@@ -429,7 +373,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         offset: usize,
     ) -> [BinaryField128b; 3] {
         // Compute the intermediate algebraic results by delegating to the wrapped `FnPackage`.
-        let tmp = self.exec_alg(data, start, offset);
+        let tmp = self.compute_algebraic_operations(data, start, offset);
 
         // Initialize the accumulators for each of the 3 output values to zero.
         let mut acc = [BinaryField128b::zero(); 3];
@@ -626,46 +570,5 @@ mod tests {
                 BinaryField128b::from(0u128)
             ]
         );
-    }
-
-    #[test]
-    fn test_exec_alg_and() {
-        // Generate two random field elements as input.
-        let a1 = BinaryField128b::random();
-        let a2 = BinaryField128b::random();
-
-        let a = [a1, a2];
-        let b = [
-            BinaryField128b::from(a1.into_inner() >> 1),
-            BinaryField128b::from(a2.into_inner() >> 1),
-        ];
-        let c = [a1, BinaryField128b::from(a2.into_inner() >> 1)];
-        let d = [BinaryField128b::from(a1.into_inner() >> 1), a2];
-
-        let bool_check_builder =
-            BoolCheckBuilder::<1> { boolean_package: BooleanPackage::And, ..Default::default() };
-
-        // Prepare input for the algebraic implementation.
-        // - Take the array of input field elements.
-        // - Transform each binary field element into 128 components, representing the bitwise
-        //   values of the element.
-        // - Flatten the resulting array of arrays into a single array.
-        let mut input_coords = a
-            .iter()
-            .flat_map(|x| (0..128).map(|i| BinaryField128b::from((x.into_inner() >> i) & 1 != 0)))
-            .collect::<Vec<_>>();
-
-        input_coords.push(BinaryField128b::zero());
-
-        let rhs = bool_check_builder.exec_alg(&input_coords, 0, 1);
-
-        let a_quad = bool_check_builder.exec_quad_compressed(&a);
-        let b_quad = bool_check_builder.exec_quad_compressed(&b);
-        let c_quad = bool_check_builder.exec_quad_compressed(&c);
-        let d_quad = bool_check_builder.exec_quad_compressed(&d);
-
-        assert_eq!(rhs[0], a_quad);
-        assert_eq!(rhs[1], b_quad);
-        assert_eq!(rhs[2], [a_quad[0] + b_quad[0] + c_quad[0] + d_quad[0]]);
     }
 }
