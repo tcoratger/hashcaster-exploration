@@ -54,7 +54,7 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
         ret
     }
 
-    fn linear_compressed(&self, data: &[BinaryField128b]) -> Self::LinearCompressedOutput {
+    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearCompressedOutput {
         // Ensure the output size is valid for the AND package.
         assert_eq!(M, 1, "Invalid output size for AND package");
 
@@ -65,7 +65,7 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
         [BinaryField128b::zero(); M]
     }
 
-    fn quadratic_compressed(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput {
+    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput {
         // Ensure the output size is valid for the AND package.
         assert_eq!(M, 1, "Invalid output size for AND package");
 
@@ -111,10 +111,10 @@ mod tests {
 
         let rhs = and_package.algebraic(&input_coords, 0, 1);
 
-        let a_quad = and_package.quadratic_compressed(&a);
-        let b_quad = and_package.quadratic_compressed(&b);
-        let c_quad = and_package.quadratic_compressed(&c);
-        let d_quad = and_package.quadratic_compressed(&d);
+        let a_quad = and_package.quadratic(&a);
+        let b_quad = and_package.quadratic(&b);
+        let c_quad = and_package.quadratic(&c);
+        let d_quad = and_package.quadratic(&d);
 
         assert_eq!(rhs[0], a_quad);
         assert_eq!(rhs[1], b_quad);

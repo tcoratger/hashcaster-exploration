@@ -55,7 +55,7 @@ pub trait AlgebraicOps {
     /// ### Notes
     /// - The compression logic and the expected output format depend on the concrete
     ///   implementation.
-    fn linear_compressed(&self, data: &[BinaryField128b]) -> Self::LinearCompressedOutput;
+    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearCompressedOutput;
 
     /// Performs a quadratic compressed evaluation on the provided data.
     ///
@@ -73,5 +73,5 @@ pub trait AlgebraicOps {
     /// ### Notes
     /// - The compression logic and the expected output format depend on the concrete
     ///   implementation.
-    fn quadratic_compressed(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput;
+    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput;
 }

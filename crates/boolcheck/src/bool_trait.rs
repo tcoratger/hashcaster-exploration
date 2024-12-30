@@ -1,7 +1,7 @@
 use hashcaster_field::binary_field::BinaryField128b;
 
-/// The `CompressedFoldedOps` trait defines an interface for executing compressed linear, quadratic,
-/// and algebraic operations over input variables and data.
+/// The `CompressedFoldedOps` trait defines an interface for executing compressed linear,
+/// quadratic, and algebraic operations over input variables and data.
 ///
 /// # Overview
 /// This trait abstracts polynomial-based boolean operations, providing methods to:
@@ -11,6 +11,13 @@ use hashcaster_field::binary_field::BinaryField128b;
 ///
 /// # Constants
 /// - `N`: The number of input variables for the operations.
+///
+/// # Explanation
+/// The "compressed" form used in this trait computes results by iteratively summing pairs of
+/// elements from the input slices. Specifically:
+/// - For linear compression, elements at indices `2i` and `2i+1` are summed.
+/// - For quadratic compression, products of elements at indices `2i` and `2i+1` are summed.
+/// These compressed results represent the linear and quadratic parts of the same formula.
 ///
 /// # Safety and Concurrency
 /// The trait is constrained by `Send` and `Sync` for safe usage in concurrent environments.
@@ -22,6 +29,10 @@ pub trait CompressedFoldedOps: Send + Sync {
     ///
     /// # Returns
     /// A single [`BinaryField128b`] value as the compressed result of the linear operation.
+    ///
+    /// # Details
+    /// This function computes the sum of elements at indices `2i` and `2i+1` in the input slice,
+    /// effectively collapsing the slice into a compressed representation.
     fn compress_linear(&self, inputs: &[BinaryField128b]) -> BinaryField128b;
 
     /// Computes the compressed result of a quadratic operation on the input variables.
@@ -31,6 +42,10 @@ pub trait CompressedFoldedOps: Send + Sync {
     ///
     /// # Returns
     /// A single [`BinaryField128b`] value as the compressed result of the quadratic operation.
+    ///
+    /// # Details
+    /// This function computes the sum of products of elements at indices `2i` and `2i+1` in the
+    /// input slice, representing the quadratic part of the formula.
     fn compress_quadratic(&self, inputs: &[BinaryField128b]) -> BinaryField128b;
 
     /// Applies an algebraic transformation to a subset of data and computes the compressed results.
@@ -43,6 +58,11 @@ pub trait CompressedFoldedOps: Send + Sync {
     /// # Returns
     /// An array of three [`BinaryField128b`] values as the compressed results of the algebraic
     /// operation.
+    ///
+    /// # Details
+    /// This method evaluates algebraic transformations on subsets of the input data using a defined
+    /// stride, compressing the results into three components. It supports transformations for
+    /// advanced boolean algebra scenarios.
     fn compress_algebraic(
         &self,
         data: &[BinaryField128b],

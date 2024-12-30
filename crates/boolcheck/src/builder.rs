@@ -33,19 +33,11 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ) -> Self {
         assert!(c < points.len());
 
-        let gammas = (0..M)
-            .scan(BinaryField128b::one(), |state, _| {
-                let current = *state;
-                *state *= gamma;
-                Some(current)
-            })
-            .collect();
-
         Self {
             c,
             points,
             boolean_package,
-            gammas,
+            gammas: BinaryField128b::compute_gammas_folding::<M>(gamma),
             claim: UnivariatePolynomial::new(claims.into()).evaluate_at(&gamma),
         }
     }
@@ -289,9 +281,9 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ///
     /// # Returns
     /// A compressed result as an array of size `[BinaryField128b; M]`.
-    pub fn compute_linear_compression(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
+    pub fn compute_linear_part(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
         match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.linear_compressed(data),
+            BooleanPackage::And => AndPackage::<M>.linear(data),
         }
     }
 
@@ -302,9 +294,9 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ///
     /// # Returns
     /// A compressed result as an array of size `[BinaryField128b; M]`.
-    pub fn compute_quadratic_compression(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
+    pub fn compute_quadratic_part(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
         match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.quadratic_compressed(data),
+            BooleanPackage::And => AndPackage::<M>.quadratic(data),
         }
     }
 
@@ -333,7 +325,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn compress_linear(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
         // computation.
-        let tmp = self.compute_linear_compression(arg);
+        let tmp = self.compute_linear_part(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
@@ -351,7 +343,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn compress_quadratic(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s quadratic
         // computation.
-        let tmp = self.compute_quadratic_compression(arg);
+        let tmp = self.compute_quadratic_part(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
