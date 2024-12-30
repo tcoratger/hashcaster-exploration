@@ -127,7 +127,7 @@ impl MultilinearLagrangianPolynomial {
         coeffs.resize(1 << points.len(), BinaryField128b::zero());
 
         // Iterate over the points to construct the equality polynomial.
-        points.iter().enumerate().for_each(|(i, &ref point)| {
+        points.iter().enumerate().for_each(|(i, point)| {
             // Split the coefficient vector into two parts: `left` and `right`.
             // `left` contains existing coefficients, `right` will store the new coefficients.
             let (left, right) = coeffs.split_at_mut(1 << i);
