@@ -367,12 +367,11 @@ impl BoolCheck {
                 .as_mut()
                 .unwrap()
                 .par_chunks_mut(1 << (number_variables - self.c - 1))
-                .map(|chunk| {
+                .for_each(|chunk| {
                     for j in 0..half {
                         chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * r;
                     }
-                })
-                .count();
+                });
         }
 
         // Transition to phase 2 if the current round equals `c + 1`.
@@ -503,6 +502,9 @@ mod tests {
         let q: MultilinearLagrangianPolynomial =
             (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
 
+        // Start a timer to measure the execution time of the test.
+        let start = std::time::Instant::now();
+
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
         let p_and_q = p.clone() & q.clone();
@@ -542,7 +544,7 @@ mod tests {
         let mut random_values = Vec::new();
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
-        for _i in 0..num_vars {
+        for _ in 0..num_vars {
             // Compute the round polynomial for the current round.
             let compressed_round_polynomial = boolcheck.compute_round_polynomial();
 
@@ -607,6 +609,9 @@ mod tests {
 
         // Validate the expected claim against the current claim
         assert_eq!(current_claim, expected_claim);
+
+        // Print the execution time of the test.
+        println!("Execution time: {:?} ms", start.elapsed().as_millis());
     }
 
     #[test]

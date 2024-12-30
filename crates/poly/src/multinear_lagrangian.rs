@@ -127,7 +127,7 @@ impl MultilinearLagrangianPolynomial {
         coeffs.resize(1 << points.len(), BinaryField128b::zero());
 
         // Iterate over the points to construct the equality polynomial.
-        for (i, point) in points.iter().enumerate() {
+        points.iter().enumerate().for_each(|(i, &ref point)| {
             // Split the coefficient vector into two parts: `left` and `right`.
             // `left` contains existing coefficients, `right` will store the new coefficients.
             let (left, right) = coeffs.split_at_mut(1 << i);
@@ -140,7 +140,7 @@ impl MultilinearLagrangianPolynomial {
                 // Update the existing coefficient in `left` by adding the computed `right_val`.
                 *left_val += *right_val;
             });
-        }
+        });
 
         // Return the constructed equality polynomial.
         Self { coeffs }
@@ -434,7 +434,7 @@ impl MultilinearLagrangianPolynomials {
         let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
 
         // Iterate over each polynomial in the input set.
-        self.iter().enumerate().for_each(|(q, poly)| {
+        self.par_iter().enumerate().for_each(|(q, poly)| {
             // Compute the starting index for the current polynomial in the result vector.
             let ret_chunk_start = q * 128 * num_chunks;
 

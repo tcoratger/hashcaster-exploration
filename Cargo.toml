@@ -50,3 +50,10 @@ rayon = "1.0"
 rand = "0.8"
 itertools = "0.13"
 unroll = "0.1"
+
+[profile.release]
+debug = true
+
+[profile.profiling]
+inherits = "release"
+debug = true
