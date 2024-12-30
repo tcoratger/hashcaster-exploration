@@ -2,7 +2,7 @@ use crate::binary_field::BinaryField128b;
 use num_traits::Zero;
 
 /// A struct representing a linear transformation using a matrix.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MatrixLinear {
     /// The number of input dimensions (columns of the matrix).
     n_in: usize,
