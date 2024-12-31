@@ -260,7 +260,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         result
     }
 
-    pub fn build(&self) -> BoolCheck {
+    pub fn build(&self) -> BoolCheck<N> {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         for poly in &self.polys {
@@ -283,7 +283,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                 |args| self.linear_compressed(args),
                 |args| self.quadratic_compressed(args),
             ),
-            polys: self.polys.to_vec(),
+            polys: self.polys.clone(),
             points: self.points.clone(),
             boolean_package: self.boolean_package.clone(),
             gammas: self.gammas.clone(),

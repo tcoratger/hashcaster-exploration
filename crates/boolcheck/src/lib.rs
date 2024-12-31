@@ -14,7 +14,7 @@ use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
-use std::ops::Index;
+use std::{array, ops::Index};
 
 pub mod algebraic;
 pub mod and;
@@ -22,11 +22,11 @@ pub mod bool_trait;
 pub mod builder;
 pub mod package;
 
-#[derive(Clone, Debug, Default)]
-pub struct BoolCheck {
+#[derive(Clone, Debug)]
+pub struct BoolCheck<const N: usize> {
     pub points: Points,
     pub poly: Vec<BinaryField128b>,
-    pub polys: Vec<MultilinearLagrangianPolynomial>,
+    pub polys: [MultilinearLagrangianPolynomial; N],
     pub extended_table: Vec<BinaryField128b>,
     poly_coords: Option<Evaluations>,
     pub c: usize,
@@ -39,7 +39,27 @@ pub struct BoolCheck {
     pub gammas: Vec<BinaryField128b>,
 }
 
-impl BoolCheck {
+impl<const N: usize> Default for BoolCheck<N> {
+    fn default() -> Self {
+        Self {
+            points: Points::default(),
+            poly: Vec::new(),
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Vec::new(),
+            poly_coords: None,
+            c: 0,
+            challenges: Points::default(),
+            bit_mapping: Vec::new(),
+            eq_sequence: MultilinearLagrangianPolynomials::default(),
+            round_polys: Vec::new(),
+            claim: BinaryField128b::zero(),
+            boolean_package: BooleanPackage::And,
+            gammas: Vec::new(),
+        }
+    }
+}
+
+impl<const N: usize> BoolCheck<N> {
     /// Returns the current round of the protocol.
     ///
     /// The current round is represented by the number of challenges that have been submitted to the
@@ -289,7 +309,7 @@ impl BoolCheck {
         match self.boolean_package {
             BooleanPackage::And => {
                 // Compute the AND operation using the `AndPackage`.
-                let acc = AndPackage::<2, 1>.algebraic(data);
+                let acc = AndPackage::<N, 1>.algebraic(data);
 
                 // Compress results using gammas.
                 //
@@ -359,7 +379,7 @@ impl BoolCheck {
 
             // Restrict the polynomial coordinates based on the accumulated challenges.
             self.poly_coords = Some(
-                MultilinearLagrangianPolynomials::from(self.polys.clone())
+                MultilinearLagrangianPolynomials::from(self.polys.to_vec())
                     .restrict(&self.challenges, number_variables),
             );
         }
@@ -417,7 +437,7 @@ mod tests {
     fn test_current_rounds() {
         // Define a sample BoolCheck instance.
         // No challenges have been submitted yet.
-        let mut bool_check = BoolCheck::default();
+        let mut bool_check = BoolCheck::<0>::default();
 
         // Assert the initial round (no challenges yet).
         assert_eq!(bool_check.current_round(), 0);
@@ -444,19 +464,19 @@ mod tests {
         // Create a BoolCheck instance with a defined number of points (variables).
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
-        let bool_check = BoolCheck { points: points.clone().into(), ..Default::default() };
+        let bool_check = BoolCheck::<0> { points: points.clone().into(), ..Default::default() };
 
         // Assert that the number of variables matches the length of the points vector.
         assert_eq!(bool_check.number_variables(), points.len());
 
         // Test with no points (empty vector).
-        let empty_bool_check = BoolCheck { points: Points::default(), ..Default::default() };
+        let empty_bool_check = BoolCheck::<0> { points: Points::default(), ..Default::default() };
         assert_eq!(empty_bool_check.number_variables(), 0);
 
         // Test with a large number of points.
         let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
         let large_bool_check =
-            BoolCheck { points: large_points.clone().into(), ..Default::default() };
+            BoolCheck::<0> { points: large_points.clone().into(), ..Default::default() };
         assert_eq!(large_bool_check.number_variables(), large_points.len());
     }
 
@@ -778,7 +798,7 @@ mod tests {
         );
 
         assert_eq!(
-            boolcheck.polys,
+            boolcheck.polys.to_vec(),
             vec![
                 MultilinearLagrangianPolynomial::from(vec![
                     BinaryField128b::new(0),
