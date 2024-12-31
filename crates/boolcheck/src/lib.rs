@@ -373,6 +373,12 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
         }
 
         // Transition to phase 2 if the current round equals `c + 1`.
+        //
+        // Here we fetch the current round again as it may have changed during the computation.
+        // If the current round is equal to `c + 1`:
+        // 1. A new challenge has been submitted during binding.
+        // 2. `self.current_round()` now returns the updated round.
+        // 3. We can transition to phase 2 by applying the `restrict` functionality.
         if self.current_round() == self.c + 1 {
             // At the end of the first phase, we do not need the extended table anymore.
             self.extended_table = Vec::new();
