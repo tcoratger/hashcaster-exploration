@@ -329,7 +329,7 @@ impl<const N: usize, const M: usize> CompressedFoldedOps for BoolCheckBuilder<N,
         acc
     }
 
-    fn algebraic(
+    fn algebraic_compressed(
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3] {

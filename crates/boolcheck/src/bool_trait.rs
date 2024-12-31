@@ -17,7 +17,7 @@ pub trait CompressedFoldedOps: Send + Sync {
     fn quadratic_compressed(&self, inputs: &[BinaryField128b]) -> BinaryField128b;
 
     /// Applies an algebraic transformation to a subset of data and computes the compressed results.
-    fn algebraic(
+    fn algebraic_compressed(
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3];
