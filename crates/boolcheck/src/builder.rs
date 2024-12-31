@@ -13,24 +13,41 @@ use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
-use std::ops::Index;
+use std::{array, ops::Index};
 
-#[derive(Clone, Debug, Default)]
-pub struct BoolCheckBuilder<const M: usize> {
+#[derive(Clone, Debug)]
+pub struct BoolCheckBuilder<const N: usize, const M: usize> {
     pub c: usize,
     pub points: Points,
     pub boolean_package: BooleanPackage,
+    pub gamma: BinaryField128b,
     pub gammas: Vec<BinaryField128b>,
-    pub claim: BinaryField128b,
+    pub claims: [BinaryField128b; M],
+    pub polys: [MultilinearLagrangianPolynomial; N],
 }
 
-impl<const M: usize> BoolCheckBuilder<M> {
+impl<const N: usize, const M: usize> Default for BoolCheckBuilder<N, M> {
+    fn default() -> Self {
+        Self {
+            c: 0,
+            points: Default::default(),
+            boolean_package: Default::default(),
+            gamma: Default::default(),
+            gammas: Default::default(),
+            claims: array::from_fn(|_| Default::default()),
+            polys: array::from_fn(|_| Default::default()),
+        }
+    }
+}
+
+impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
     pub fn new(
         c: usize,
         points: Points,
         boolean_package: BooleanPackage,
-        claims: [BinaryField128b; M],
         gamma: BinaryField128b,
+        claims: [BinaryField128b; M],
+        polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
         assert!(c < points.len());
 
@@ -38,8 +55,10 @@ impl<const M: usize> BoolCheckBuilder<M> {
             c,
             points,
             boolean_package,
+            gamma,
             gammas: BinaryField128b::compute_gammas_folding::<M>(gamma),
-            claim: UnivariatePolynomial::new(claims.into()).evaluate_at(&gamma),
+            claims,
+            polys,
         }
     }
 
@@ -145,9 +164,8 @@ impl<const M: usize> BoolCheckBuilder<M> {
     ///
     /// ### Output:
     /// - Returns an extended table as a `Vec<BinaryField128b>` containing the computed values.
-    pub fn extend_n_tables<const N: usize, L, Q>(
+    pub fn extend_n_tables<L, Q>(
         &self,
-        tables: &[MultilinearLagrangianPolynomial; N],
         trit_mapping: &[u16],
         f_lin: L,
         f_quad: Q,
@@ -159,7 +177,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
         // Recursion depth parameter.
         let c = self.c;
         // Log2 of table size, determines the dimensions.
-        let dims = tables[0].len().ilog2() as usize;
+        let dims = self.polys[0].len().ilog2() as usize;
 
         // pow3: Total number of ternary indices to process (3^(c+1)).
         let pow3 = 3usize.pow((c + 1) as u32);
@@ -197,9 +215,9 @@ impl<const M: usize> BoolCheckBuilder<M> {
                         let idx = base_tab_offset + (offset >> 1);
                         let tab_ext = &mut tables_ext[j];
 
-                        for z in 0..N {
+                        for (z, tab) in tab_ext.iter_mut().enumerate().take(N) {
                             // Copy table values at the current offset.
-                            tab_ext[z] = tables[z][idx];
+                            *tab = self.polys[z][idx];
                         }
 
                         // Apply the linear and quadratic functions.
@@ -240,13 +258,10 @@ impl<const M: usize> BoolCheckBuilder<M> {
         result
     }
 
-    pub fn build<const N: usize>(
-        &self,
-        polynomials: &[MultilinearLagrangianPolynomial; N],
-    ) -> BoolCheck {
+    pub fn build(&self) -> BoolCheck {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
-        for poly in polynomials {
+        for poly in &self.polys {
             assert_eq!(poly.len(), expected_poly_len, "Polynomial length mismatch");
         }
 
@@ -260,14 +275,13 @@ impl<const M: usize> BoolCheckBuilder<M> {
             eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(
                 &self.points[1..].into(),
             ),
-            claim: self.claim,
+            claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(&self.gamma),
             extended_table: self.extend_n_tables(
-                polynomials,
                 &trit_mapping,
                 |args| self.linear_compressed(args),
                 |args| self.quadratic_compressed(args),
             ),
-            polys: polynomials.to_vec(),
+            polys: self.polys.to_vec(),
             points: self.points.clone(),
             boolean_package: self.boolean_package.clone(),
             gammas: self.gammas.clone(),
@@ -276,7 +290,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
     }
 }
 
-impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
+impl<const N: usize, const M: usize> CompressedFoldedOps for BoolCheckBuilder<N, M> {
     fn linear_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the linear part of the boolean formula.
         let lin = match self.boolean_package {
@@ -349,7 +363,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 1, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 1, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -364,7 +378,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 2, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -383,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 4, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 4, ..Default::default() };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -416,7 +430,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckBuilder with c = 0 (single ternary digit).
-        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 0, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 0, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -435,11 +449,6 @@ mod tests {
         // Table size is determined as 2^dims. Here, dims = 3, so table size = 8 (2^3).
         let dims = 3;
 
-        // Create a BoolCheckBuilder instance
-        // The `c` parameter sets the recursion depth for ternary mappings.
-        // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckBuilder<0> = BoolCheckBuilder { c: 2, ..Default::default() };
-
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
         let table1: MultilinearLagrangianPolynomial =
@@ -453,6 +462,12 @@ mod tests {
 
         // Combine the three tables into an array.
         let tabs = [table1, table2, table3];
+
+        // Create a BoolCheckBuilder instance
+        // The `c` parameter sets the recursion depth for ternary mappings.
+        // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
+        let bool_check: BoolCheckBuilder<3, 0> =
+            BoolCheckBuilder { c: 2, polys: tabs, ..Default::default() };
 
         // Compute the ternary mapping for the current value of `c`
         // `trit_mapping` is a precomputed array that determines how table values are combined
@@ -482,7 +497,7 @@ mod tests {
         // Call the `extend_n_tables` function
         // This function extends the input tables using the ternary mapping and applies the linear
         // and quadratic functions to combine the table values hierarchically.
-        let result = bool_check.extend_n_tables(&tabs, &trit_mapping, f_lin, f_quad);
+        let result = bool_check.extend_n_tables(&trit_mapping, f_lin, f_quad);
 
         // Validate the result
         // The result is compared to a hardcoded expected output. The expected output is the result

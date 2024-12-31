@@ -505,15 +505,16 @@ mod tests {
             phase_switch,
             points.clone().into(),
             BooleanPackage::And,
-            [initial_claim],
             gamma,
+            [initial_claim],
+            [p, q],
         );
 
         // Build the Boolean check with the following parameters:
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut boolcheck = boolcheck_builder.build(&[p, q]);
+        let mut boolcheck = boolcheck_builder.build();
 
         // Initialize the current claim as the initial claim.
         // The current claim will be updated during each round of the protocol.
@@ -631,15 +632,16 @@ mod tests {
             phase_switch,
             points.into(),
             BooleanPackage::And,
-            [initial_claim],
             gamma,
+            [initial_claim],
+            [p, q],
         );
 
         // Build the Boolean check with the following parameters:
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut boolcheck = boolcheck_builder.build(&[p, q]);
+        let mut boolcheck = boolcheck_builder.build();
 
         // Validate the initial extended table.
         assert_eq!(
