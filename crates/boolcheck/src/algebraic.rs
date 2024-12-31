@@ -6,27 +6,18 @@ use hashcaster_field::binary_field::BinaryField128b;
 ///
 /// This trait abstracts the evaluation of bitwise operations or similar computations across
 /// data slices. The specifics of the evaluation are defined by the implementor.
-pub trait AlgebraicOps {
-    /// The type of output produced by the algebraic evaluation.
-    type AlgebraicOutput;
-
-    /// The type of output produced by the linear evaluation.
-    type LinearOutput;
-
-    /// The type of output produced by the quadratic evaluation.
-    type QuadraticOutput;
-
+pub trait AlgebraicOps<const I: usize, const O: usize> {
     /// Performs an algebraic evaluation based on the provided data and indices.
     fn algebraic(
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
-    ) -> Self::AlgebraicOutput;
+    ) -> [[BinaryField128b; O]; 3];
 
     /// Executes the linear part of a boolean formulas.
-    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearOutput;
+    fn linear(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O];
 
     /// Executes the quadratic part of a boolean formula and compresses the results.
-    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticOutput;
+    fn quadratic(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O];
 }
 
 /// Enum to represent the mode of operation for [`StrideWrapper`].

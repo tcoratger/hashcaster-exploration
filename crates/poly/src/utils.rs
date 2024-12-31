@@ -1,5 +1,38 @@
 use std::arch::aarch64::{int64x2_t, vld1q_s64, vshlq_n_s64};
 
+/// A macro to safely create a reference to an array from a slice.
+///
+/// # Parameters
+/// - `$arr`: The source slice from which the array reference is created.
+/// - `$offset`: The starting index in the slice.
+/// - `$len`: The length of the array to extract.
+///
+/// # Returns
+/// A reference to an array of size `$len` starting from `$offset` in `$arr`.
+///
+/// # Safety
+/// This macro uses an unsafe block to cast the slice to an array reference.
+/// It is the caller's responsibility to ensure:
+/// - The slice has at least `$offset + $len` elements.
+/// - `$len` matches the expected array size at compile time.
+///
+/// # Example
+/// ```
+/// let data = [1, 2, 3, 4, 5];
+/// let array_ref = array_ref!(data, 1, 3);
+/// assert_eq!(array_ref, &[2, 3, 4]);
+/// ```
+#[macro_export]
+macro_rules! array_ref {
+    ($arr:expr, $offset:expr, $len:expr) => {{
+        #[inline]
+        const unsafe fn as_array<T, const N: usize>(slice: &[T]) -> &[T; N] {
+            &*(slice.as_ptr() as *const [_; N])
+        }
+        unsafe { as_array::<_, $len>(&$arr[$offset..$offset + $len]) }
+    }};
+}
+
 /// Removes the most significant bit (MSB) from a given number and returns the modified value along
 /// with the MSB's position.
 ///

@@ -5,21 +5,14 @@ use std::ops::Index;
 
 /// A structure that implements the behavior of the AND operations.
 #[derive(Debug, Clone)]
-pub struct AndPackage<const M: usize>;
+pub struct AndPackage<const I: usize, const O: usize>;
 
-impl<const M: usize> AlgebraicOps for AndPackage<M> {
-    type AlgebraicOutput = [[BinaryField128b; M]; 3];
-    type LinearOutput = [BinaryField128b; M];
-    type QuadraticOutput = [BinaryField128b; M];
-
+impl<const I: usize, const O: usize> AlgebraicOps<I, O> for AndPackage<I, O> {
     fn algebraic(
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
-    ) -> Self::AlgebraicOutput {
-        // Ensure the output size is valid for the AND package.
-        assert_eq!(M, 1, "Invalid output size for AND package");
-
-        let mut ret = [[BinaryField128b::zero(); M]; 3];
+    ) -> [[BinaryField128b; O]; 3] {
+        let mut ret = [[BinaryField128b::zero(); O]; 3];
 
         // Iterate over the 128 basis elements of the binary field.
         for i in 0..128 {
@@ -43,26 +36,14 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
         ret
     }
 
-    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearOutput {
-        // Ensure the output size is valid for the AND package.
-        assert_eq!(M, 1, "Invalid output size for AND package");
-
-        // Validate the size of the input data.
-        assert_eq!(data.len(), 2, "Invalid input size for AND package");
-
+    fn linear(&self, _data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
         // Return a zero-initialized array as the result of the linear compression.
-        [BinaryField128b::zero(); M]
+        [BinaryField128b::zero(); O]
     }
 
-    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticOutput {
-        // Ensure the output size is valid for the AND package.
-        assert_eq!(M, 1, "Invalid output size for AND package");
-
-        // Validate the size of the input data.
-        assert_eq!(data.len(), 2, "Invalid input size for AND package");
-
+    fn quadratic(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
         // Compute and return the bitwise AND of the two input elements.
-        [data[0] & data[1]; M]
+        [data[0] & data[1]; O]
     }
 }
 
@@ -85,7 +66,7 @@ mod tests {
         let c = [a1, BinaryField128b::from(a2.into_inner() >> 1)];
         let d = [BinaryField128b::from(a1.into_inner() >> 1), a2];
 
-        let and_package = AndPackage::<1>;
+        let and_package = AndPackage::<2, 1>;
 
         // Prepare input for the algebraic implementation.
         // - Take the array of input field elements.

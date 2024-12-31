@@ -9,12 +9,12 @@ use std::ops::Index;
 /// - Execute linear part of boolean formulas and compress the results.
 /// - Execute quadratic part of boolean formulas and compress the results.
 /// - Apply algebraic transformations to data and compress the results.
-pub trait CompressedFoldedOps: Send + Sync {
+pub trait CompressedFoldedOps<const I: usize>: Send + Sync {
     /// Executes the linear part of a boolean formula and compresses the results.
-    fn linear_compressed(&self, inputs: &[BinaryField128b]) -> BinaryField128b;
+    fn linear_compressed(&self, inputs: &[BinaryField128b; I]) -> BinaryField128b;
 
     /// Executes the quadratic part of a boolean formula and compresses the results.
-    fn quadratic_compressed(&self, inputs: &[BinaryField128b]) -> BinaryField128b;
+    fn quadratic_compressed(&self, inputs: &[BinaryField128b; I]) -> BinaryField128b;
 
     /// Applies an algebraic transformation to a subset of data and computes the compressed results.
     fn algebraic_compressed(

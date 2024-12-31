@@ -4,6 +4,7 @@ use crate::{
 };
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
+    array_ref,
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
     point::Points,
     univariate::UnivariatePolynomial,
@@ -171,8 +172,8 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         f_quad: Q,
     ) -> Vec<BinaryField128b>
     where
-        L: Fn(&[BinaryField128b]) -> BinaryField128b + Send + Sync,
-        Q: Fn(&[BinaryField128b]) -> BinaryField128b + Send + Sync,
+        L: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
+        Q: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
     {
         // Recursion depth parameter.
         let c = self.c;
@@ -220,8 +221,9 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                             *tab = self.polys[z][idx];
                         }
 
-                        // Apply the linear and quadratic functions.
-                        result_chunk[j] = f_quad(&tab_ext[0..N]) + f_lin(&tab_ext[0..N]);
+                        // Sum the linear and quadratic parts.
+                        let a = array_ref!(tab_ext, 0, N);
+                        result_chunk[j] = f_quad(a) + f_lin(a);
                     } else {
                         // Odd offset: Combine results from previous indices.
                         let tab_ext1 = tables_ext[j - offset];
@@ -233,8 +235,8 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                             tab_ext[z] = tab_ext1[z] + tab_ext2[z];
                         }
 
-                        // Apply the quadratic function.
-                        result_chunk[j] = f_quad(&tab_ext[0..N]);
+                        // Compute the quadratic part.
+                        result_chunk[j] = f_quad(array_ref!(tab_ext, 0, N));
                     }
                 } else {
                     // Case 2: Large indices (recursive range).
@@ -290,11 +292,11 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
     }
 }
 
-impl<const N: usize, const M: usize> CompressedFoldedOps for BoolCheckBuilder<N, M> {
-    fn linear_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+impl<const N: usize, const M: usize> CompressedFoldedOps<N> for BoolCheckBuilder<N, M> {
+    fn linear_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute the linear part of the boolean formula.
         let lin = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.linear(arg),
+            BooleanPackage::And => AndPackage::<N, M>.linear(arg),
         };
 
         // Initialize the accumulator to zero.
@@ -310,10 +312,10 @@ impl<const N: usize, const M: usize> CompressedFoldedOps for BoolCheckBuilder<N,
         acc
     }
 
-    fn quadratic_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+    fn quadratic_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute the quadratic part of the boolean formula.
         let quad = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.quadratic(arg),
+            BooleanPackage::And => AndPackage::<N, M>.quadratic(arg),
         };
 
         // Initialize the accumulator to zero.
@@ -335,7 +337,7 @@ impl<const N: usize, const M: usize> CompressedFoldedOps for BoolCheckBuilder<N,
     ) -> [BinaryField128b; 3] {
         // Compute the algebraic result.
         let alg = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.algebraic(data),
+            BooleanPackage::And => AndPackage::<N, M>.algebraic(data),
         };
 
         // Initialize the accumulators for each of the 3 output values to zero.
@@ -476,7 +478,7 @@ mod tests {
 
         // Define the linear function (f_lin)
         // `f_lin` computes the sum of all values in the input slice.
-        let f_lin = |args: &[BinaryField128b]| {
+        let f_lin = |args: &[BinaryField128b; 3]| {
             let mut res = BinaryField128b::zero();
             for &x in args {
                 res += x;
@@ -486,7 +488,7 @@ mod tests {
 
         // Define the quadratic function (f_quad)
         // `f_quad` computes the sum of the squares of all values in the input slice.
-        let f_quad = |args: &[BinaryField128b]| {
+        let f_quad = |args: &[BinaryField128b; 3]| {
             let mut res = BinaryField128b::zero();
             for &x in args {
                 res += x * x;

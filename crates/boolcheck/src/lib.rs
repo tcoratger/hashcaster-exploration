@@ -289,7 +289,7 @@ impl BoolCheck {
         match self.boolean_package {
             BooleanPackage::And => {
                 // Compute the AND operation using the `AndPackage`.
-                let acc = AndPackage::<1>.algebraic(data);
+                let acc = AndPackage::<2, 1>.algebraic(data);
 
                 // Compress results using gammas.
                 //
@@ -570,7 +570,7 @@ mod tests {
         frob_evals.push(BinaryField128b::zero());
 
         // Compute algebraic AND
-        let and_algebraic = AndPackage::<1>.algebraic([
+        let and_algebraic = AndPackage::<2, 1>.algebraic([
             StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
             StrideWrapper { arr: &frob_evals, start: 128, offset: 1, mode: StrideMode::Wrapper0 },
             StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
