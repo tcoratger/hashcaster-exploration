@@ -19,6 +19,7 @@ use hashcaster_field::binary_field::BinaryField128b;
 /// elements from the input slices. Specifically:
 /// - For linear compression, elements at indices `2i` and `2i+1` are summed.
 /// - For quadratic compression, products of elements at indices `2i` and `2i+1` are summed.
+///
 /// These compressed results represent the linear and quadratic parts of the same formula.
 ///
 /// # Safety and Concurrency

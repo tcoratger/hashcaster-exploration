@@ -43,9 +43,9 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         assert!(num_vars >= num_active_vars);
 
         // Ensure that each polynomial has the correct number of coefficients.
-        polys.iter().for_each(|poly| {
+        for poly in &polys {
             assert!(poly.len() == 1 << num_vars);
-        });
+        }
 
         // Initialize the linear check with the provided parameters.
         Self { matrix, polys, points, num_vars, num_active_vars, initial_claims }

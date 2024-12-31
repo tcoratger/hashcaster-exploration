@@ -92,7 +92,7 @@ pub struct StrideWrapper<'a, T> {
     pub mode: StrideMode,
 }
 
-impl<'a, T: std::ops::Add<Output = T> + Copy> Index<usize> for StrideWrapper<'a, T> {
+impl<T: std::ops::Add<Output = T> + Copy> Index<usize> for StrideWrapper<'_, T> {
     type Output = T;
 
     fn index(&self, i: usize) -> &Self::Output {

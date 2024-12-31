@@ -157,7 +157,7 @@ impl BinaryField128b {
     /// - The length of the vector is equal to `M`.
     pub fn compute_gammas_folding<const M: usize>(gamma: Self) -> Vec<Self> {
         (0..M)
-            .scan(BinaryField128b::one(), |state, _| {
+            .scan(Self::one(), |state, _| {
                 let current = *state;
                 *state *= gamma;
                 Some(current)
@@ -808,7 +808,7 @@ mod tests {
     #[test]
     fn test_compute_gammas_folding_large_gamma() {
         // Case: Gamma = large value
-        let gamma = BinaryField128b::new(123456789);
+        let gamma = BinaryField128b::new(123_456_789);
         let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
 
         // Expected result calculated manually: [1, gamma, gamma^2]

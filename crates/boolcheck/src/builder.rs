@@ -10,7 +10,7 @@ use hashcaster_poly::{
     point::Points,
     univariate::UnivariatePolynomial,
 };
-use num_traits::{identities::Zero, One};
+use num_traits::identities::Zero;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,

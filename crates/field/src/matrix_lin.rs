@@ -29,12 +29,12 @@ impl MatrixLinear {
     }
 
     /// Returns the number of input dimensions (columns).
-    pub fn n_in(&self) -> usize {
+    pub const fn n_in(&self) -> usize {
         self.n_in
     }
 
     /// Returns the number of output dimensions (rows).
-    pub fn n_out(&self) -> usize {
+    pub const fn n_out(&self) -> usize {
         self.n_out
     }
 

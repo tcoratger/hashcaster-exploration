@@ -201,29 +201,21 @@ impl BoolCheck {
             (0..half)
                 .into_par_iter()
                 .map(|i| {
+                    let offset = 1 << (number_variables - self.c - 1);
+                    let arr = &poly_coords[2 * i..];
                     self.compute_algebraic([
+                        StrideWrapper { arr, start: 0, offset, mode: StrideMode::Wrapper0 },
                         StrideWrapper {
-                            arr: &poly_coords[2 * i..],
-                            start: 0,
-                            offset: 1 << (number_variables - self.c - 1),
+                            arr,
+                            start: 128 * offset,
+                            offset,
                             mode: StrideMode::Wrapper0,
                         },
+                        StrideWrapper { arr, start: 0, offset, mode: StrideMode::Wrapper1 },
                         StrideWrapper {
-                            arr: &poly_coords[2 * i..],
-                            start: 128 * (1 << (number_variables - self.c - 1)),
-                            offset: 1 << (number_variables - self.c - 1),
-                            mode: StrideMode::Wrapper0,
-                        },
-                        StrideWrapper {
-                            arr: &poly_coords[2 * i..],
-                            start: 0,
-                            offset: 1 << (number_variables - self.c - 1),
-                            mode: StrideMode::Wrapper1,
-                        },
-                        StrideWrapper {
-                            arr: &poly_coords[2 * i..],
-                            start: 128 * (1 << (number_variables - self.c - 1)),
-                            offset: 1 << (number_variables - self.c - 1),
+                            arr,
+                            start: 128 * offset,
+                            offset,
                             mode: StrideMode::Wrapper1,
                         },
                     ])
