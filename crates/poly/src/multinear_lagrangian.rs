@@ -274,6 +274,12 @@ impl Deref for MultilinearLagrangianPolynomial {
     }
 }
 
+impl DerefMut for MultilinearLagrangianPolynomial {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.coeffs
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MultilinearLagrangianPolynomials(Vec<MultilinearLagrangianPolynomial>);
 

@@ -286,7 +286,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
             polys: self.polys.clone(),
             points: self.points.clone(),
             boolean_package: self.boolean_package.clone(),
-            gammas: self.gammas.clone(),
+            gammas: self.gammas,
             ..Default::default()
         }
     }

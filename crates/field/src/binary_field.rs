@@ -160,9 +160,9 @@ impl BinaryField128b {
         // Start with the multiplicative identity
         let mut current = Self::one();
 
-        for i in 0..M {
+        for g in gammas.iter_mut().take(M) {
             // Set the current power in the array
-            gammas[i] = current;
+            *g = current;
             // Compute the next power
             current *= gamma;
         }

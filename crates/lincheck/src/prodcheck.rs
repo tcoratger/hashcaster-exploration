@@ -1,16 +1,16 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    compressed::CompressedPoly, multinear_lagrangian::MultilinearLagrangianPolynomials,
+    compressed::CompressedPoly, multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::Points,
 };
 use num_traits::identities::Zero;
 
-#[derive(Clone, Debug, Default)]
-pub struct ProdCheck {
+#[derive(Clone, Debug)]
+pub struct ProdCheck<const N: usize> {
     /// Polynomials of the first input set (`P`).
-    pub p_polys: MultilinearLagrangianPolynomials,
+    pub p_polys: [MultilinearLagrangianPolynomial; N],
     /// Polynomials of the second input set (`Q`).
-    pub q_polys: MultilinearLagrangianPolynomials,
+    pub q_polys: [MultilinearLagrangianPolynomial; N],
     /// The initial claim that represents the sum of the products of `P` and `Q`.
     pub claim: BinaryField128b,
     /// A list of challenges (random values) generated during the protocol.
@@ -21,10 +21,23 @@ pub struct ProdCheck {
     cached_round_msg: Option<CompressedPoly>,
 }
 
-impl ProdCheck {
+impl<const N: usize> Default for ProdCheck<N> {
+    fn default() -> Self {
+        Self {
+            p_polys: core::array::from_fn(|_| Default::default()),
+            q_polys: core::array::from_fn(|_| Default::default()),
+            claim: BinaryField128b::zero(),
+            challenges: Default::default(),
+            num_vars: 0,
+            cached_round_msg: None,
+        }
+    }
+}
+
+impl<const N: usize> ProdCheck<N> {
     pub fn new(
-        p_polys: MultilinearLagrangianPolynomials,
-        q_polys: MultilinearLagrangianPolynomials,
+        p_polys: [MultilinearLagrangianPolynomial; N],
+        q_polys: [MultilinearLagrangianPolynomial; N],
         claim: BinaryField128b,
         check_init_claim: bool,
     ) -> Self {
