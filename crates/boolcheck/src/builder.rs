@@ -265,8 +265,8 @@ impl<const M: usize> BoolCheckBuilder<M> {
             extended_table: self.extend_n_tables(
                 polynomials,
                 &trit_mapping,
-                |args| self.compress_linear(args),
-                |args| self.compress_quadratic(args),
+                |args| self.linear_compressed(args),
+                |args| self.quadratic_compressed(args),
             ),
             polys: polynomials.to_vec(),
             points: self.points.clone(),
@@ -322,7 +322,7 @@ impl<const M: usize> BoolCheckBuilder<M> {
 }
 
 impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
-    fn compress_linear(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+    fn linear_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
         // computation.
         let tmp = self.compute_linear_part(arg);
@@ -340,7 +340,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         acc
     }
 
-    fn compress_quadratic(&self, arg: &[BinaryField128b]) -> BinaryField128b {
+    fn quadratic_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
         // Compute the intermediate result by delegating to the wrapped `FnPackage`'s quadratic
         // computation.
         let tmp = self.compute_quadratic_part(arg);
@@ -358,7 +358,7 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         acc
     }
 
-    fn exec_alg(
+    fn algebraic(
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3] {
