@@ -22,7 +22,7 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize> {
     pub points: Points,
     pub boolean_package: BooleanPackage,
     pub gamma: BinaryField128b,
-    pub gammas: Vec<BinaryField128b>,
+    pub gammas: [BinaryField128b; M],
     pub claims: [BinaryField128b; M],
     pub polys: [MultilinearLagrangianPolynomial; N],
 }
@@ -34,7 +34,7 @@ impl<const N: usize, const M: usize> Default for BoolCheckBuilder<N, M> {
             points: Default::default(),
             boolean_package: Default::default(),
             gamma: Default::default(),
-            gammas: Default::default(),
+            gammas: array::from_fn(|_| Default::default()),
             claims: array::from_fn(|_| Default::default()),
             polys: array::from_fn(|_| Default::default()),
         }
@@ -260,7 +260,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         result
     }
 
-    pub fn build(&self) -> BoolCheck<N> {
+    pub fn build(&self) -> BoolCheck<N, M> {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         for poly in &self.polys {

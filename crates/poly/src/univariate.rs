@@ -116,12 +116,12 @@ impl UnivariatePolynomial {
     /// - `other` = `d_0 + d_1 \cdot x`,
     ///
     /// The result is:
-    /// ```
+    /// ```text
     /// \text{result} = (c_0 + c_1 \cdot x + c_2 \cdot x^2) \cdot (d_0 + d_1 \cdot x)
     /// ```
     ///
     /// Expanding:
-    /// ```
+    /// ```text
     /// \text{result} = c_0 \cdot d_0
     ///              + (c_0 \cdot d_1 + c_1 \cdot d_0) \cdot x
     ///              + (c_1 \cdot d_1 + c_2 \cdot d_0) \cdot x^2

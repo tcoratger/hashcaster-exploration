@@ -17,7 +17,7 @@ use std::arch::aarch64::{int64x2_t, vld1q_s64, vshlq_n_s64};
 /// - `$len` matches the expected array size at compile time.
 ///
 /// # Example
-/// ```
+/// ```rust,ignore
 /// let data = [1, 2, 3, 4, 5];
 /// let array_ref = array_ref!(data, 1, 3);
 /// assert_eq!(array_ref, &[2, 3, 4]);
@@ -145,7 +145,7 @@ pub(crate) const fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
 /// - Ensure the input is valid for a left shift operation, and the target hardware supports NEON.
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// let input: [u8; 16] = [
 ///     0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1
 ///     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 2

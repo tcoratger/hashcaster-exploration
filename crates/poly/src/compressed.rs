@@ -34,14 +34,14 @@ impl CompressedPoly {
     ///
     /// # Example
     /// Given the polynomial:
-    /// ```
+    /// ```text
     /// P(x) = 3 + 4x + 5x ^ 2 + 6x ^ 3
     /// ```
     /// - Compressed coefficients: `[3, 5, 6]` (skipping `c1 = 4`).
     /// - Sum at `x = 1`: `P(1) = 3 + 4 + 5 + 6 = 18`.
     ///
     /// The function reconstructs the coefficients as:
-    /// ```
+    /// ```text
     /// [3, 4, 5, 6]
     /// ```
     pub fn coeffs(&self, sum: BinaryField128b) -> UnivariatePolynomial {

@@ -23,7 +23,7 @@ pub mod builder;
 pub mod package;
 
 #[derive(Clone, Debug)]
-pub struct BoolCheck<const N: usize> {
+pub struct BoolCheck<const N: usize, const M: usize> {
     pub points: Points,
     pub poly: Vec<BinaryField128b>,
     pub polys: [MultilinearLagrangianPolynomial; N],
@@ -36,10 +36,10 @@ pub struct BoolCheck<const N: usize> {
     pub round_polys: Vec<CompressedPoly>,
     pub claim: BinaryField128b,
     pub boolean_package: BooleanPackage,
-    pub gammas: Vec<BinaryField128b>,
+    pub gammas: [BinaryField128b; M],
 }
 
-impl<const N: usize> Default for BoolCheck<N> {
+impl<const N: usize, const M: usize> Default for BoolCheck<N, M> {
     fn default() -> Self {
         Self {
             points: Points::default(),
@@ -54,12 +54,12 @@ impl<const N: usize> Default for BoolCheck<N> {
             round_polys: Vec::new(),
             claim: BinaryField128b::zero(),
             boolean_package: BooleanPackage::And,
-            gammas: Vec::new(),
+            gammas: array::from_fn(|_| Default::default()),
         }
     }
 }
 
-impl<const N: usize> BoolCheck<N> {
+impl<const N: usize, const M: usize> BoolCheck<N, M> {
     /// Returns the current round of the protocol.
     ///
     /// The current round is represented by the number of challenges that have been submitted to the
@@ -437,7 +437,7 @@ mod tests {
     fn test_current_rounds() {
         // Define a sample BoolCheck instance.
         // No challenges have been submitted yet.
-        let mut bool_check = BoolCheck::<0>::default();
+        let mut bool_check = BoolCheck::<0, 0>::default();
 
         // Assert the initial round (no challenges yet).
         assert_eq!(bool_check.current_round(), 0);
@@ -464,19 +464,20 @@ mod tests {
         // Create a BoolCheck instance with a defined number of points (variables).
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
-        let bool_check = BoolCheck::<0> { points: points.clone().into(), ..Default::default() };
+        let bool_check = BoolCheck::<0, 0> { points: points.clone().into(), ..Default::default() };
 
         // Assert that the number of variables matches the length of the points vector.
         assert_eq!(bool_check.number_variables(), points.len());
 
         // Test with no points (empty vector).
-        let empty_bool_check = BoolCheck::<0> { points: Points::default(), ..Default::default() };
+        let empty_bool_check =
+            BoolCheck::<0, 0> { points: Points::default(), ..Default::default() };
         assert_eq!(empty_bool_check.number_variables(), 0);
 
         // Test with a large number of points.
         let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
         let large_bool_check =
-            BoolCheck::<0> { points: large_points.clone().into(), ..Default::default() };
+            BoolCheck::<0, 0> { points: large_points.clone().into(), ..Default::default() };
         assert_eq!(large_bool_check.number_variables(), large_points.len());
     }
 

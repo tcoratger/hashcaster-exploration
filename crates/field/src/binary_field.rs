@@ -67,7 +67,7 @@ impl BinaryField128b {
     ///   bits.
     ///
     /// # Example
-    /// ```
+    /// ```rust,ignore
     /// let b0 = BinaryField128b::basis(0); // Represents x^0, or 1
     /// let b1 = BinaryField128b::basis(1); // Represents x^1, or 2
     /// let b127 = BinaryField128b::basis(127); // Represents x^127
@@ -153,16 +153,21 @@ impl BinaryField128b {
     ///   - Must be specified as a compile-time constant.
     ///
     /// # Returns
-    /// A `Vec<BinaryField128b>` containing the computed sequence of gamma values.
-    /// - The length of the vector is equal to `M`.
-    pub fn compute_gammas_folding<const M: usize>(gamma: Self) -> Vec<Self> {
-        (0..M)
-            .scan(Self::one(), |state, _| {
-                let current = *state;
-                *state *= gamma;
-                Some(current)
-            })
-            .collect()
+    /// An array of size `M` containing the computed sequence of gamma values.
+    pub fn compute_gammas_folding<const M: usize>(gamma: Self) -> [Self; M] {
+        // Initialize the array with the identity element
+        let mut gammas = [Self::one(); M];
+        // Start with the multiplicative identity
+        let mut current = Self::one();
+
+        for i in 0..M {
+            // Set the current power in the array
+            gammas[i] = current;
+            // Compute the next power
+            current *= gamma;
+        }
+
+        gammas
     }
 }
 
@@ -790,7 +795,7 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<5>(gamma);
 
         // Expected result is a sequence of ones
-        let expected = vec![BinaryField128b::one(); 5];
+        let expected = [BinaryField128b::one(); 5];
         assert_eq!(result, expected, "Gamma folding with identity failed");
     }
 
@@ -801,7 +806,7 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<4>(gamma);
 
         // Expected result
-        let expected = vec![BinaryField128b::one(), gamma, gamma * gamma, gamma * gamma * gamma];
+        let expected = [BinaryField128b::one(), gamma, gamma * gamma, gamma * gamma * gamma];
         assert_eq!(result, expected, "Gamma folding with simple case failed");
     }
 
@@ -812,7 +817,7 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
 
         // Expected result calculated manually: [1, gamma, gamma^2]
-        let expected = vec![BinaryField128b::one(), gamma, gamma * gamma];
+        let expected = [BinaryField128b::one(), gamma, gamma * gamma];
         assert_eq!(result, expected, "Gamma folding with large gamma failed");
     }
 
@@ -823,8 +828,7 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
 
         // Expected result: [1, 0, 0]
-        let expected =
-            vec![BinaryField128b::one(), BinaryField128b::zero(), BinaryField128b::zero()];
+        let expected = [BinaryField128b::one(), BinaryField128b::zero(), BinaryField128b::zero()];
         assert_eq!(result, expected, "Gamma folding with zero gamma failed");
     }
 }
