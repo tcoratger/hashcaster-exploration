@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use crate::{
     algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
     package::BooleanPackage, BoolCheck,
@@ -311,12 +313,10 @@ impl<const M: usize> BoolCheckBuilder<M> {
     /// A 2D array `[3][M]` containing aggregated results of algebraic operations.
     pub fn compute_algebraic(
         &self,
-        data: &[BinaryField128b],
-        idx_a: usize,
-        offset: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [[BinaryField128b; M]; 3] {
         match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.algebraic(data, idx_a, offset),
+            BooleanPackage::And => AndPackage::<M>.algebraic(data),
         }
     }
 }
@@ -360,12 +360,10 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
 
     fn exec_alg(
         &self,
-        data: &[BinaryField128b],
-        start: usize,
-        offset: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3] {
         // Compute the intermediate algebraic results by delegating to the wrapped `FnPackage`.
-        let tmp = self.compute_algebraic(data, start, offset);
+        let tmp = self.compute_algebraic(data);
 
         // Initialize the accumulators for each of the 3 output values to zero.
         let mut acc = [BinaryField128b::zero(); 3];

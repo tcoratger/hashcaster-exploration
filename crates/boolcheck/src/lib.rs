@@ -1,4 +1,4 @@
-use algebraic::AlgebraicOps;
+use algebraic::{AlgebraicOps, StrideMode, StrideWrapper};
 use and::AndPackage;
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
@@ -14,6 +14,7 @@ use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
+use std::ops::Index;
 
 pub mod algebraic;
 pub mod and;
@@ -200,8 +201,33 @@ impl BoolCheck {
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.compute_algebraic(poly_coords, i, 1 << (number_variables - self.c - 1))
-                        .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic([
+                        StrideWrapper {
+                            arr: &poly_coords[2 * i..],
+                            start: 0,
+                            offset: 1 << (number_variables - self.c - 1),
+                            mode: StrideMode::Wrapper0,
+                        },
+                        StrideWrapper {
+                            arr: &poly_coords[2 * i..],
+                            start: 128 * (1 << (number_variables - self.c - 1)),
+                            offset: 1 << (number_variables - self.c - 1),
+                            mode: StrideMode::Wrapper0,
+                        },
+                        StrideWrapper {
+                            arr: &poly_coords[2 * i..],
+                            start: 0,
+                            offset: 1 << (number_variables - self.c - 1),
+                            mode: StrideMode::Wrapper1,
+                        },
+                        StrideWrapper {
+                            arr: &poly_coords[2 * i..],
+                            start: 128 * (1 << (number_variables - self.c - 1)),
+                            offset: 1 << (number_variables - self.c - 1),
+                            mode: StrideMode::Wrapper1,
+                        },
+                    ])
+                    .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(
                     || [BinaryField128b::zero(); 3],
@@ -266,14 +292,12 @@ impl BoolCheck {
 
     pub fn compute_algebraic(
         &self,
-        data: &Evaluations,
-        idx_a: usize,
-        offset: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3] {
         match self.boolean_package {
             BooleanPackage::And => {
                 // Compute the AND operation using the `AndPackage`.
-                let acc = AndPackage::<1>.algebraic(data, idx_a, offset);
+                let acc = AndPackage::<1>.algebraic(data);
 
                 // Compress results using gammas.
                 //
@@ -392,6 +416,7 @@ pub struct BoolCheckOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use algebraic::{StrideMode, StrideWrapper};
     use builder::BoolCheckBuilder;
     use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
     use package::BooleanPackage;
@@ -552,7 +577,12 @@ mod tests {
         frob_evals.push(BinaryField128b::zero());
 
         // Compute algebraic AND
-        let and_algebraic = AndPackage::<1>.algebraic(&frob_evals, 0, 1);
+        let and_algebraic = AndPackage::<1>.algebraic([
+            StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
+            StrideWrapper { arr: &frob_evals, start: 128, offset: 1, mode: StrideMode::Wrapper0 },
+            StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
+            StrideWrapper { arr: &frob_evals, start: 128, offset: 1, mode: StrideMode::Wrapper1 },
+        ]);
 
         // Transform vector of Field elements to Points
         let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
@@ -723,12 +753,25 @@ mod tests {
         // Verify the correctness of the round polynomial cache.
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
 
+        let algebraic_data = (0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>();
+
         // Test an imaginary algorithm execution.
-        let alg_res = boolcheck.compute_algebraic(
-            &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>().into(),
-            0,
-            1,
-        );
+        let alg_res = boolcheck.compute_algebraic([
+            StrideWrapper { arr: &algebraic_data, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
+            StrideWrapper {
+                arr: &algebraic_data,
+                start: 128,
+                offset: 1,
+                mode: StrideMode::Wrapper0,
+            },
+            StrideWrapper { arr: &algebraic_data, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
+            StrideWrapper {
+                arr: &algebraic_data,
+                start: 128,
+                offset: 1,
+                mode: StrideMode::Wrapper1,
+            },
+        ]);
 
         // Verify the result of the imaginary algorithm execution.
         assert_eq!(

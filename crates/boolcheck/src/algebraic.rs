@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use hashcaster_field::binary_field::BinaryField128b;
 
 /// A trait defining a generic algebraic evaluation behavior.
@@ -34,9 +36,7 @@ pub trait AlgebraicOps {
     /// - This trait allows for extensible and customizable evaluation strategies.
     fn algebraic(
         &self,
-        data: &[BinaryField128b],
-        idx_a: usize,
-        offset: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> Self::AlgebraicOutput;
 
     /// Performs a linear compressed evaluation on the provided data.
@@ -74,4 +74,31 @@ pub trait AlgebraicOps {
     /// - The compression logic and the expected output format depend on the concrete
     ///   implementation.
     fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput;
+}
+
+/// Enum to represent the mode of operation for [`StrideWrapper`].
+#[derive(Debug, Clone, Copy)]
+pub enum StrideMode {
+    Wrapper0,
+    Wrapper1,
+}
+
+/// Unified wrapper for accessing elements with stride and mode.
+#[derive(Debug, Clone, Copy)]
+pub struct StrideWrapper<'a, T> {
+    pub arr: &'a [T],
+    pub start: usize,
+    pub offset: usize,
+    pub mode: StrideMode,
+}
+
+impl<'a, T: std::ops::Add<Output = T> + Copy> Index<usize> for StrideWrapper<'a, T> {
+    type Output = T;
+
+    fn index(&self, i: usize) -> &Self::Output {
+        match self.mode {
+            StrideMode::Wrapper0 => &self.arr[self.start + i * self.offset],
+            StrideMode::Wrapper1 => &self.arr[self.start + i * self.offset + 1],
+        }
+    }
 }

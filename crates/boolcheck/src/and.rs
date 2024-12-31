@@ -1,6 +1,7 @@
 use crate::algebraic::AlgebraicOps;
 use hashcaster_field::binary_field::BinaryField128b;
 use num_traits::Zero;
+use std::ops::Index;
 
 /// A structure that implements the behavior of the AND operations.
 #[derive(Debug, Clone)]
@@ -8,24 +9,16 @@ pub struct AndPackage<const M: usize>;
 
 impl<const M: usize> AlgebraicOps for AndPackage<M> {
     type AlgebraicOutput = [[BinaryField128b; M]; 3];
-
     type LinearCompressedOutput = [BinaryField128b; M];
-
     type QuadraticCompressedOutput = [BinaryField128b; M];
 
     fn algebraic(
         &self,
-        data: &[BinaryField128b],
-        idx_a: usize,
-        offset: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> Self::AlgebraicOutput {
         // Ensure the output size is valid for the AND package.
         assert_eq!(M, 1, "Invalid output size for AND package");
 
-        // Initialize the indices for the first and second operands.
-        let mut idx_a = idx_a * 2;
-        // Calculate the index for the second operand with the specified offset.
-        let mut idx_b = idx_a + offset * 128;
         let mut ret = [[BinaryField128b::zero(); M]; 3];
 
         // Iterate over the 128 basis elements of the binary field.
@@ -34,10 +27,10 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
             let basis = BinaryField128b::basis(i);
 
             // Extract the elements from the data slices.
-            let a = data[idx_a];
-            let b = data[idx_b];
-            let a_next = data[idx_a + 1];
-            let b_next = data[idx_b + 1];
+            let a = data[0][i];
+            let b = data[1][i];
+            let a_next = data[2][i];
+            let b_next = data[3][i];
 
             // `Σ (ϕ_i * a * b)`
             ret[0][0] += basis * a * b;
@@ -45,10 +38,6 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
             ret[1][0] += basis * a_next * b_next;
             // `Σ (ϕ_i * (a + a_next) * (b + b_next))`
             ret[2][0] += basis * (a + a_next) * (b + b_next);
-
-            // Move to the next indices
-            idx_a += offset;
-            idx_b += offset;
         }
 
         ret
@@ -80,6 +69,7 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::algebraic::{StrideMode, StrideWrapper};
 
     #[test]
     fn test_exec_alg_and() {
@@ -109,7 +99,12 @@ mod tests {
 
         input_coords.push(BinaryField128b::zero());
 
-        let rhs = and_package.algebraic(&input_coords, 0, 1);
+        let rhs = and_package.algebraic([
+            StrideWrapper { arr: &input_coords, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
+            StrideWrapper { arr: &input_coords, start: 128, offset: 1, mode: StrideMode::Wrapper0 },
+            StrideWrapper { arr: &input_coords, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
+            StrideWrapper { arr: &input_coords, start: 128, offset: 1, mode: StrideMode::Wrapper1 },
+        ]);
 
         let a_quad = and_package.quadratic(&a);
         let b_quad = and_package.quadratic(&b);

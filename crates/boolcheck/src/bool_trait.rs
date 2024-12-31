@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use hashcaster_field::binary_field::BinaryField128b;
 
 /// The `CompressedFoldedOps` trait defines an interface for executing compressed linear,
@@ -65,8 +67,6 @@ pub trait CompressedFoldedOps: Send + Sync {
     /// advanced boolean algebra scenarios.
     fn exec_alg(
         &self,
-        data: &[BinaryField128b],
-        start: usize,
-        stride: usize,
+        data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3];
 }
