@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use crate::{
     algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
     package::BooleanPackage, BoolCheck,
@@ -15,6 +13,7 @@ use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
+use std::ops::Index;
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckBuilder<const M: usize> {
@@ -275,63 +274,20 @@ impl<const M: usize> BoolCheckBuilder<M> {
             ..Default::default()
         }
     }
-
-    /// Computes a linear compression of the given data slice.
-    ///
-    /// # Parameters
-    /// - `data`: Input slice of binary field elements.
-    ///
-    /// # Returns
-    /// A compressed result as an array of size `[BinaryField128b; M]`.
-    pub fn compute_linear_part(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
-        match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.linear(data),
-        }
-    }
-
-    /// Computes a quadratic compression of the given data slice.
-    ///
-    /// # Parameters
-    /// - `data`: Input slice of binary field elements.
-    ///
-    /// # Returns
-    /// A compressed result as an array of size `[BinaryField128b; M]`.
-    pub fn compute_quadratic_part(&self, data: &[BinaryField128b]) -> [BinaryField128b; M] {
-        match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.quadratic(data),
-        }
-    }
-
-    /// Performs an algebraic evaluation on binary field elements.
-    ///
-    /// # Parameters
-    /// - `data`: Input slice of binary field elements.
-    /// - `idx_a`: Starting index for the first operand.
-    /// - `offset`: Step size for computing indices.
-    ///
-    /// # Returns
-    /// A 2D array `[3][M]` containing aggregated results of algebraic operations.
-    pub fn compute_algebraic(
-        &self,
-        data: [impl Index<usize, Output = BinaryField128b>; 4],
-    ) -> [[BinaryField128b; M]; 3] {
-        match self.boolean_package {
-            BooleanPackage::And => AndPackage::<M>.algebraic(data),
-        }
-    }
 }
 
 impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     fn linear_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
-        // Compute the intermediate result by delegating to the wrapped `FnPackage`'s linear
-        // computation.
-        let tmp = self.compute_linear_part(arg);
+        // Compute the linear part of the boolean formula.
+        let lin = match self.boolean_package {
+            BooleanPackage::And => AndPackage::<M>.linear(arg),
+        };
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
 
         // Iterate over the output size `M` and compute the folded sum using `gammas`.
-        for (i, &t) in tmp.iter().enumerate() {
+        for (i, &t) in lin.iter().enumerate() {
             // Multiply the result by the corresponding gamma and accumulate.
             acc += t * self.gammas[i];
         }
@@ -341,15 +297,16 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
     }
 
     fn quadratic_compressed(&self, arg: &[BinaryField128b]) -> BinaryField128b {
-        // Compute the intermediate result by delegating to the wrapped `FnPackage`'s quadratic
-        // computation.
-        let tmp = self.compute_quadratic_part(arg);
+        // Compute the quadratic part of the boolean formula.
+        let quad = match self.boolean_package {
+            BooleanPackage::And => AndPackage::<M>.quadratic(arg),
+        };
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
 
         // Iterate over the output size `M` and compute the folded sum using `gammas`.
-        for (i, &t) in tmp.iter().enumerate() {
+        for (i, &t) in quad.iter().enumerate() {
             // Multiply the result by the corresponding gamma and accumulate.
             acc += t * self.gammas[i];
         }
@@ -362,8 +319,10 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         &self,
         data: [impl Index<usize, Output = BinaryField128b>; 4],
     ) -> [BinaryField128b; 3] {
-        // Compute the intermediate algebraic results by delegating to the wrapped `FnPackage`.
-        let tmp = self.compute_algebraic(data);
+        // Compute the algebraic result.
+        let alg = match self.boolean_package {
+            BooleanPackage::And => AndPackage::<M>.algebraic(data),
+        };
 
         // Initialize the accumulators for each of the 3 output values to zero.
         let mut acc = [BinaryField128b::zero(); 3];
@@ -371,11 +330,11 @@ impl<const M: usize> CompressedFoldedOps for BoolCheckBuilder<M> {
         // Iterate over the output size `M` and compute the folded sums for each output value.
         for i in 0..M {
             // Compress the first output using gammas.
-            acc[0] += tmp[0][i] * self.gammas[i];
+            acc[0] += alg[0][i] * self.gammas[i];
             // Compress the second output using gammas.
-            acc[1] += tmp[1][i] * self.gammas[i];
+            acc[1] += alg[1][i] * self.gammas[i];
             // Compress the third output using gammas.
-            acc[2] += tmp[2][i] * self.gammas[i];
+            acc[2] += alg[2][i] * self.gammas[i];
         }
 
         // Return the array of results.

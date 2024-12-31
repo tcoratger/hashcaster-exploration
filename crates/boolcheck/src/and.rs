@@ -9,8 +9,8 @@ pub struct AndPackage<const M: usize>;
 
 impl<const M: usize> AlgebraicOps for AndPackage<M> {
     type AlgebraicOutput = [[BinaryField128b; M]; 3];
-    type LinearCompressedOutput = [BinaryField128b; M];
-    type QuadraticCompressedOutput = [BinaryField128b; M];
+    type LinearOutput = [BinaryField128b; M];
+    type QuadraticOutput = [BinaryField128b; M];
 
     fn algebraic(
         &self,
@@ -43,7 +43,7 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
         ret
     }
 
-    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearCompressedOutput {
+    fn linear(&self, data: &[BinaryField128b]) -> Self::LinearOutput {
         // Ensure the output size is valid for the AND package.
         assert_eq!(M, 1, "Invalid output size for AND package");
 
@@ -54,7 +54,7 @@ impl<const M: usize> AlgebraicOps for AndPackage<M> {
         [BinaryField128b::zero(); M]
     }
 
-    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticCompressedOutput {
+    fn quadratic(&self, data: &[BinaryField128b]) -> Self::QuadraticOutput {
         // Ensure the output size is valid for the AND package.
         assert_eq!(M, 1, "Invalid output size for AND package");
 
