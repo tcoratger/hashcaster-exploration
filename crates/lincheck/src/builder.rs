@@ -62,8 +62,8 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         initial_claims: [BinaryField128b; M],
     ) -> Self {
         // Assert matrix dimensions match expectations.
-        assert!(matrix.n_in() == N * (1 << num_active_vars), "Invalid matrix dimensions");
-        assert!(matrix.n_out() == M * (1 << num_active_vars), "Invalid matrix dimensions");
+        assert_eq!(matrix.n_in(), N * (1 << num_active_vars), "Invalid matrix dimensions");
+        assert_eq!(matrix.n_out(), M * (1 << num_active_vars), "Invalid matrix dimensions");
 
         // Determine total number of variables and validate.
         let num_vars = points.len();
@@ -392,5 +392,83 @@ mod tests {
 
         // Attempt construction (should panic)
         LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+    }
+
+    #[test]
+    fn test_lincheck_builder_build() {
+        // Number of input polynomials
+        const N: usize = 2;
+        // Number of output claims
+        const M: usize = 2;
+        // Total variables
+        const NUM_VARS: usize = 3;
+        // Active variables
+        const NUM_ACTIVE_VARS: usize = 2;
+
+        // Create valid inputs
+        let polys: [MultilinearLagrangianPolynomial; N] = [
+            vec![BinaryField128b::from(5678); 1 << NUM_VARS].into(),
+            vec![BinaryField128b::from(910); 1 << NUM_VARS].into(),
+        ];
+
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let matrix = MatrixLinear::new(
+            N * (1 << NUM_ACTIVE_VARS),
+            M * (1 << NUM_ACTIVE_VARS),
+            vec![BinaryField128b::from(18); N * M * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Construct LinCheckBuilder
+        let lincheck = LinCheckBuilder::new(
+            polys,
+            points.clone(),
+            matrix.clone(),
+            NUM_ACTIVE_VARS,
+            initial_claims,
+        );
+
+        // Build the LinCheck prover
+        let lincheck_prover = lincheck.build(BinaryField128b::from(1234));
+
+        // Expected ProdCheck prover
+        let expected_prover = ProdCheck {
+            p_polys: [
+                MultilinearLagrangianPolynomial::new(vec![
+                    BinaryField128b::from(5678),
+                    BinaryField128b::from(5678),
+                    BinaryField128b::from(5678),
+                    BinaryField128b::from(5678),
+                ]),
+                MultilinearLagrangianPolynomial::new(vec![
+                    BinaryField128b::from(910),
+                    BinaryField128b::from(910),
+                    BinaryField128b::from(910),
+                    BinaryField128b::from(910),
+                ]),
+            ],
+            q_polys: [
+                MultilinearLagrangianPolynomial::new(vec![
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                ]),
+                MultilinearLagrangianPolynomial::new(vec![
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                    BinaryField128b::from(18692268690725379462709786785192376188),
+                ]),
+            ],
+            claim: BinaryField128b::from(258410230055561301416705741312625744282),
+            challenges: Points::default(),
+            num_vars: 2,
+            cached_round_msg: None,
+        };
+
+        // Validate the LinCheck prover
+        assert_eq!(lincheck_prover, expected_prover);
     }
 }

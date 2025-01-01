@@ -5,7 +5,7 @@ use hashcaster_poly::{
 };
 use num_traits::identities::Zero;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProdCheck<const N: usize> {
     /// Polynomials of the first input set (`P`).
     pub p_polys: [MultilinearLagrangianPolynomial; N],
@@ -16,9 +16,9 @@ pub struct ProdCheck<const N: usize> {
     /// A list of challenges (random values) generated during the protocol.
     pub challenges: Points,
     /// The number of variables in the polynomials (`log2(size of each polynomial)`).
-    num_vars: usize,
+    pub num_vars: usize,
     /// Cached result of the round message polynomial, used for optimization.
-    cached_round_msg: Option<CompressedPoly>,
+    pub cached_round_msg: Option<CompressedPoly>,
 }
 
 impl<const N: usize> Default for ProdCheck<N> {
