@@ -243,4 +243,154 @@ mod tests {
         // Force incorrect polynomial length by mismatching points and variables
         LinCheckBuilder::new(polys, points, matrix, 3, initial_claims);
     }
+
+    #[test]
+    fn test_lincheck_builder_new_with_valid_inputs() {
+        // Number of input polynomials
+        const N: usize = 2;
+        // Number of output claims
+        const M: usize = 2;
+        // Total variables
+        const NUM_VARS: usize = 3;
+        // Active variables
+        const NUM_ACTIVE_VARS: usize = 2;
+
+        // Create valid inputs
+        let polys: [MultilinearLagrangianPolynomial; N] = core::array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::from(1); 1 << NUM_VARS])
+        });
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let matrix = MatrixLinear::new(
+            N * (1 << NUM_ACTIVE_VARS),
+            M * (1 << NUM_ACTIVE_VARS),
+            vec![BinaryField128b::from(1); N * M * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Construct LinCheckBuilder
+        let lincheck = LinCheckBuilder::new(
+            polys,
+            points.clone(),
+            matrix.clone(),
+            NUM_ACTIVE_VARS,
+            initial_claims,
+        );
+
+        // Validate the LinCheckBuilder state
+        assert_eq!(lincheck.num_vars, points.len());
+        assert_eq!(lincheck.num_active_vars, NUM_ACTIVE_VARS);
+        assert_eq!(lincheck.matrix, matrix);
+        assert_eq!(lincheck.points, points);
+        assert_eq!(lincheck.initial_claims, initial_claims);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid matrix dimensions")]
+    fn test_lincheck_builder_new_with_invalid_matrix_input_size() {
+        const N: usize = 2;
+        const M: usize = 2;
+        const NUM_VARS: usize = 3;
+        const NUM_ACTIVE_VARS: usize = 2;
+
+        // Create invalid matrix (wrong input size)
+        let matrix = MatrixLinear::new(
+            (N - 1) * (1 << NUM_ACTIVE_VARS), // Incorrect input size
+            M * (1 << NUM_ACTIVE_VARS),
+            vec![BinaryField128b::from(1); (N - 1) * M * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+
+        // Other valid inputs
+        let polys: [MultilinearLagrangianPolynomial; N] = core::array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::from(1); 1 << NUM_VARS])
+        });
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Attempt construction (should panic)
+        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid matrix dimensions")]
+    fn test_lincheck_builder_new_with_invalid_matrix_output_size() {
+        const N: usize = 2;
+        const M: usize = 2;
+        const NUM_VARS: usize = 3;
+        const NUM_ACTIVE_VARS: usize = 2;
+
+        // Create invalid matrix (wrong output size)
+        let matrix = MatrixLinear::new(
+            N * (1 << NUM_ACTIVE_VARS),
+            (M + 1) * (1 << NUM_ACTIVE_VARS), // Incorrect output size
+            vec![BinaryField128b::from(1); N * (M + 1) * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+
+        // Other valid inputs
+        let polys: [MultilinearLagrangianPolynomial; N] = core::array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::from(1); 1 << NUM_VARS])
+        });
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Attempt construction (should panic)
+        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+    }
+
+    #[test]
+    #[should_panic(expected = "Number of variables must be >= active variables")]
+    fn test_lincheck_builder_new_with_insufficient_points() {
+        const N: usize = 2;
+        const M: usize = 2;
+        const NUM_VARS: usize = 2; // Less than NUM_ACTIVE_VARS
+        const NUM_ACTIVE_VARS: usize = 3; // Active variables exceed total variables
+
+        // Valid matrix and other inputs
+        let polys: [MultilinearLagrangianPolynomial; N] = core::array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::from(1); 1 << NUM_VARS])
+        });
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let matrix = MatrixLinear::new(
+            N * (1 << NUM_ACTIVE_VARS),
+            M * (1 << NUM_ACTIVE_VARS),
+            vec![BinaryField128b::from(1); N * M * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Attempt construction (should panic)
+        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+    }
+
+    #[test]
+    #[should_panic(expected = "Polynomial size mismatch")]
+    fn test_lincheck_builder_new_with_invalid_polynomial_length() {
+        const N: usize = 2;
+        const M: usize = 2;
+        const NUM_VARS: usize = 3; // Total variables
+        const NUM_ACTIVE_VARS: usize = 2;
+
+        // Invalid polynomials (wrong length)
+        let polys: [MultilinearLagrangianPolynomial; N] = core::array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![
+                BinaryField128b::from(1);
+                (1 << NUM_VARS) - 1
+            ]) // Incorrect size
+        });
+
+        // Valid points, matrix, and initial claims
+        let points = Points::from(vec![BinaryField128b::from(2); NUM_VARS]);
+        let matrix = MatrixLinear::new(
+            N * (1 << NUM_ACTIVE_VARS),
+            M * (1 << NUM_ACTIVE_VARS),
+            vec![BinaryField128b::from(1); N * M * (1 << (NUM_ACTIVE_VARS * 2))],
+        );
+        let initial_claims: [BinaryField128b; M] =
+            [BinaryField128b::from(4), BinaryField128b::from(5)];
+
+        // Attempt construction (should panic)
+        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+    }
 }
