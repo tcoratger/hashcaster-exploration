@@ -51,6 +51,7 @@ rayon = "1.0"
 rand = "0.8"
 itertools = "0.13"
 unroll = "0.1"
+criterion = "0.5"
 
 [profile.release]
 debug = true
@@ -58,3 +59,11 @@ debug = true
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false

@@ -13,3 +13,10 @@ hashcaster-poly = { workspace = true }
 
 num-traits = { workspace = true }
 rayon = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "extend"
+harness = false
