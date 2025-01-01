@@ -395,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
     fn test_lincheck_builder_build() {
         // Number of input polynomials
         const N: usize = 2;
@@ -421,13 +422,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Construct LinCheckBuilder
-        let lincheck = LinCheckBuilder::new(
-            polys,
-            points.clone(),
-            matrix.clone(),
-            NUM_ACTIVE_VARS,
-            initial_claims,
-        );
+        let lincheck = LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover
         let lincheck_prover = lincheck.build(BinaryField128b::from(1234));
