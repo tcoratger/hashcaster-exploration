@@ -8,6 +8,7 @@ use num_traits::{MulAddAssign, One, Zero};
 use rand::Rng;
 use std::{
     arch::aarch64::uint8x16_t,
+    iter::Sum,
     ops::{Add, AddAssign, BitAnd, Deref, Mul, MulAssign, Neg, Sub},
 };
 
@@ -168,6 +169,12 @@ impl BinaryField128b {
         }
 
         gammas
+    }
+}
+
+impl Sum for BinaryField128b {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(BinaryField128b::zero(), |acc, val| acc + val)
     }
 }
 

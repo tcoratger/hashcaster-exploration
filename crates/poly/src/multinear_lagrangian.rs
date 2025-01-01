@@ -15,6 +15,7 @@ use rayon::{
 };
 use std::{
     ops::{BitAnd, Deref, DerefMut},
+    slice::{Iter, IterMut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -245,9 +246,27 @@ impl MultilinearLagrangianPolynomial {
     }
 }
 
+impl<'a> IntoIterator for &'a MultilinearLagrangianPolynomial {
+    type Item = &'a BinaryField128b;
+    type IntoIter = Iter<'a, BinaryField128b>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.coeffs.iter()
+    }
+}
+
 impl From<Vec<BinaryField128b>> for MultilinearLagrangianPolynomial {
     fn from(coeffs: Vec<BinaryField128b>) -> Self {
         Self::new(coeffs)
+    }
+}
+
+impl<'a> IntoIterator for &'a mut MultilinearLagrangianPolynomial {
+    type Item = &'a mut BinaryField128b;
+    type IntoIter = IterMut<'a, BinaryField128b>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.coeffs.iter_mut()
     }
 }
 
