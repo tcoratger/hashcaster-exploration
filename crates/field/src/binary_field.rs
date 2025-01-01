@@ -174,7 +174,7 @@ impl BinaryField128b {
 
 impl Sum for BinaryField128b {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(BinaryField128b::zero(), |acc, val| acc + val)
+        iter.fold(Self::zero(), |acc, val| acc + val)
     }
 }
 
