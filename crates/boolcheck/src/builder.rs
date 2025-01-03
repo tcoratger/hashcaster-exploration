@@ -214,7 +214,6 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                         // Even offset: Fetch values directly from the input tables.
                         let idx = base_tab_offset + (offset >> 1);
                         let tab_ext = &mut tables_ext[j];
-
                         for (z, tab) in tab_ext.iter_mut().enumerate() {
                             // Copy table values at the current offset.
                             *tab = self.polys[z][idx];
@@ -226,7 +225,6 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                         // Odd offset: Combine results from previous indices.
                         let tab_ext1 = tables_ext[j - offset];
                         let tab_ext2 = tables_ext[j - 2 * offset];
-
                         let tab_ext = &mut tables_ext[j];
                         for (z, tab) in tab_ext.iter_mut().enumerate() {
                             // Combine values recursively.
@@ -239,13 +237,11 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                 } else {
                     // Case 2: Large indices (recursive range).
                     let mut args = [BinaryField128b::zero(); N];
-
                     let tab_ext1 = &tables_ext[j - offset];
                     let tab_ext2 = &tables_ext[j - 2 * offset];
-
-                    for z in 0..N {
+                    for (z, arg) in args.iter_mut().enumerate() {
                         // Combine values recursively.
-                        args[z] = tab_ext1[z] + tab_ext2[z];
+                        *arg = tab_ext1[z] + tab_ext2[z];
                     }
 
                     // Apply the quadratic function.
