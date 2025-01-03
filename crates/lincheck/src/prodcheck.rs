@@ -5,6 +5,7 @@ use hashcaster_poly::{
 };
 use num_traits::identities::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::array::from_fn;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProdCheck<const N: usize> {
@@ -183,11 +184,86 @@ impl<const N: usize> ProdCheck<N> {
         // Return the compressed polynomial.
         compressed_poly
     }
+
+    /// Updates the state of the `ProdCheck` instance by binding a new challenge.
+    ///
+    /// ### Purpose
+    /// In the sumcheck protocol, the `bind` function progresses the protocol to the next step
+    /// by incorporating a new challenge, updating the claim, and halving the size of the
+    /// polynomials (`P` and `Q`). This allows for iterative reduction of the problem size.
+    ///
+    /// ### Key Steps
+    /// 1. Validates that the protocol is incomplete (polynomials are not fully reduced).
+    /// 2. Computes the new claim by evaluating the decompressed round polynomial at the challenge.
+    /// 3. Updates the list of challenges with the new challenge.
+    /// 4. Reduces the size of the `P` and `Q` polynomials by halving them based on the challenge.
+    /// 5. Clears the cached round message, as it becomes invalid after this operation.
+    ///
+    /// ### Parameters
+    /// - `r`: The new challenge (`BinaryField128b`) to bind to the protocol.
+    ///
+    /// ### Panics
+    /// - Panics if the protocol is already complete (polynomials have size 1).
+    pub fn bind(&mut self, r: BinaryField128b) {
+        // Validate that the protocol is not complete.
+        // Get the length of the first polynomial.
+        let p0_len = self.p_polys[0].len();
+        assert!(p0_len > 1, "The protocol is already complete");
+
+        // Compute the midpoint of the polynomial range.
+        let half = p0_len / 2;
+
+        // Compute the new claim using the decompressed round polynomial and the challenge.
+        //
+        // Fetch the coefficients of the round polynomial and evaluate it at the challenge `r`.
+        let round_poly = self.compute_round_polynomial().coeffs(self.claim);
+        self.claim = round_poly.evaluate_at(&r);
+
+        // Add the new challenge to the list of challenges.
+        self.challenges.push(r.into());
+
+        // Prepare new (halved) polynomials for `P` and `Q`.
+        let mut p_new: [MultilinearLagrangianPolynomial; N] =
+            from_fn(|_| vec![BinaryField128b::zero(); half].into());
+        let mut q_new: [MultilinearLagrangianPolynomial; N] =
+            from_fn(|_| vec![BinaryField128b::zero(); half].into());
+
+        // Halve the polynomials using the challenge.
+        for i in 0..N {
+            // Current polynomial from `P`.
+            let p = &self.p_polys[i];
+            // Current polynomial from `Q`.
+            let q = &self.q_polys[i];
+
+            // Compute the new values for the halved polynomials.
+            let (p_values, q_values): (Vec<_>, Vec<_>) = (0..half)
+                .into_par_iter()
+                .map(|j| {
+                    (
+                        p[2 * j] + (p[2 * j + 1] + p[2 * j]) * r,
+                        q[2 * j] + (q[2 * j + 1] + q[2 * j]) * r,
+                    )
+                })
+                .unzip();
+
+            // Assign the computed values to the new polynomials.
+            p_new[i] = p_values.into();
+            q_new[i] = q_values.into();
+        }
+
+        // Replace the old polynomials with the halved ones.
+        self.p_polys = p_new;
+        self.q_polys = q_new;
+
+        // Clear the cached round message as it is no longer valid.
+        self.cached_round_msg = None;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hashcaster_poly::point::Point;
     use std::array;
 
     #[test]
@@ -462,5 +538,109 @@ mod tests {
 
         // This should panic because the protocol is complete.
         prodcheck.compute_round_polynomial();
+    }
+
+    #[test]
+    fn test_prodcheck_bind_valid_challenge() {
+        const N: usize = 3;
+
+        // Create valid polynomials for P and Q.
+        let p1 = BinaryField128b::from(1);
+        let p2 = BinaryField128b::from(2);
+        let p3 = BinaryField128b::from(3);
+        let p4 = BinaryField128b::from(4);
+        let p_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![p1, p2, p3, p4]));
+
+        let q1 = BinaryField128b::from(5);
+        let q2 = BinaryField128b::from(6);
+        let q3 = BinaryField128b::from(7);
+        let q4 = BinaryField128b::from(8);
+        let q_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![q1, q2, q3, q4]));
+
+        // Compute the initial claim.
+        let initial_claim = (p1 * q1 + p2 * q2 + p3 * q3 + p4 * q4) +
+            (p1 * q1 + p2 * q2 + p3 * q3 + p4 * q4) +
+            (p1 * q1 + p2 * q2 + p3 * q3 + p4 * q4);
+
+        // Create ProdCheck with the initial state.
+        let mut prodcheck = ProdCheck::new(p_polys, q_polys, initial_claim, true);
+
+        // Perform binding with a valid challenge.
+        let challenge = BinaryField128b::from(3);
+        prodcheck.bind(challenge);
+
+        // Manually compute the expected compressed polynomial.
+        // - `pq_zero` is the sum of products of lower halves for all polynomials.
+        // - `pq_one` is omitted in the compressed polynomial.
+        // - `pq_inf` is the sum of products of sums of halves for all polynomials.
+        let pq_zero = (p1 * q1 + p3 * q3) + (p1 * q1 + p3 * q3) + (p1 * q1 + p3 * q3);
+        let pq_inf = ((p1 + p2) * (q1 + q2) + (p3 + p4) * (q3 + q4)) +
+            ((p1 + p2) * (q1 + q2) + (p3 + p4) * (q3 + q4)) +
+            ((p1 + p2) * (q1 + q2) + (p3 + p4) * (q3 + q4));
+
+        // Compute the coefficients of the univariate round polynomial.
+        let a = pq_zero;
+        let b = pq_inf + pq_zero + pq_zero + initial_claim;
+        let c = pq_inf;
+
+        // Compute the new claim using the challenge.
+        let new_claim = a + b * challenge + c * challenge * challenge;
+
+        // Assert the new claim is updated correctly.
+        assert_eq!(new_claim, prodcheck.claim);
+
+        // Compute manually the expected new polynomials for P and Q.
+        let expected_p: [_; N] = array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![
+                p1 + (p2 + p1) * challenge,
+                p3 + (p4 + p3) * challenge,
+            ])
+        });
+
+        let expected_q: [_; N] = array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(vec![
+                q1 + (q2 + q1) * challenge,
+                q3 + (q4 + q3) * challenge,
+            ])
+        });
+
+        // Assert the polynomials are reduced in size.
+        assert_eq!(prodcheck.p_polys, expected_p);
+        assert_eq!(prodcheck.q_polys, expected_q);
+
+        // Assert the polynomials are reduced in size.
+        // Original polynomials have size 4, so the new size should be 2.
+        assert_eq!(prodcheck.p_polys[0].len(), 2);
+        assert_eq!(prodcheck.q_polys[0].len(), 2);
+
+        // Assert that the challenge is added to the list of challenges.
+        assert_eq!(prodcheck.challenges, Points::from(vec![Point::from(challenge)]));
+
+        // Assert the cached round message is cleared.
+        assert!(prodcheck.cached_round_msg.is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "The protocol is already complete")]
+    fn test_prodcheck_bind_protocol_complete() {
+        const N: usize = 2;
+
+        // Create polynomials with size 1 (indicating protocol completion).
+        let p1 = BinaryField128b::from(1);
+        let p_polys: [_; N] = array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![p1]));
+        let q1 = BinaryField128b::from(2);
+        let q_polys: [_; N] = array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![q1]));
+
+        // Compute the claim manually.
+        let claim = (p1 * q1) + (p1 * q1);
+
+        // Create ProdCheck with the final state.
+        let mut prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);
+
+        // Attempt to bind with a new challenge (should panic).
+        let challenge = BinaryField128b::from(3);
+        prodcheck.bind(challenge);
     }
 }

@@ -15,6 +15,7 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
 
     // Generate test data for the input tables
     let tables: [MultilinearLagrangianPolynomial; N] = array::from_fn(|i| {
+        #[allow(clippy::cast_sign_loss)]
         (i as u128 * 10..i as u128 * 10 + table_size as u128)
             .map(BinaryField128b::from)
             .collect::<Vec<_>>()
@@ -32,7 +33,7 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
     let (_, trit_mapping) = bool_check.trit_mapping();
 
     // Define the linear and quadratic functions
-    let f_lin = |args: &[BinaryField128b; N]| args.iter().cloned().sum();
+    let f_lin = |args: &[BinaryField128b; N]| args.iter().copied().sum();
     let f_quad = |args: &[BinaryField128b; N]| args.iter().map(|&x| x * x).sum();
 
     // Benchmark the `extend_n_tables` function
@@ -43,7 +44,7 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
                 black_box(f_lin),
                 black_box(f_quad),
             )
-        })
+        });
     });
 }
 

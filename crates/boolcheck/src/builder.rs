@@ -4,7 +4,6 @@ use crate::{
 };
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    array_ref,
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
     point::Points,
     univariate::UnivariatePolynomial,
@@ -216,27 +215,26 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
                         let idx = base_tab_offset + (offset >> 1);
                         let tab_ext = &mut tables_ext[j];
 
-                        for (z, tab) in tab_ext.iter_mut().enumerate().take(N) {
+                        for (z, tab) in tab_ext.iter_mut().enumerate() {
                             // Copy table values at the current offset.
                             *tab = self.polys[z][idx];
                         }
 
                         // Sum the linear and quadratic parts.
-                        let a = array_ref!(tab_ext, 0, N);
-                        result_chunk[j] = f_quad(a) + f_lin(a);
+                        result_chunk[j] = f_quad(tab_ext) + f_lin(tab_ext);
                     } else {
                         // Odd offset: Combine results from previous indices.
                         let tab_ext1 = tables_ext[j - offset];
                         let tab_ext2 = tables_ext[j - 2 * offset];
 
                         let tab_ext = &mut tables_ext[j];
-                        for z in 0..N {
+                        for (z, tab) in tab_ext.iter_mut().enumerate() {
                             // Combine values recursively.
-                            tab_ext[z] = tab_ext1[z] + tab_ext2[z];
+                            *tab = tab_ext1[z] + tab_ext2[z];
                         }
 
                         // Compute the quadratic part.
-                        result_chunk[j] = f_quad(array_ref!(tab_ext, 0, N));
+                        result_chunk[j] = f_quad(tab_ext);
                     }
                 } else {
                     // Case 2: Large indices (recursive range).
