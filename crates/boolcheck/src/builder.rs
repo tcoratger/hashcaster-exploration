@@ -186,7 +186,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         let pow3_adj = 2 * pow3 / 3;
 
         // pow2: Determines the number of chunks to process based on table size and recursion depth.
-        let pow2 = 2usize.pow((dims - c - 1) as u32);
+        let pow2 = 1 << (dims - c - 1);
 
         // base_stride: Offset step for table chunks.
         let base_stride = 1 << (c + 1);
