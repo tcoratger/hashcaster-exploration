@@ -1,6 +1,7 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     compressed::CompressedPoly,
+    evaluation::Evaluations,
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
 };
@@ -259,6 +260,73 @@ impl<const N: usize> ProdCheck<N> {
         // Clear the cached round message as it is no longer valid.
         self.cached_round_msg = None;
     }
+
+    /// Finalizes the protocol and returns the results.
+    ///
+    /// # Purpose
+    /// The `finish` function is invoked when the sumcheck protocol has completed all rounds.
+    /// It produces the final evaluations of the `p_polys` and `q_polys`, which are guaranteed
+    /// to be single values at this stage.
+    ///
+    /// # Returns
+    /// A `ProdCheckOutput` containing the final evaluations of `p_polys` and `q_polys`.
+    ///
+    /// # Panics
+    /// - Panics if any polynomial in `p_polys` or `q_polys` is not fully reduced (i.e., does not
+    ///   have a length of 1).
+    pub fn finish(&self) -> ProdCheckOutput {
+        ProdCheckOutput {
+            p_evaluations: self
+                .p_polys
+                .iter()
+                .map(|p| {
+                    // Ensure the polynomial is fully reduced (length == 1).
+                    assert_eq!(p.len(), 1, "The protocol is not complete");
+                    // Extract the single value from the polynomial.
+                    p[0]
+                })
+                .collect::<Vec<_>>()
+                .into(),
+            q_evaluations: self
+                .q_polys
+                .iter()
+                .map(|q| {
+                    // Ensure the polynomial is fully reduced (length == 1).
+                    assert_eq!(q.len(), 1, "The protocol is not complete");
+                    // Extract the single value from the polynomial.
+                    q[0]
+                })
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
+}
+
+/// Represents the final output of the sumcheck protocol.
+///
+/// # Purpose
+/// The `ProdCheckOutput` struct encapsulates the final evaluations of the `p_polys`
+/// and `q_polys` after the sumcheck protocol has been completed. These evaluations
+/// are derived from fully reduced polynomials.
+///
+/// # Fields
+/// - `p_evaluations`: The final evaluations of the `p_polys`, represented as an `Evaluations`
+///   object containing the single values extracted from the reduced `p_polys`.
+/// - `q_evaluations`: The final evaluations of the `q_polys`, represented as an `Evaluations`
+///   object containing the single values extracted from the reduced `q_polys`.
+#[derive(Clone, Debug, Default)]
+pub struct ProdCheckOutput {
+    /// Final evaluations of the `p_polys`.
+    ///
+    /// Each evaluation corresponds to the single value extracted from a fully reduced
+    /// polynomial in the `p_polys` set.
+    pub p_evaluations: Evaluations,
+
+    /// Final evaluations of the `q_polys`.
+    ///
+    /// Each evaluation corresponds to the single value extracted from a fully reduced
+    /// polynomial in the `q_polys` set.
+    pub q_evaluations: Evaluations,
 }
 
 #[cfg(test)]
@@ -643,5 +711,76 @@ mod tests {
         // Attempt to bind with a new challenge (should panic).
         let challenge = BinaryField128b::from(3);
         prodcheck.bind(&Point(challenge));
+    }
+
+    #[test]
+    fn test_prodcheck_finish_valid_state() {
+        const N: usize = 2;
+
+        // Create polynomials with size 1 (indicating protocol completion).
+        let p1 = BinaryField128b::from(1);
+        let p_polys: [_; N] = array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![p1]));
+        let q1 = BinaryField128b::from(2);
+        let q_polys: [_; N] = array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![q1]));
+
+        // Compute the claim manually.
+        let claim = (p1 * q1) + (p1 * q1);
+
+        // Create ProdCheck in the completed state.
+        let prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);
+
+        // Call `finish` and validate the output.
+        let output = prodcheck.finish();
+        assert_eq!(output.p_evaluations, Evaluations::from(vec![p1; N]));
+        assert_eq!(output.q_evaluations, Evaluations::from(vec![q1; N]));
+    }
+
+    #[test]
+    #[should_panic(expected = "The protocol is not complete")]
+    fn test_prodcheck_finish_incomplete_state() {
+        const N: usize = 2;
+
+        // Create polynomials with size > 1 (indicating protocol is incomplete).
+        let p1 = BinaryField128b::from(1);
+        let p2 = BinaryField128b::from(2);
+        let p_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![p1, p2]));
+        let q1 = BinaryField128b::from(3);
+        let q2 = BinaryField128b::from(4);
+        let q_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![q1, q2]));
+
+        // Compute the claim manually.
+        let claim = (p1 * q1 + p2 * q2) + (p1 * q1 + p2 * q2);
+
+        // Create ProdCheck in an incomplete state.
+        let prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);
+
+        // This should panic as the protocol is incomplete.
+        prodcheck.finish();
+    }
+
+    #[test]
+    fn test_prodcheck_finish_multiple_variables() {
+        const N: usize = 3;
+
+        // Create polynomials with size 1 for completion.
+        let p_vals = [BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
+        let q_vals = [BinaryField128b::from(4), BinaryField128b::from(5), BinaryField128b::from(6)];
+        let p_polys: [_; N] =
+            array::from_fn(|i| MultilinearLagrangianPolynomial::new(vec![p_vals[i]]));
+        let q_polys: [_; N] =
+            array::from_fn(|i| MultilinearLagrangianPolynomial::new(vec![q_vals[i]]));
+
+        // Compute the claim manually.
+        let claim = p_vals.iter().zip(&q_vals).map(|(p, q)| *p * *q).sum();
+
+        // Create ProdCheck in the completed state.
+        let prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);
+
+        // Call `finish` and validate the output.
+        let output = prodcheck.finish();
+        assert_eq!(output.p_evaluations, Evaluations::from(p_vals.to_vec()));
+        assert_eq!(output.q_evaluations, Evaluations::from(q_vals.to_vec()));
     }
 }
