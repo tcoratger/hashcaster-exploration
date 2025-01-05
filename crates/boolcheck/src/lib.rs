@@ -7,7 +7,7 @@ use hashcaster_poly::{
     compressed::CompressedPoly,
     evaluation::Evaluations,
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
-    point::Points,
+    point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
 use num_traits::{One, Zero};
@@ -322,7 +322,7 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
         }
     }
 
-    pub fn bind(&mut self, r: BinaryField128b) {
+    pub fn bind(&mut self, r: &Point) {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -339,13 +339,13 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
         let round_poly = self.compute_round_polynomial().coeffs(self.claim);
         // Update the current claim:
         // - We evaluate the round polynomial at the random value `r` provided by the verifier.
-        self.claim = round_poly.evaluate_at(&r);
+        self.claim = round_poly.evaluate_at(r);
 
         // Add the random value sent by the verifier to the list of gammas.
-        self.challenges.push(r.into());
+        self.challenges.push(r.clone());
 
         // Compute `r^2` for future usage in the protocol.
-        let r2 = r * r;
+        let r2 = **r * **r;
 
         if round <= self.c {
             // We compute, by chunk of 3, the new values for the extended table:
@@ -355,7 +355,7 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
             self.extended_table = self
                 .extended_table
                 .par_chunks(3)
-                .map(|chunk| chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * r + chunk[2] * r2)
+                .map(|chunk| chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * **r + chunk[2] * r2)
                 .collect();
         } else {
             // At each round we halve the number of variables in the hypercube.
@@ -370,7 +370,7 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
                 .par_chunks_mut(1 << (number_variables - self.c - 1))
                 .for_each(|chunk| {
                     for j in 0..half {
-                        chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * r;
+                        chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * **r;
                     }
                 });
         }
@@ -535,7 +535,7 @@ mod tests {
             phase_switch,
             points.clone().into(),
             BooleanPackage::And,
-            gamma,
+            &Point(gamma),
             [initial_claim],
             [p, q],
         );
@@ -582,7 +582,7 @@ mod tests {
                 r * r * r * round_polynomial[3];
 
             // Bind the random value `r` to the Boolean check for the next round.
-            boolcheck.bind(r);
+            boolcheck.bind(&Point(r));
         }
 
         // Finish the protocol and obtain the output.
@@ -662,7 +662,7 @@ mod tests {
             phase_switch,
             points.into(),
             BooleanPackage::And,
-            gamma,
+            &Point(gamma),
             [initial_claim],
             [p, q],
         );
@@ -747,7 +747,7 @@ mod tests {
         assert_eq!(current_claim, BinaryField128b::new(284181495769767592368287233794578256034));
 
         // Bind the random value `r` to the Boolean check for the next round.
-        boolcheck.bind(r);
+        boolcheck.bind(&Point(r));
 
         // Validate the updated extended table after the first imaginary round.
         assert_eq!(

@@ -5,7 +5,7 @@ use crate::{
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
-    point::Points,
+    point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
 use num_traits::identities::Zero;
@@ -20,7 +20,7 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize> {
     pub c: usize,
     pub points: Points,
     pub boolean_package: BooleanPackage,
-    pub gamma: BinaryField128b,
+    pub gamma: Point,
     pub gammas: [BinaryField128b; M],
     pub claims: [BinaryField128b; M],
     pub polys: [MultilinearLagrangianPolynomial; N],
@@ -45,7 +45,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         c: usize,
         points: Points,
         boolean_package: BooleanPackage,
-        gamma: BinaryField128b,
+        gamma: &Point,
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
@@ -55,8 +55,8 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
             c,
             points,
             boolean_package,
-            gamma,
-            gammas: BinaryField128b::compute_gammas_folding::<M>(gamma),
+            gamma: gamma.clone(),
+            gammas: BinaryField128b::compute_gammas_folding::<M>(**gamma),
             claims,
             polys,
         }

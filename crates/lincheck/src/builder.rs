@@ -1,7 +1,8 @@
 use crate::prodcheck::ProdCheck;
 use hashcaster_field::{binary_field::BinaryField128b, matrix_lin::MatrixLinear};
 use hashcaster_poly::{
-    multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
+    multinear_lagrangian::MultilinearLagrangianPolynomial,
+    point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
 use num_traits::Zero;
@@ -91,7 +92,7 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
     ///
     /// ## Returns
     /// A `ProdCheck` object containing the folded polynomials and evaluations.
-    pub fn build(self, gamma: BinaryField128b) -> ProdCheck<N> {
+    pub fn build(self, gamma: &Point) -> ProdCheck<N> {
         // Compute chunk size based on active variables.
         // Each polynomial is divided into chunks of size `2^num_active_vars`.
         let chunk_size = 1 << self.num_active_vars;
@@ -123,7 +124,7 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         // Compute powers of gamma for folding.
         //
         // Computes successive powers `[1, γ, γ², ..., γ^(M-1)]`.
-        let gammas = BinaryField128b::compute_gammas_folding::<M>(gamma);
+        let gammas = BinaryField128b::compute_gammas_folding::<M>(**gamma);
 
         // Generate equality polynomial for active variables.
         let eq_active = MultilinearLagrangianPolynomial::new_eq_poly(&pt_active.into());
@@ -154,7 +155,7 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         // Evaluate the initial claims using a univariate polynomial.
         //
         // `claim(γ) = Σ(initial_claims[i] * γ^i)` for `i = 0, ..., M-1`.
-        let claim = UnivariatePolynomial::new(self.initial_claims.to_vec()).evaluate_at(&gamma);
+        let claim = UnivariatePolynomial::new(self.initial_claims.to_vec()).evaluate_at(gamma);
 
         // Return a `ProdCheck` object with the computed data.
         ProdCheck::new(p_polys, q_polys, claim, false)
@@ -425,7 +426,7 @@ mod tests {
         let lincheck = LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover
-        let lincheck_prover = lincheck.build(BinaryField128b::from(1234));
+        let lincheck_prover = lincheck.build(&Point(BinaryField128b::from(1234)));
 
         // Expected ProdCheck prover
         let expected_prover = ProdCheck {

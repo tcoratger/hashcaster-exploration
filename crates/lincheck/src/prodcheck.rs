@@ -1,7 +1,8 @@
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    compressed::CompressedPoly, multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::Points,
+    compressed::CompressedPoly,
+    multinear_lagrangian::MultilinearLagrangianPolynomial,
+    point::{Point, Points},
 };
 use num_traits::identities::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -204,7 +205,7 @@ impl<const N: usize> ProdCheck<N> {
     ///
     /// ### Panics
     /// - Panics if the protocol is already complete (polynomials have size 1).
-    pub fn bind(&mut self, r: BinaryField128b) {
+    pub fn bind(&mut self, r: &Point) {
         // Validate that the protocol is not complete.
         // Get the length of the first polynomial.
         let p0_len = self.p_polys[0].len();
@@ -217,10 +218,10 @@ impl<const N: usize> ProdCheck<N> {
         //
         // Fetch the coefficients of the round polynomial and evaluate it at the challenge `r`.
         let round_poly = self.compute_round_polynomial().coeffs(self.claim);
-        self.claim = round_poly.evaluate_at(&r);
+        self.claim = round_poly.evaluate_at(r);
 
         // Add the new challenge to the list of challenges.
-        self.challenges.push(r.into());
+        self.challenges.push(r.clone());
 
         // Prepare new (halved) polynomials for `P` and `Q`.
         let mut p_new: [MultilinearLagrangianPolynomial; N] =
@@ -240,8 +241,8 @@ impl<const N: usize> ProdCheck<N> {
                 .into_par_iter()
                 .map(|j| {
                     (
-                        p[2 * j] + (p[2 * j + 1] + p[2 * j]) * r,
-                        q[2 * j] + (q[2 * j + 1] + q[2 * j]) * r,
+                        p[2 * j] + (p[2 * j + 1] + p[2 * j]) * **r,
+                        q[2 * j] + (q[2 * j + 1] + q[2 * j]) * **r,
                     )
                 })
                 .unzip();
@@ -569,7 +570,7 @@ mod tests {
 
         // Perform binding with a valid challenge.
         let challenge = BinaryField128b::from(3);
-        prodcheck.bind(challenge);
+        prodcheck.bind(&Point(challenge));
 
         // Manually compute the expected compressed polynomial.
         // - `pq_zero` is the sum of products of lower halves for all polynomials.
@@ -641,6 +642,6 @@ mod tests {
 
         // Attempt to bind with a new challenge (should panic).
         let challenge = BinaryField128b::from(3);
-        prodcheck.bind(challenge);
+        prodcheck.bind(&Point(challenge));
     }
 }

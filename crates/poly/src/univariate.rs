@@ -42,7 +42,7 @@ impl UnivariatePolynomial {
     /// Evaluates the polynomial at a given point using Horner's method.
     ///
     /// # Parameters
-    /// - `at`: The point at which to evaluate the polynomial, represented as a `BinaryField128b`.
+    /// - `at`: The point at which to evaluate the polynomial, represented as a `Point`.
     ///
     /// # Returns
     /// The result of evaluating the polynomial at the given point, as a `BinaryField128b`.
@@ -50,11 +50,11 @@ impl UnivariatePolynomial {
     /// # Methodology
     /// This method employs Horner's method for efficient polynomial evaluation:
     /// `P(x) = (((a_n \cdot x + a_{n-1}) \cdot x + a_{n-2}) \cdot x + ... + a_0)`
-    pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
+    pub fn evaluate_at(&self, at: &Point) -> BinaryField128b {
         // Start with an accumulator initialized to zero.
         self.coeffs.iter().rev().fold(BinaryField128b::zero(), |mut acc, &coeff| {
             // Multiply the accumulator by `at` and add the current coefficient.
-            acc.mul_add_assign(at, coeff);
+            acc.mul_add_assign(**at, coeff);
             // Return the updated accumulator for the next iteration.
             acc
         })
@@ -223,7 +223,7 @@ mod tests {
         let poly = UnivariatePolynomial::new(coeffs);
 
         // Define the point to evaluate the polynomial at
-        let x = BinaryField128b::from(2);
+        let x = Point(BinaryField128b::from(2));
 
         // Manually compute the expected value
         // P(2) = 3 + 2 * 2 + 1 * (2^2)
@@ -264,8 +264,8 @@ mod tests {
         assert_eq!(poly.coeffs, expected_coeffs, "Incorrect polynomial coefficients.");
 
         // Verify evaluation of the polynomial matches the input evaluations.
-        let at_0 = BinaryField128b::zero();
-        let at_1 = BinaryField128b::one();
+        let at_0 = Point(BinaryField128b::zero());
+        let at_1 = Point(BinaryField128b::one());
         assert_eq!(poly.evaluate_at(&at_0), evals[0], "Evaluation at t = 0 failed.");
         assert_eq!(poly.evaluate_at(&at_1), evals[1], "Evaluation at t = 1 failed.");
     }
