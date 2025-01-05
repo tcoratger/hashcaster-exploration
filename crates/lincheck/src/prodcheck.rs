@@ -783,4 +783,87 @@ mod tests {
         assert_eq!(output.p_evaluations, Evaluations::from(p_vals.to_vec()));
         assert_eq!(output.q_evaluations, Evaluations::from(q_vals.to_vec()));
     }
+
+    #[test]
+    fn test_prodcheck_full() {
+        // Number of polynomials in the test.
+        const N: usize = 3;
+        // Number of variables for the polynomials.
+        const NUM_VARS: usize = 15;
+
+        // Generate random polynomials for `p_polys` and `q_polys`.
+        // Each polynomial has `2^NUM_VARS` evaluations.
+        let p_polys: [MultilinearLagrangianPolynomial; N] = array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(
+                // Create a vector of random field elements of length `2^NUM_VARS`.
+                (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
+            )
+        });
+
+        let q_polys: [MultilinearLagrangianPolynomial; N] = array::from_fn(|_| {
+            MultilinearLagrangianPolynomial::new(
+                // Create another vector of random field elements for `q_polys`.
+                (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
+            )
+        });
+
+        // Compute the initial claim: the sum of the element-wise products of `P` and `Q`.
+        let mut current_claim =
+            p_polys.iter().zip(&q_polys).fold(BinaryField128b::zero(), |acc, (p, q)| {
+                acc + p.iter().zip(q).map(|(&p_val, &q_val)| p_val * q_val).sum::<BinaryField128b>()
+            });
+
+        // Initialize the `ProdCheck` object with the generated polynomials and computed claim.
+        let mut prodcheck = ProdCheck::new(p_polys.clone(), q_polys.clone(), current_claim, true);
+
+        // Simulate the rounds of the sumcheck protocol.
+        for _ in 0..NUM_VARS {
+            // Compute the round polynomial for the current state of the protocol.
+            let compressed_round_polynomial = prodcheck.compute_round_polynomial();
+
+            // Generate a random challenge `r` for the current round.
+            let r = Point(BinaryField128b::random());
+
+            // Decompress the round polynomial to obtain its coefficients.
+            // The round polynomial is represented as a univariate polynomial in `r`.
+            let round_polynomial = compressed_round_polynomial.coeffs(current_claim);
+
+            // Update the current claim by evaluating the round polynomial at the challenge `r`.
+            // The evaluation is computed as:
+            // ```
+            // current_claim = c_0 + r * c_1 + r ^ 2 * c_2
+            // ```
+            current_claim =
+                round_polynomial[0] + *r * round_polynomial[1] + *r * *r * round_polynomial[2];
+
+            // Bind the challenge `r` to the `ProdCheck` instance, updating its state.
+            prodcheck.bind(&r);
+        }
+
+        // Ensure the protocol is complete, meaning all polynomials are reduced to a single value.
+        assert!(prodcheck.p_polys.iter().all(|p| p.len() == 1));
+        assert!(prodcheck.q_polys.iter().all(|q| q.len() == 1));
+
+        // Extract the final evaluations using the `finish` method.
+        let output = prodcheck.finish();
+
+        // Verify that the final evaluations of `p_polys` match the expected values.
+        let p_evaluations: Vec<_> =
+            p_polys.iter().map(|p| p.evaluate_at(&prodcheck.challenges)).collect();
+        let q_evaluations: Vec<_> =
+            q_polys.iter().map(|q| q.evaluate_at(&prodcheck.challenges)).collect();
+
+        assert_eq!(output.p_evaluations, Evaluations::from(p_evaluations.clone()));
+        assert_eq!(output.q_evaluations, Evaluations::from(q_evaluations.clone()));
+
+        // Compute the final claim by multiplying the final evaluations of `p_polys` and `q_polys`.
+        let final_claim = p_evaluations
+            .iter()
+            .zip(&q_evaluations)
+            .map(|(&p_eval, &q_eval)| p_eval * q_eval)
+            .fold(BinaryField128b::zero(), |acc, val| acc + val);
+
+        // Ensure the final computed claim matches the current claim in the protocol.
+        assert_eq!(final_claim, current_claim);
+    }
 }
