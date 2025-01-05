@@ -1,3 +1,5 @@
+#![feature(int_roundings)]
+
 use algebraic::{AlgebraicOps, StrideMode, StrideWrapper};
 use and::AndPackage;
 use hashcaster_field::binary_field::BinaryField128b;
@@ -21,6 +23,7 @@ pub mod and;
 pub mod bool_trait;
 pub mod builder;
 pub mod package;
+pub mod ternary_mapping;
 
 #[derive(Clone, Debug)]
 pub struct BoolCheck<const N: usize, const M: usize> {

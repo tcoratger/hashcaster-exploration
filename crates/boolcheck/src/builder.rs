@@ -1,6 +1,6 @@
 use crate::{
     algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
-    package::BooleanPackage, BoolCheck,
+    package::BooleanPackage, ternary_mapping::TernaryMapping, BoolCheck,
 };
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
@@ -251,6 +251,71 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         });
 
         // Return the fully extended table.
+        result
+    }
+
+    // This is an experimental version of the `extend_n_tables` with no improvements right now.
+    pub fn extend_n_tables_experiment<L, Q>(
+        &self,
+        tree: &TernaryMapping,
+        f_lin: L,
+        f_quad: Q,
+    ) -> Vec<BinaryField128b>
+    where
+        L: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
+        Q: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
+    {
+        use rayon::prelude::*;
+
+        // Recursion depth parameter.
+        let c = self.c;
+        let dims = self.polys[0].len().ilog2() as usize;
+
+        let pow3 = 3usize.pow((c + 1) as u32);
+        let pow3_adj = 2 * pow3 / 3;
+        let pow2 = 1 << (dims - c - 1);
+
+        let chunk_size = 3usize.pow((c - 2) as u32);
+        let base_stride = 1 << (c + 1);
+
+        assert_eq!(pow3 % chunk_size, 0, "Chunk size must evenly divide total size");
+
+        let mut result = vec![BinaryField128b::zero(); pow3 * pow2];
+
+        // Préparation hors des boucles
+        let tree_descendants: Vec<_> =
+            tree.par_iter().map(|node| node.descendants.clone()).collect();
+
+        result.par_chunks_mut(chunk_size).enumerate().for_each(|(chunk_id, chunk)| {
+            let base_chunk = (chunk_id * chunk_size) / pow3;
+            let base_offset = base_chunk * base_stride;
+            let base = (chunk_size * chunk_id) % pow3;
+
+            chunk.iter_mut().enumerate().for_each(|(local_j, elem)| {
+                let global_j = base + local_j;
+                let offset = &tree_descendants[global_j];
+
+                let mut args = [BinaryField128b::zero(); N];
+
+                for (z, arg) in args.iter_mut().enumerate().take(N) {
+                    let mut acc = BinaryField128b::zero();
+                    for &x in offset {
+                        unsafe {
+                            acc +=
+                                *self.polys.get_unchecked(z).get_unchecked(base_offset + (x >> 1));
+                        }
+                    }
+                    *arg = acc;
+                }
+
+                *elem = if global_j < pow3_adj && offset.len() == 1 {
+                    f_quad(&args) + f_lin(&args)
+                } else {
+                    f_quad(&args)
+                };
+            });
+        });
+
         result
     }
 
