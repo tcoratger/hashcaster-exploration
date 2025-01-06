@@ -1203,4 +1203,59 @@ mod tests {
         // Assert that the current round is back to 0 after clearing challenges.
         assert_eq!(bool_check.current_round(), 0);
     }
+
+    #[test]
+    fn test_number_variables_initial_state() {
+        // Create a BoolCheck instance with no points defined (default state).
+        let bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Assert that the number of variables is 0 as no points are defined.
+        assert_eq!(bool_check.number_variables(), 0);
+    }
+
+    #[test]
+    fn test_number_variables_with_single_point() {
+        // Create a BoolCheck instance with a single point.
+        let bool_check = BoolCheck::<0, 0> {
+            points: Points::from(vec![BinaryField128b::from(1)]),
+            ..Default::default()
+        };
+
+        // Assert that the number of variables is 1, corresponding to the single point.
+        assert_eq!(bool_check.number_variables(), 1);
+    }
+
+    #[test]
+    fn test_number_variables_with_multiple_points() {
+        // Create a BoolCheck instance with multiple points.
+        let points =
+            vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
+        let bool_check =
+            BoolCheck::<0, 0> { points: Points::from(points.clone()), ..Default::default() };
+
+        // Assert that the number of variables matches the number of points (3).
+        assert_eq!(bool_check.number_variables(), points.len());
+    }
+
+    #[test]
+    fn test_number_variables_with_empty_points() {
+        // Create a BoolCheck instance with an empty points vector.
+        let bool_check = BoolCheck::<0, 0> { points: Points::default(), ..Default::default() };
+
+        // Assert that the number of variables is 0 when no points are defined.
+        assert_eq!(bool_check.number_variables(), 0);
+    }
+
+    #[test]
+    fn test_number_variables_with_large_number_of_points() {
+        // Generate a large number of points (e.g., 1000 points).
+        let points: Vec<BinaryField128b> = (0..1000).map(BinaryField128b::from).collect();
+
+        // Create a BoolCheck instance with these points.
+        let bool_check =
+            BoolCheck::<0, 0> { points: Points::from(points.clone()), ..Default::default() };
+
+        // Assert that the number of variables matches the number of points (1000).
+        assert_eq!(bool_check.number_variables(), points.len());
+    }
 }
