@@ -1129,4 +1129,78 @@ mod tests {
         // Verify that the updated claim matches the computed result.
         assert_eq!(updated_claim, bool_check.claim);
     }
+
+    #[test]
+    fn test_current_round_initial_state() {
+        // Create a default BoolCheck instance with no challenges added.
+        let bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Assert that the initial round is 0 because no challenges have been added yet.
+        assert_eq!(bool_check.current_round(), 0);
+    }
+
+    #[test]
+    fn test_current_round_after_single_challenge() {
+        // Create a default BoolCheck instance.
+        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Add one challenge to the challenges vector.
+        bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
+
+        // Assert that the current round is now 1.
+        assert_eq!(bool_check.current_round(), 1);
+    }
+
+    #[test]
+    fn test_current_round_after_multiple_challenges() {
+        // Create a default BoolCheck instance.
+        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Add multiple challenges to the challenges vector.
+        bool_check.challenges.extend(vec![
+            Point::from(BinaryField128b::from(10)),
+            Point::from(BinaryField128b::from(20)),
+            Point::from(BinaryField128b::from(30)),
+        ]);
+
+        // Assert that the current round reflects the number of challenges added (3).
+        assert_eq!(bool_check.current_round(), 3);
+    }
+
+    #[test]
+    fn test_current_round_after_removing_challenges() {
+        // Create a default BoolCheck instance.
+        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Add multiple challenges to the challenges vector.
+        bool_check.challenges.extend(vec![
+            Point::from(BinaryField128b::from(10)),
+            Point::from(BinaryField128b::from(20)),
+            Point::from(BinaryField128b::from(30)),
+        ]);
+
+        // Remove one challenge (simulating a removal operation, if valid in the context).
+        bool_check.challenges.pop();
+
+        // Assert that the current round reflects the updated number of challenges (2).
+        assert_eq!(bool_check.current_round(), 2);
+    }
+
+    #[test]
+    fn test_current_round_with_no_challenges_after_clear() {
+        // Create a default BoolCheck instance.
+        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+
+        // Add multiple challenges to the challenges vector.
+        bool_check.challenges.extend(vec![
+            Point::from(BinaryField128b::from(10)),
+            Point::from(BinaryField128b::from(20)),
+        ]);
+
+        // Clear all challenges.
+        bool_check.challenges.clear();
+
+        // Assert that the current round is back to 0 after clearing challenges.
+        assert_eq!(bool_check.current_round(), 0);
+    }
 }
