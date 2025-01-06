@@ -284,7 +284,7 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
         // ```
         //
         // The first step is to compute the equality polynomial `eq(r_{<i}; q)`.
-        let eq_y_multiplier = self.challenges.eq_eval(&self.points[..round].to_vec().into());
+        let eq_y_multiplier = self.challenges.eq_eval_slice(&self.points[..round]);
 
         // 1. From the intermediate evaluations of the degree-2 polynomial:
         // - `P(0), P(1), P(∞)`,
