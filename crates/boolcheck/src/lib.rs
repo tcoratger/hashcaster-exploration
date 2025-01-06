@@ -1,5 +1,3 @@
-#![feature(int_roundings)]
-
 use algebraic::{AlgebraicOps, StrideMode, StrideWrapper};
 use and::AndPackage;
 use hashcaster_field::binary_field::BinaryField128b;
@@ -25,20 +23,51 @@ pub mod builder;
 pub mod package;
 pub mod ternary_mapping;
 
+/// A struct representing Boolean check protocol.
+///
+/// The `BoolCheck` struct encapsulates the components and state needed to perform
+/// Boolean check protocol. It uses multilinear polynomials and equality sequences to validate
+/// claims iteratively over multiple rounds.
+///
+/// # Type Parameters
+/// - `N`: The number of multilinear polynomials used in the protocol.
+/// - `M`: The number of folding challenges (gammas) used for compression.
 #[derive(Clone, Debug)]
 pub struct BoolCheck<const N: usize, const M: usize> {
+    /// The evaluation points for the multilinear polynomials.
     pub points: Points,
-    pub poly: Vec<BinaryField128b>,
+
+    /// An array of multilinear polynomials used in the protocol.
     pub polys: [MultilinearLagrangianPolynomial; N],
+
+    /// A vector storing intermediate evaluations of the polynomials.
     pub extended_table: Vec<BinaryField128b>,
+
+    /// An optional field storing evaluations on a restricted subset of the hypercube.
     poly_coords: Option<Evaluations>,
+
+    /// The phase switch parameter, indicating the number of rounds in phase one.
     pub c: usize,
+
+    /// A sequence of random challenges provided by the verifier.
     pub challenges: Points,
+
+    /// A vector of bit mappings for optimized indexing of polynomial coefficients.
     pub bit_mapping: Vec<u16>,
+
+    /// A sequence of equality polynomials used to verify claims.
     pub eq_sequence: MultilinearLagrangianPolynomials,
+
+    /// A vector of compressed polynomials computed at each round.
     pub round_polys: Vec<CompressedPoly>,
+
+    /// The current claim being verified in the protocol.
     pub claim: BinaryField128b,
+
+    /// The Boolean package specifying the operation (e.g., AND) being performed.
     pub boolean_package: BooleanPackage,
+
+    /// An array of folding challenges used for polynomial compression.
     pub gammas: [BinaryField128b; M],
 }
 
@@ -46,7 +75,6 @@ impl<const N: usize, const M: usize> Default for BoolCheck<N, M> {
     fn default() -> Self {
         Self {
             points: Points::default(),
-            poly: Vec::new(),
             polys: array::from_fn(|_| Default::default()),
             extended_table: Vec::new(),
             poly_coords: None,
