@@ -824,4 +824,309 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_compute_round_polynomial_cached_result() {
+        // Generate a vector `points` of 2 field elements in `BinaryField128b`.
+        let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
+
+        // Generate a vector `p` with 2^2 = 4 elements.
+        let p: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(11),
+            BinaryField128b::new(22),
+            BinaryField128b::new(33),
+            BinaryField128b::new(44),
+        ]
+        .into();
+
+        // Generate another vector `q` with 2^2 = 4 elements.
+        let q: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(111),
+            BinaryField128b::new(222),
+            BinaryField128b::new(333),
+            BinaryField128b::new(444),
+        ]
+        .into();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        // The result is stored in `p_and_q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // The prover compute the initial claim for the AND operation at the points in `points`.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter, which controls the folding phases.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance with:
+        // - the phase switch parameter (c),
+        // - the points at which the AND operation is evaluated,
+        // - the Boolean package (AND operation for this test).
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [initial_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check with the following parameters:
+        // - the multilinear polynomials `p` and `q` used in the AND operation,
+        // - the initial claim for the AND operation,
+        // - the folding challenge `gamma`.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Add a precomputed round polynomial to the cache.
+        let cached_poly = CompressedPoly::new(vec![BinaryField128b::from(1)]);
+        bool_check.round_polys.push(cached_poly.clone());
+
+        // Compute the round polynomial for the cached round.
+        let round_poly = bool_check.compute_round_polynomial();
+
+        // Ensure the cached polynomial is returned.
+        assert_eq!(round_poly, cached_poly);
+
+        // Ensure no new polynomial is added to the cache.
+        assert_eq!(bool_check.round_polys.len(), 1);
+    }
+
+    #[test]
+    fn test_compute_round_polynomial_initial_round() {
+        // Generate a vector `points` of 2 field elements in `BinaryField128b`.
+        let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
+
+        // Generate a vector `p` with 2^2 = 4 elements.
+        let p: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(11),
+            BinaryField128b::new(22),
+            BinaryField128b::new(33),
+            BinaryField128b::new(44),
+        ]
+        .into();
+
+        // Generate another vector `q` with 2^2 = 4 elements.
+        let q: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(111),
+            BinaryField128b::new(222),
+            BinaryField128b::new(333),
+            BinaryField128b::new(444),
+        ]
+        .into();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        // The result is stored in `p_and_q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // The prover compute the initial claim for the AND operation at the points in `points`.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter, which controls the folding phases.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`.
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance.
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [initial_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Compute the round polynomial for the initial round.
+        let round_poly = bool_check.compute_round_polynomial();
+
+        // Ensure the computed polynomial is not empty.
+        assert!(!round_poly.coeffs(initial_claim).is_empty());
+
+        // Verify that the claim remains unchanged for the initial round.
+        assert_eq!(bool_check.claim, initial_claim);
+
+        // Verify that the round polynomial cache now has one polynomial.
+        assert_eq!(bool_check.round_polys.len(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Protocol has reached the maximum number of rounds.")]
+    fn test_compute_round_polynomial_exceeds_round_limit() {
+        // Generate a vector `points` of 3 field elements in `BinaryField128b`.
+        let points: Vec<_> =
+            vec![BinaryField128b::new(1), BinaryField128b::new(2), BinaryField128b::new(3)];
+
+        // Generate a vector `p` with 2^3 = 8 elements.
+        let p: MultilinearLagrangianPolynomial =
+            (0..8).map(BinaryField128b::new).collect::<Vec<_>>().into();
+
+        // Generate another vector `q` with 2^3 = 8 elements.
+        let q: MultilinearLagrangianPolynomial =
+            (10..18).map(BinaryField128b::new).collect::<Vec<_>>().into();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // Compute the initial claim for the AND operation.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter.
+        let phase_switch = 2;
+
+        // Generate a folding challenge `gamma`.
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance.
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [initial_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Simulate adding challenges equal to the number of variables.
+        for i in 0..bool_check.number_variables() {
+            bool_check.challenges.push(Point(BinaryField128b::new(i as u128)));
+        }
+
+        // Attempt to compute a round polynomial beyond the round limit.
+        // This should panic.
+        bool_check.compute_round_polynomial();
+    }
+
+    #[test]
+    #[should_panic(expected = "Claim does not match expected value.")]
+    fn test_compute_round_polynomial_invalid_claim() {
+        // Generate a vector `points` of 2 field elements in `BinaryField128b`.
+        let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
+
+        // Generate a vector `p` with 2^2 = 4 elements.
+        let p: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(11),
+            BinaryField128b::new(22),
+            BinaryField128b::new(33),
+            BinaryField128b::new(44),
+        ]
+        .into();
+
+        // Generate another vector `q` with 2^2 = 4 elements.
+        let q: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(111),
+            BinaryField128b::new(222),
+            BinaryField128b::new(333),
+            BinaryField128b::new(444),
+        ]
+        .into();
+
+        // Compute an incorrect initial claim for testing purposes.
+        let incorrect_claim = BinaryField128b::new(999);
+
+        // Set a phase switch parameter.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`.
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance.
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [incorrect_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Attempt to compute a round polynomial with the incorrect claim.
+        // This should panic as the claim does not match the computed value.
+        bool_check.compute_round_polynomial();
+    }
+
+    #[test]
+    fn test_compute_round_polynomial_correct_claim_update() {
+        // Generate a vector `points` of 2 field elements in `BinaryField128b`.
+        let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
+
+        // Generate a vector `p` with 2^2 = 4 elements.
+        let p: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(11),
+            BinaryField128b::new(22),
+            BinaryField128b::new(33),
+            BinaryField128b::new(44),
+        ]
+        .into();
+
+        // Generate another vector `q` with 2^2 = 4 elements.
+        let q: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::new(111),
+            BinaryField128b::new(222),
+            BinaryField128b::new(333),
+            BinaryField128b::new(444),
+        ]
+        .into();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // Compute the initial claim for the AND operation.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`.
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance.
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [initial_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Compute the round polynomial.
+        let round_poly = bool_check.compute_round_polynomial();
+
+        // Decompress the round polynomial and retrieve its coefficients.
+        let coeffs = round_poly.coeffs(initial_claim);
+
+        // Generate a random challenge value.
+        let challenge = Point(BinaryField128b::new(3));
+
+        // Compute the round polynomial.
+        bool_check.bind(&challenge);
+
+        // Ensure the polynomial has 3 coefficients (degree 2 polynomial).
+        assert_eq!(coeffs.len(), 4);
+
+        // Compute the updated claim using the polynomial coefficients.
+        let updated_claim = coeffs[0] +
+            coeffs[1] * *challenge +
+            coeffs[2] * *challenge * *challenge +
+            coeffs[3] * *challenge * *challenge * *challenge;
+
+        // Verify that the updated claim matches the computed result.
+        assert_eq!(updated_claim, bool_check.claim);
+    }
 }
