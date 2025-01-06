@@ -15,14 +15,69 @@ use rayon::{
 };
 use std::{array, ops::Index};
 
+/// A builder for creating instances of `BoolCheck`.
+///
+/// # Overview
+/// The `BoolCheckBuilder` struct is designed to provide a streamlined and configurable way
+/// to construct `BoolCheck` objects, which are used for verifying Boolean relations over
+/// multilinear polynomials.
+///
+/// It encapsulates the configuration parameters and input data required to construct
+/// `BoolCheck`, allowing users to build instances with minimal effort while ensuring
+/// correctness and consistency.
+///
+/// # Fields
+/// - `N`: The number of multilinear polynomials (`polys`) involved in the `BoolCheck`.
+/// - `M`: The number of outputs produced by the Boolean operations (e.g., AND, OR).
+///
+/// # Purpose
+/// The primary purpose of `BoolCheckBuilder` is to:
+/// - Validate and process input data.
+/// - Precompute intermediate parameters such as folding challenges and mappings.
+/// - Construct the extended tables and claims required for the `BoolCheck` protocol.
 #[derive(Clone, Debug)]
 pub struct BoolCheckBuilder<const N: usize, const M: usize> {
+    /// The phase switch parameter (`c`).
+    ///
+    /// This parameter controls the number of initial rounds in the protocol.
     pub c: usize,
+
+    /// The evaluation points for the multilinear polynomials.
+    ///
+    /// A collection of field elements where the Boolean operations are evaluated.
+    /// These points represent the input space for the `BoolCheck` protocol.
     pub points: Points,
+
+    /// The Boolean operation package.
+    ///
+    /// Defines the Boolean operation (e.g., AND) to be performed on the polynomials.
+    /// This is specified using the `BooleanPackage` enum.
     pub boolean_package: BooleanPackage,
+
+    /// The folding challenge `gamma`.
+    ///
+    /// A random field element used to compute folding challenges.
+    /// Folding challenges are applied to compress the polynomials and evaluate
+    /// the Boolean relations.
     pub gamma: Point,
+
+    /// Precomputed folding challenges (`gammas`).
+    ///
+    /// An array of field elements derived from `gamma`. These values are used
+    /// for compressing the Boolean operations during the `BoolCheck` protocol.
     pub gammas: [BinaryField128b; M],
+
+    /// The initial claims for the Boolean operations.
+    ///
+    /// An array of field elements representing the initial claims for each
+    /// Boolean operation at the given evaluation points.
     pub claims: [BinaryField128b; M],
+
+    /// The multilinear polynomials to be used in the `BoolCheck` protocol.
+    ///
+    /// An array of polynomials representing the operands for the Boolean operations.
+    /// Each polynomial must have a length equal to `2^dim`, where `dim` is the
+    /// dimensionality of the input space.
     pub polys: [MultilinearLagrangianPolynomial; N],
 }
 
@@ -41,6 +96,30 @@ impl<const N: usize, const M: usize> Default for BoolCheckBuilder<N, M> {
 }
 
 impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
+    /// Creates a new instance of `BoolCheckBuilder`.
+    ///
+    /// # Parameters
+    /// - `c`: The phase switch parameter, representing the number of initial rounds in the
+    ///   protocol.
+    /// - `points`: A collection of field elements (`Points`) where the Boolean operations are
+    ///   evaluated.
+    /// - `boolean_package`: Specifies the type of Boolean operation (e.g., AND) to perform, defined
+    ///   by the `BooleanPackage` enum.
+    /// - `gamma`: A reference to a random field element (`Point`) used to compute folding
+    ///   challenges.
+    /// - `claims`: An array of initial claims (`[BinaryField128b; M]`) for the Boolean operations.
+    /// - `polys`: An array of multilinear polynomials (`[MultilinearLagrangianPolynomial; N]`) used
+    ///   as inputs to the Boolean operations.
+    ///
+    /// # Returns
+    /// - A new instance of `BoolCheckBuilder` initialized with the provided parameters.
+    ///
+    /// # Panics
+    /// - The function panics if `c >= points.len()`, as this would result in an invalid phase
+    ///   switch configuration.
+    ///
+    /// # Notes
+    /// - The `gammas` field is computed from the provided `gamma` using a folding strategy.
     pub fn new(
         c: usize,
         points: Points,
@@ -49,8 +128,11 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
+        // Ensure the phase switch parameter `c` is valid.
+        // `c` must be less than the number of evaluation points (`points.len()`).
+        //
+        // This ensures the phase switch does not exceed the dimensionality of the input space.
         assert!(c < points.len());
-
         Self {
             c,
             points,
