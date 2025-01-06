@@ -1258,4 +1258,58 @@ mod tests {
         // Assert that the number of variables matches the number of points (1000).
         assert_eq!(bool_check.number_variables(), points.len());
     }
+
+    #[test]
+    fn test_bind_single() {
+        // Create a realistic setup with points and polynomials.
+        let points = vec![BinaryField128b::from(1), BinaryField128b::from(2)];
+        let p: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::from(11),
+            BinaryField128b::from(22),
+            BinaryField128b::from(33),
+            BinaryField128b::from(44),
+        ]
+        .into();
+        let q: MultilinearLagrangianPolynomial = vec![
+            BinaryField128b::from(111),
+            BinaryField128b::from(222),
+            BinaryField128b::from(333),
+            BinaryField128b::from(444),
+        ]
+        .into();
+
+        // Compute the AND operation between the polynomials and the initial claim.
+        let p_and_q = p.clone() & q.clone();
+        let initial_claim = p_and_q.evaluate_at(&Points::from(points.clone()));
+
+        // Set a phase switch parameter.
+        let phase_switch = 1;
+
+        // Generate a folding challenge `gamma`.
+        let gamma = BinaryField128b::new(1234);
+
+        // Create a new `BoolCheckBuilder` instance.
+        let boolcheck_builder = BoolCheckBuilder::new(
+            phase_switch,
+            points.into(),
+            BooleanPackage::And,
+            &Point(gamma),
+            [initial_claim],
+            [p, q],
+        );
+
+        // Build the Boolean check.
+        let mut bool_check = boolcheck_builder.build();
+
+        // Bind a random challenge `r` to the BoolCheck instance.
+        let r = Point::from(BinaryField128b::from(42));
+        bool_check.bind(&r);
+
+        // Verify that the challenge has been added.
+        assert_eq!(bool_check.challenges.len(), 1);
+        assert_eq!(bool_check.challenges[0], r);
+
+        // Verify that the extended table is updated after binding.
+        assert!(!bool_check.extended_table.is_empty());
+    }
 }
