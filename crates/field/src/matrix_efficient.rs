@@ -1,5 +1,6 @@
 use crate::{
     binary_field::BinaryField128b,
+    frobenius::FROBENIUS,
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
 use num_traits::Zero;
@@ -50,6 +51,31 @@ impl Default for EfficientMatrix {
 }
 
 impl EfficientMatrix {
+    /// Constructs an `EfficientMatrix` using Frobenius inverse linear combinations.
+    ///
+    /// This function computes a new matrix from the given `gammas` and a
+    /// precomputed Frobenius table.
+    ///
+    /// # Parameters
+    /// - `gammas`: An array of 128 elements (`BinaryField128b`) used for linear combinations.
+    ///
+    /// # Returns
+    /// An `EfficientMatrix` constructed from the computed columns.
+    pub fn from_frobenius_inv_lc(gammas: &[BinaryField128b; NUM_COLS]) -> Self {
+        // Precompute `minus_i` values for all rows
+        let minus_indices: [_; NUM_COLS] = array::from_fn(|i| (NUM_COLS - i) % NUM_COLS);
+
+        // Compute the result columns using Frobenius inverse coefficients
+        let ret: [_; NUM_COLS] = array::from_fn(|j| {
+            minus_indices.iter().enumerate().fold(BinaryField128b::zero(), |acc, (i, &minus_i)| {
+                acc + gammas[i] * BinaryField128b::from(FROBENIUS[minus_i][j])
+            })
+        });
+
+        // Construct the EfficientMatrix from the computed columns
+        Self::from_cols(&ret)
+    }
+
     /// Constructs an `EfficientMatrix` from its rows.
     ///
     /// This function processes the binary matrix row-wise, computes column contributions
@@ -498,8 +524,7 @@ mod tests {
         let cols: [_; 128] = array::from_fn(|_| rng.gen::<u128>());
 
         // Create an EfficientMatrix from the columns
-        let matrix =
-            EfficientMatrix::from_cols(&cols.map(BinaryField128b::from).try_into().unwrap());
+        let matrix = EfficientMatrix::from_cols(&cols.map(BinaryField128b::from));
 
         // Create a traditional matrix from the columns (assuming Matrix::new exists)
         let traditional_matrix = Matrix::new(cols);
@@ -518,6 +543,100 @@ mod tests {
             result_efficient,
             BinaryField128b::from(result_traditional),
             "EfficientMatrix and traditional matrix gave different results"
+        );
+    }
+
+    #[test]
+    fn test_frobenius_inv_lc_all_zeros() {
+        // Initialize `gammas` with all zeros
+        let gammas = [BinaryField128b::zero(); NUM_COLS];
+
+        // Create the matrix
+        let matrix = EfficientMatrix::from_frobenius_inv_lc(&gammas);
+
+        // Expected result: all columns should also be zero
+        let expected = EfficientMatrix::default();
+
+        // Assert equality
+        assert_eq!(matrix, expected, "Matrix should be all zeros when gammas are zero.");
+    }
+
+    #[test]
+    fn test_frobenius_inv_lc_single_gamma() {
+        // Initialize `gammas` with a single non-zero element
+        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        // Set the first gamma to be non-zero
+        gammas[0] = BinaryField128b::from(5467);
+
+        // Create the matrix
+        let matrix = EfficientMatrix::from_frobenius_inv_lc(&gammas);
+
+        // Expected result: each column should be the corresponding Frobenius value
+        let expected_cols: [_; NUM_COLS] = array::from_fn(|j| {
+            BinaryField128b::from(5467) * BinaryField128b::from(FROBENIUS[0][j])
+        });
+
+        let expected = EfficientMatrix::from_cols(&expected_cols);
+
+        // Assert equality
+        assert_eq!(
+            matrix, expected,
+            "Matrix should match the expected result for a single non-zero gamma."
+        );
+    }
+
+    #[test]
+    #[allow(clippy::large_stack_frames)]
+    fn test_frobenius_inv_lc_multiple_nonzero_gammas() {
+        // Initialize `gammas` with multiple non-zero elements
+        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        // First gamma
+        gammas[0] = BinaryField128b::from(383);
+        // Second gamma
+        gammas[1] = BinaryField128b::from(463);
+
+        // Create the matrix
+        let matrix = EfficientMatrix::from_frobenius_inv_lc(&gammas);
+
+        // Expected result: compute each column based on multiple gammas
+        let expected_cols: [_; NUM_COLS] = array::from_fn(|j| {
+            BinaryField128b::from(383) * BinaryField128b::from(FROBENIUS[0][j]) +
+                BinaryField128b::from(463) * BinaryField128b::from(FROBENIUS[127][j])
+        });
+
+        // Construct the expected matrix
+        let expected = EfficientMatrix::from_cols(&expected_cols);
+
+        // Assert equality
+        assert_eq!(
+            matrix, expected,
+            "Matrix should match the expected result for multiple non-zero gammas."
+        );
+    }
+
+    #[test]
+    fn test_frobenius_inv_lc_wraparound_indices() {
+        // Initialize `gammas` with the last element non-zero
+        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        // Last gamma
+        gammas[127] = BinaryField128b::from(5363);
+
+        // Create the matrix
+        let matrix = EfficientMatrix::from_frobenius_inv_lc(&gammas);
+
+        // Expected result: compute each column using wraparound Frobenius indices
+        // Wraparound for minus_i = 1
+        let expected_cols: [_; NUM_COLS] = array::from_fn(|j| {
+            BinaryField128b::from(5363) * BinaryField128b::from(FROBENIUS[1][j])
+        });
+
+        // Construct the expected matrix
+        let expected = EfficientMatrix::from_cols(&expected_cols);
+
+        // Assert equality
+        assert_eq!(
+            matrix, expected,
+            "Matrix should match the expected result for wraparound indices."
         );
     }
 }
