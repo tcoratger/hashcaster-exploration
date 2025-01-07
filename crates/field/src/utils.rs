@@ -15,7 +15,7 @@ use std::arch::aarch64::{int64x2_t, vld1q_s64, vshlq_n_s64};
 /// A tuple `(usize, usize)` containing:
 /// - The value of `x` with the MSB cleared.
 /// - The zero-based position of the MSB in the binary representation of `x`.
-pub(crate) const fn drop_top_bit(x: usize) -> (usize, usize) {
+pub const fn drop_top_bit(x: usize) -> (usize, usize) {
     // Compute the index of the most significant bit.
     let s = x.leading_zeros() as usize ^ (usize::BITS as usize - 1);
     // Return x with the top bit cleared and its position.
@@ -68,7 +68,7 @@ pub(crate) const fn drop_top_bit(x: usize) -> (usize, usize) {
 /// This function can be used in scenarios where hardware SIMD instructions are unavailable,
 /// or in testing environments to verify the behavior of such instructions.
 #[unroll::unroll_for_loops]
-pub(crate) const fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
+pub const fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
     // Initialize the result variable to store the combined MSB mask.
     let mut ret = 0;
     // Iterate through the 16-byte array in reverse order (from the last byte to the first).
@@ -126,7 +126,7 @@ pub(crate) const fn cpu_v_movemask_epi8(x: [u8; 16]) -> i32 {
 ///     ]
 /// );
 /// ```
-pub(crate) fn v_slli_epi64<const K: i32>(x: [u8; 16]) -> [u8; 16] {
+pub fn v_slli_epi64<const K: i32>(x: [u8; 16]) -> [u8; 16] {
     unsafe {
         // Load safely the 16-byte input array into a 128-bit SIMD register as two 64-bit integers.
         #[allow(clippy::cast_ptr_alignment)]

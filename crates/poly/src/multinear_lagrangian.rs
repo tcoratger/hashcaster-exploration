@@ -1,10 +1,9 @@
-use crate::{
-    evaluation::Evaluations,
-    point::Points,
+use crate::{evaluation::Evaluations, point::Points};
+use bytemuck::cast_slice;
+use hashcaster_field::{
+    binary_field::BinaryField128b,
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
-use bytemuck::cast_slice;
-use hashcaster_field::binary_field::BinaryField128b;
 use num_traits::{One, Zero};
 use rayon::{
     iter::{

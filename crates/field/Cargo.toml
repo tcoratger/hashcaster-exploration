@@ -17,3 +17,5 @@ bytemuck = { workspace = true, features = [
 num-traits = { workspace = true }
 ruint = { workspace = true }
 rand = { workspace = true }
+rayon = { workspace = true }
+unroll = { workspace = true }

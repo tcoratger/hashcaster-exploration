@@ -51,7 +51,7 @@ mod tests {
         let builder: MulticlaimBuilder<3> = MulticlaimBuilder::default();
 
         // Verify that the default polys array is empty.
-        for poly in builder.polys.iter() {
+        for poly in &builder.polys {
             assert!(poly.is_empty());
         }
 
