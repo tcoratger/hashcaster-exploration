@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+
 use hashcaster_field::{
     array_ref, binary_field::BinaryField128b, matrix_efficient::EfficientMatrix,
 };
@@ -11,7 +14,7 @@ pub mod builder;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MultiClaim<const N: usize> {
-    pub polys: [Vec<BinaryField128b>; N],
+    pub polys: [MultilinearLagrangianPolynomial; N],
     pub gamma: BinaryField128b,
     pub object: ProdCheck<1>,
 }
@@ -32,7 +35,7 @@ impl<const N: usize> MultiClaim<N> {
         points: &Points,
         openings: &[BinaryField128b],
         gamma_pows: &[BinaryField128b],
-        polys: [Vec<BinaryField128b>; N],
+        polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
         // Compute the Frobenius linear combination matrix.
         // This matrix represents the operation \( M_\gamma = \sum \gamma_i \cdot Frob^{-i} \).
@@ -88,8 +91,9 @@ mod tests {
         gamma_pows[0] = BinaryField128b::from(1);
 
         // Create polynomials (empty for now)
-        let polys: [Vec<BinaryField128b>; 2] = array::from_fn(|_| {
+        let polys: [MultilinearLagrangianPolynomial; 2] = array::from_fn(|_| {
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)]
+                .into()
         });
 
         // Call the `new` function
@@ -126,8 +130,9 @@ mod tests {
         let gamma_pows: Vec<_> = (0..129).map(BinaryField128b::from).collect();
 
         // Create polynomials
-        let polys: [Vec<BinaryField128b>; 2] = array::from_fn(|_| {
+        let polys: [MultilinearLagrangianPolynomial; 2] = array::from_fn(|_| {
             vec![BinaryField128b::from(2), BinaryField128b::from(4), BinaryField128b::from(6)]
+                .into()
         });
 
         // Call the `new` function
