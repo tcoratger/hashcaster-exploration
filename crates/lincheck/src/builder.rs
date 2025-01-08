@@ -101,9 +101,11 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         // - Active variables (`x_0, ..., x_(a-1)`) directly affect chunk-wise computation.
         // - Dormant variables (`x_a, ..., x_(n-1)`) are used to restrict the polynomial.
         let (pt_active, pt_dormant) = self.points.split_at(self.num_active_vars);
+        let pt_active: Points = pt_active.into();
+        let pt_dormant: Points = pt_dormant.into();
 
         // Generate equality polynomial for dormant variables.
-        let eq_dormant = MultilinearLagrangianPolynomial::new_eq_poly(&pt_dormant.into());
+        let eq_dormant = pt_dormant.to_eq_poly();
 
         // Initialize restricted polynomials with zero coefficients.
         // Initializes `N` restricted polynomials, each with `2^num_active_vars` coefficients.
@@ -127,7 +129,7 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
         let gammas = BinaryField128b::compute_gammas_folding::<M>(**gamma);
 
         // Generate equality polynomial for active variables.
-        let eq_active = MultilinearLagrangianPolynomial::new_eq_poly(&pt_active.into());
+        let eq_active = pt_active.to_eq_poly();
 
         // Combine gamma powers and active equality polynomial.
         //

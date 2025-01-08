@@ -4,7 +4,7 @@ use crate::{
 };
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
-    multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+    multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
@@ -411,13 +411,14 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         // Generate bit and trit mappings
         let (bit_mapping, trit_mapping) = self.trit_mapping();
 
+        // Prepare the points to be used in the eq sequence
+        let pt_eq_sequence: Points = self.points[1..].into();
+
         // Return the constructed BoolCheck
         BoolCheck {
             c: self.c,
             bit_mapping,
-            eq_sequence: MultilinearLagrangianPolynomials::new_eq_poly_sequence(
-                &self.points[1..].into(),
-            ),
+            eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
             claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(&self.gamma),
             extended_table: self.extend_n_tables(
                 &trit_mapping,

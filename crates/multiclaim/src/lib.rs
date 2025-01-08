@@ -69,7 +69,7 @@ impl<const N: usize> MultiClaim<N> {
         // Generate the equality polynomial for the evaluation points
         // 1. Compute the Lagrange basis at the evaluation points
         // 2. Modify the polynomial `eq` to account for Frobenius twists.
-        let mut eq = MultilinearLagrangianPolynomial::new_eq_poly(points);
+        let mut eq = points.to_eq_poly();
         eq.par_iter_mut().for_each(|x| *x = m.apply(*x));
 
         // Compute the initial claim

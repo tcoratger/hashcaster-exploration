@@ -2,7 +2,18 @@ use std::ops::{Deref, DerefMut};
 
 use hashcaster_field::binary_field::BinaryField128b;
 use itertools::Itertools;
-use num_traits::One;
+use num_traits::{One, Zero};
+use rayon::{
+    iter::{
+        IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator,
+        ParallelIterator,
+    },
+    slice::ParallelSliceMut,
+};
+
+use crate::multinear_lagrangian::{
+    MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
+};
 
 /// A point represented as a field element in a binary field.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -44,9 +55,148 @@ impl Deref for Point {
 /// - Performing operations on points, such as equality polynomial evaluations.
 /// - Interfacing with mathematical constructs that require points.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Points(Vec<Point>);
+pub struct Points(pub Vec<Point>);
 
 impl Points {
+    /// Constructs the equality polynomial based on the provided points.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of `BinaryField128b` elements representing the input points.
+    ///
+    /// # Returns
+    /// An instance of `MultilinearLagrangianPolynomial` containing the coefficients of the equality
+    /// polynomial.
+    ///
+    /// # Explanation
+    /// The equality polynomial is a multivariate polynomial constructed to encode the relationship
+    /// between multiple input points. It ensures that the polynomial evaluates to `1` when the
+    /// input `z` aligns with the combination of input points `points` and appropriately
+    /// interpolates over the domain for multivariate inputs.
+    ///
+    /// ## Definition
+    /// Given a set of points `points = [b_1, b_2, ..., b_m]` in the finite field, the equality
+    /// polynomial `eq(z, points)` is defined iteratively as:
+    ///
+    /// ```text
+    /// eq(z, points) = prod_{i=1}^m (z_i * b_i + (1 - z_i) * (1 - b_i)).
+    /// ```
+    /// Here, `z = (z_1, z_2, ..., z_m)` is the evaluation point, and `points` represent the
+    /// multivariate configuration for which the polynomial encodes the behavior.
+    ///
+    /// ## Utility in Multivariate Context
+    /// The equality polynomial extends to encode the behavior across multiple input points. It
+    /// forms the basis for evaluating multilinear extensions in higher-dimensional spaces. For
+    /// a multilinear extension `f_MLE` of a function `f`, we use:
+    ///
+    /// ```text
+    /// f_MLE(z) = sum_{b in {0,1}^m} eq(z, b) * f(b),
+    /// ```
+    /// where `f(b)` is the value of the function at point `b`, and `eq(z, b)` ensures interpolation
+    /// for the multivariate domain.
+    ///
+    /// ## Multivariate Example
+    /// For `points = [pt1, pt2]`:
+    /// ```text
+    /// eq_poly(z) =
+    ///   coeffs[0] * (1 - pt1) * (1 - pt2) +
+    ///   coeffs[1] * pt1 * (1 - pt2) +
+    ///   coeffs[2] * (1 - pt1) * pt2 +
+    ///   coeffs[3] * pt1 * pt2.
+    /// ```
+    /// The coefficients `coeffs` are updated iteratively to encode this multivariate behavior. This
+    /// ensures that the polynomial evaluates correctly for combinations of inputs.
+    ///
+    /// ## How This Implementation Works
+    /// - The polynomial is constructed iteratively starting from a single coefficient (initialized
+    ///   to `1`).
+    /// - Coefficients are updated using the recurrence relation to encode the multivariate
+    ///   relationships.
+    /// - The result captures the equality polynomial over the domain, supporting evaluation in
+    ///   multilinear extensions and related computations.
+    pub fn to_eq_poly(&self) -> MultilinearLagrangianPolynomial {
+        // Initialize the coefficients with a single 1 (neutral element for multiplication).
+        let mut coeffs = vec![BinaryField128b::one()];
+
+        // Preallocate memory for all coefficients, filling with zeros beyond the initial size.
+        coeffs.resize(1 << self.len(), BinaryField128b::zero());
+
+        // Iterate over the points to construct the equality polynomial.
+        self.iter().enumerate().for_each(|(i, point)| {
+            // Split the coefficient vector into two parts: `left` and `right`.
+            // `left` contains existing coefficients, `right` will store the new coefficients.
+            let (left, right) = coeffs.split_at_mut(1 << i);
+
+            // Update coefficients in parallel using iterators over `left` and `right`.
+            left.par_iter_mut().zip(right.par_iter_mut()).for_each(|(left_val, right_val)| {
+                // Compute the new coefficient in `right` as the product of `left_val` and the
+                // current point.
+                *right_val = *left_val * **point;
+                // Update the existing coefficient in `left` by adding the computed `right_val`.
+                *left_val += *right_val;
+            });
+        });
+
+        // Return the constructed equality polynomial.
+        MultilinearLagrangianPolynomial { coeffs }
+    }
+
+    /// Constructs the sequence of equality polynomials for a given set of points.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of `BinaryField128b` elements representing the input points.
+    ///
+    /// # Returns
+    /// A [`MultilinearLagrangianPolynomials`] instance containing the sequence of equality
+    /// polynomials.
+    ///
+    /// # Explanation
+    /// This method generates a sequence of equality polynomials, where each polynomial encodes the
+    /// relationships of subsets of the input points. The sequence starts with a base case
+    /// polynomial `eq_0(x) = 1` and iteratively constructs each subsequent polynomial using
+    /// a recurrence relation.
+    ///
+    /// ## Sequence Construction
+    /// The equality polynomials in the sequence are defined recursively:
+    /// - `eq_0(x) = 1` (base case),
+    /// - `eq_k(x) = eq_{k-1}(x) * (1 + m_k * x)`, where `m_k` is the multiplier for the \(k\)-th
+    ///   point.
+    ///
+    /// ## Utility
+    /// This sequence is useful in efficiently constructing multilinear extensions, where each
+    /// polynomial in the sequence serves as a building block for interpolating functions over
+    /// the Boolean hypercube \( \{0, 1\}^n \).
+    pub fn to_eq_poly_sequence(&self) -> MultilinearLagrangianPolynomials {
+        // Start with the base case: eq_0(x) = 1.
+        let mut polynomials =
+            vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::one()])];
+
+        // Iterate over the points in reverse order.
+        for (i, multiplier) in self.iter().rev().enumerate() {
+            // Reference the previously computed polynomial in the sequence.
+            let previous = &polynomials[i];
+
+            // Allocate space for the new polynomial coefficients.
+            // The new polynomial will have twice the size of the previous one.
+            let mut new_coeffs = vec![BinaryField128b::zero(); 1 << (i + 1)];
+
+            // Compute the new polynomial coefficients using the recurrence relation.
+            new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
+                |(chunk, &prev_coeff)| {
+                    // Calculate the updated coefficients.
+                    let multiplied = **multiplier * prev_coeff;
+                    chunk[0] = prev_coeff + multiplied; // Update the first coefficient.
+                    chunk[1] = multiplied; // Update the second coefficient.
+                },
+            );
+
+            // Append the new polynomial to the list.
+            polynomials.push(MultilinearLagrangianPolynomial::new(new_coeffs));
+        }
+
+        // Return the constructed sequence of equality polynomials.
+        MultilinearLagrangianPolynomials(polynomials)
+    }
+
     /// Computes the evaluation of the equality polynomial for two sets of points.
     ///
     /// # Description
@@ -321,5 +471,29 @@ mod tests {
 
         // Attempt to perform the eq_eval_slice operation (should panic).
         points_a.eq_eval_slice(&points_b);
+    }
+
+    #[test]
+    fn test_eq_poly_sequence_cross_check() {
+        // Generate a random vector of 20 points in the finite field.
+        let points = Points::from((0..20).map(|_| BinaryField128b::random()).collect::<Vec<_>>());
+
+        // Compute the equality polynomial sequence for the points.
+        let eq_sequence = points.to_eq_poly_sequence();
+
+        // Verify the sequence length matches the expected size (points.len() + 1).
+        assert_eq!(eq_sequence.len(), points.len() + 1);
+
+        // Verify the initial polynomial is [1].
+        assert_eq!(
+            eq_sequence[0],
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::one()])
+        );
+
+        // Cross-check each polynomial in the sequence with its direct computation.
+        eq_sequence.iter().enumerate().skip(1).for_each(|(i, poly)| {
+            let pts: Points = points[points.len() - i..].into();
+            assert_eq!(*poly, pts.to_eq_poly());
+        });
     }
 }
