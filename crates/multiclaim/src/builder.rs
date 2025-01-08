@@ -1,6 +1,7 @@
 use crate::MultiClaim;
 use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
+    evaluation::Evaluations,
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
 };
@@ -22,7 +23,7 @@ pub struct MulticlaimBuilder<const N: usize> {
     /// Evaluation points for the claim, represented as a `Points` collection.
     pub points: Points,
     /// Openings for the polynomials, represented as a flat vector of `BinaryField128b`.
-    pub openings: Vec<BinaryField128b>,
+    pub openings: Evaluations,
 }
 
 impl<const N: usize> Default for MulticlaimBuilder<N> {
@@ -30,7 +31,7 @@ impl<const N: usize> Default for MulticlaimBuilder<N> {
         Self {
             polys: array::from_fn(|_| Default::default()),
             points: Default::default(),
-            openings: Vec::new(),
+            openings: Default::default(),
         }
     }
 }
@@ -49,7 +50,7 @@ impl<const N: usize> MulticlaimBuilder<N> {
     pub fn new(
         polys: [MultilinearLagrangianPolynomial; N],
         points: Points,
-        openings: Vec<BinaryField128b>,
+        openings: Evaluations,
     ) -> Self {
         // Check that the number of openings is correct.
         assert_eq!(openings.len(), N * 128, "Invalid number of openings");
@@ -146,7 +147,7 @@ mod tests {
         let points = Points::from(vec![Point::from(BinaryField128b::from(1))]);
 
         // Define valid openings for N = 2 with 128 * N elements.
-        let openings = vec![BinaryField128b::from(0); 2 * 128];
+        let openings: Evaluations = vec![BinaryField128b::from(0); 2 * 128].into();
 
         // Create a new MulticlaimBuilder instance.
         let builder = MulticlaimBuilder::new(polys.clone(), points.clone(), openings.clone());
@@ -171,7 +172,7 @@ mod tests {
         let openings = vec![BinaryField128b::from(0); 100];
 
         // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(polys, points, openings);
+        MulticlaimBuilder::new(polys, points, openings.into());
     }
 
     #[test]
@@ -190,7 +191,7 @@ mod tests {
         let openings = vec![BinaryField128b::from(0); 2 * 128];
 
         // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(polys, points, openings);
+        MulticlaimBuilder::new(polys, points, openings.into());
     }
 
     #[test]
@@ -202,7 +203,7 @@ mod tests {
         let points = Points::default();
 
         // Define valid openings for N = 1 with 128 * N elements.
-        let openings = vec![BinaryField128b::from(0); 128];
+        let openings: Evaluations = vec![BinaryField128b::from(0); 128].into();
 
         // Create a new MulticlaimBuilder instance.
         let builder = MulticlaimBuilder::new(polys.clone(), points.clone(), openings.clone());
@@ -237,7 +238,7 @@ mod tests {
         }
 
         // Create a new MulticlaimBuilder instance
-        let builder = MulticlaimBuilder::new(polys, points, openings.clone());
+        let builder = MulticlaimBuilder::new(polys, points, openings.clone().into());
 
         // Define gamma (random point for testing)
         let gamma = Point::from(BinaryField128b::from(2));

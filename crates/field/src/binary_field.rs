@@ -4,7 +4,7 @@ use crate::{
     frobenius::FROBENIUS,
 };
 use bytemuck::{Pod, Zeroable};
-use num_traits::{MulAddAssign, One, Zero};
+use num_traits::{MulAdd, MulAddAssign, One, Zero};
 use rand::Rng;
 use std::{
     arch::aarch64::uint8x16_t,
@@ -278,6 +278,22 @@ impl MulAssign for BinaryField128b {
 impl MulAssign<&Self> for BinaryField128b {
     fn mul_assign(&mut self, other: &Self) {
         *self = unsafe { Self(Self::mul_impl(self.0, other.0)) };
+    }
+}
+
+impl MulAdd<Self> for BinaryField128b {
+    type Output = Self;
+
+    fn mul_add(self, a: Self, b: Self) -> Self::Output {
+        (self * a) + b
+    }
+}
+
+impl MulAdd<&Self> for BinaryField128b {
+    type Output = Self;
+
+    fn mul_add(self, a: &Self, b: Self) -> Self::Output {
+        (self * a) + b
     }
 }
 
@@ -837,5 +853,133 @@ mod tests {
         // Expected result: [1, 0, 0]
         let expected = [BinaryField128b::one(), BinaryField128b::zero(), BinaryField128b::zero()];
         assert_eq!(result, expected, "Gamma folding with zero gamma failed");
+    }
+
+    #[test]
+    fn test_muladd_basic() {
+        let a = BinaryField128b::random();
+        let b = BinaryField128b::random();
+        let c = BinaryField128b::random();
+
+        // Expected result: (a * b) + c
+        let expected = (a * b) + c;
+
+        // Using MulAdd trait
+        let result = a.mul_add(b, c);
+
+        assert_eq!(
+            result,
+            expected,
+            "MulAdd failed: got {:#x}, expected {:#x}",
+            result.into_inner(),
+            expected.into_inner()
+        );
+    }
+
+    #[test]
+    fn test_muladd_with_zero() {
+        let zero = BinaryField128b::zero();
+        let a = BinaryField128b::new(7);
+        let b = BinaryField128b::new(11);
+
+        // Multiplying by zero
+        assert_eq!(zero.mul_add(a, b), b, "MulAdd with zero failed");
+        assert_eq!(a.mul_add(zero, b), b, "MulAdd with zero failed");
+    }
+
+    #[test]
+    fn test_muladd_with_one() {
+        let one = BinaryField128b::one();
+        let a = BinaryField128b::new(13);
+        let b = BinaryField128b::new(17);
+
+        // Multiplying by one
+        let result = one.mul_add(a, b);
+        let expected = a + b;
+
+        assert_eq!(
+            result,
+            expected,
+            "MulAdd with one failed: got {:#x}, expected {:#x}",
+            result.into_inner(),
+            expected.into_inner()
+        );
+    }
+
+    #[test]
+    fn test_muladdassign_basic() {
+        let mut result = BinaryField128b::new(10);
+        let a = BinaryField128b::new(2);
+        let b = BinaryField128b::new(3);
+
+        // Manually calculate expected result
+        let expected = (result * a) + b;
+
+        // Using MulAddAssign
+        result.mul_add_assign(a, b);
+
+        assert_eq!(
+            result,
+            expected,
+            "MulAddAssign failed: got {:#x}, expected {:#x}",
+            result.into_inner(),
+            expected.into_inner()
+        );
+    }
+
+    #[test]
+    fn test_muladdassign_with_zero() {
+        let mut result = BinaryField128b::new(8);
+        let zero = BinaryField128b::zero();
+
+        // Multiplying by zero should leave the accumulator unchanged
+        result.mul_add_assign(zero, zero);
+        assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero failed");
+
+        // Adding zero should leave the result unchanged
+        result.mul_add_assign(BinaryField128b::one(), zero);
+        assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero addition failed");
+    }
+
+    #[test]
+    fn test_muladdassign_with_one() {
+        let mut result = BinaryField128b::new(9);
+        let one = BinaryField128b::one();
+        let a = BinaryField128b::new(4);
+
+        // Using MulAddAssign
+        result.mul_add_assign(one, a);
+
+        // Expected: result + a
+        let expected = BinaryField128b::new(9) + a;
+
+        assert_eq!(
+            result,
+            expected,
+            "MulAddAssign with one failed: got {:#x}, expected {:#x}",
+            result.into_inner(),
+            expected.into_inner()
+        );
+    }
+
+    #[test]
+    fn test_muladdassign_random() {
+        let mut result = BinaryField128b::new(0xAAAA_BBBB_CCCC_DDDD);
+        let a = BinaryField128b::new(0x1111_2222_3333_4444);
+        let b = BinaryField128b::new(0x5555_6666_7777_8888);
+
+        // Manually calculate expected result
+        let expected = (result * a) + b;
+
+        // Using MulAddAssign
+        result.mul_add_assign(a, b);
+
+        assert_eq!(
+            result,
+            expected,
+            "MulAddAssign failed for random inputs: got {:#x}, expected {:#x}",
+            result.into_inner(),
+            expected.into_inner()
+        );
     }
 }
