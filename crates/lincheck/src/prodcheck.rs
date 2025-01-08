@@ -1,10 +1,10 @@
-use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     compressed::CompressedPoly,
     evaluation::Evaluations,
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
 };
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::identities::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array::from_fn;

@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use hashcaster_field::binary_field::BinaryField128b;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use itertools::Itertools;
 use num_traits::{One, Zero};
 use rayon::{
@@ -307,7 +307,7 @@ impl DerefMut for Points {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_field::binary_field::BinaryField128b;
+    use hashcaster_primitives::binary_field::BinaryField128b;
 
     #[test]
     fn test_eq_eval() {

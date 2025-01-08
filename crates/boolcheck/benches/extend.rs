@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use hashcaster_boolcheck::builder::BoolCheckBuilder;
-use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use std::array;
 
 fn benchmark_extend_n_tables(c: &mut Criterion) {

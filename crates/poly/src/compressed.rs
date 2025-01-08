@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use hashcaster_field::binary_field::BinaryField128b;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::identities::Zero;
 
 use crate::univariate::UnivariatePolynomial;
@@ -86,7 +86,7 @@ impl Deref for CompressedPoly {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_field::binary_field::BinaryField128b;
+    use hashcaster_primitives::binary_field::BinaryField128b;
 
     #[test]
     fn test_compress() {

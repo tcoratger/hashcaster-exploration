@@ -1,6 +1,5 @@
 use algebraic::{AlgebraicOps, StrideMode, StrideWrapper};
 use and::AndPackage;
-use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     compressed::CompressedPoly,
     evaluation::Evaluations,
@@ -8,6 +7,7 @@ use hashcaster_poly::{
     point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::{One, Zero};
 use package::BooleanPackage;
 use rayon::{

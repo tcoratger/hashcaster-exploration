@@ -1,15 +1,15 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
-use hashcaster_field::{
-    array_ref, binary_field::BinaryField128b, matrix_efficient::EfficientMatrix,
-};
 use hashcaster_lincheck::prodcheck::ProdCheck;
 use hashcaster_poly::{
     compressed::CompressedPoly,
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
     univariate::UnivariatePolynomial,
+};
+use hashcaster_primitives::{
+    array_ref, binary_field::BinaryField128b, matrix_efficient::EfficientMatrix,
 };
 use num_traits::{MulAdd, Zero};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};

@@ -1,6 +1,6 @@
 use crate::{evaluation::Evaluations, point::Points};
 use bytemuck::cast_slice;
-use hashcaster_field::{
+use hashcaster_primitives::{
     binary_field::BinaryField128b,
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };

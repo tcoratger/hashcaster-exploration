@@ -1,5 +1,5 @@
 use crate::algebraic::AlgebraicOps;
-use hashcaster_field::binary_field::BinaryField128b;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::Zero;
 use std::ops::Index;
 

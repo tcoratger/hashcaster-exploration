@@ -2,12 +2,12 @@ use crate::{
     algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
     package::BooleanPackage, ternary_mapping::TernaryMapping, BoolCheck,
 };
-use hashcaster_field::binary_field::BinaryField128b;
 use hashcaster_poly::{
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::identities::Zero;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},

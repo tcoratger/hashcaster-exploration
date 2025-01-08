@@ -1,5 +1,5 @@
 use crate::point::Point;
-use hashcaster_field::binary_field::BinaryField128b;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::{MulAddAssign, Zero};
 use std::ops::{Deref, DerefMut, Mul, MulAssign};
 
@@ -12,7 +12,7 @@ use std::ops::{Deref, DerefMut, Mul, MulAssign};
 ///
 /// # Example
 /// ```rust,ignore
-/// use hashcaster_field::binary_field::BinaryField128b;
+/// use hashcaster_primitives::binary_field::BinaryField128b;
 /// use univariate_polynomial::UnivariatePolynomial;
 ///
 /// let coeffs = vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];

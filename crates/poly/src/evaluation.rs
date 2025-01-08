@@ -1,4 +1,4 @@
-use hashcaster_field::{
+use hashcaster_primitives::{
     binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE,
 };
 use num_traits::Zero;

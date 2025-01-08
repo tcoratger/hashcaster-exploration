@@ -1,10 +1,10 @@
 use crate::prodcheck::ProdCheck;
-use hashcaster_field::{binary_field::BinaryField128b, matrix_lin::MatrixLinear};
 use hashcaster_poly::{
     multinear_lagrangian::MultilinearLagrangianPolynomial,
     point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
+use hashcaster_primitives::{binary_field::BinaryField128b, matrix_lin::MatrixLinear};
 use num_traits::Zero;
 use std::array;
 

@@ -1,4 +1,4 @@
-use hashcaster_field::binary_field::BinaryField128b;
+use hashcaster_primitives::binary_field::BinaryField128b;
 use std::ops::Index;
 
 /// The `CompressedFoldedOps` trait defines an interface for executing compressed linear,

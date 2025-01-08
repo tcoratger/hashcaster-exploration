@@ -7,7 +7,7 @@ rust-version = "1.83"
 [workspace]
 members = [
     "crates/boolcheck",
-    "crates/field",
+    "crates/primitives",
     "crates/poly",
     "crates/lincheck",
     "crates/multiclaim",
@@ -44,7 +44,7 @@ default_trait_access = "allow"
 module_name_repetitions = "allow"
 
 [workspace.dependencies]
-hashcaster-field = { path = "crates/field" }
+hashcaster-primitives = { path = "crates/primitives" }
 hashcaster-boolcheck = { path = "crates/boolcheck" }
 hashcaster-poly = { path = "crates/poly" }
 hashcaster-lincheck = { path = "crates/lincheck" }
