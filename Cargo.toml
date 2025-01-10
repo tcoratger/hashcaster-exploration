@@ -11,6 +11,7 @@ members = [
     "crates/poly",
     "crates/lincheck",
     "crates/multiclaim",
+    "examples/keccak",
 ]
 
 [workspace.lints]

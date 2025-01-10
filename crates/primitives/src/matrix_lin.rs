@@ -1,4 +1,4 @@
-use crate::binary_field::BinaryField128b;
+use crate::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use num_traits::Zero;
 
 /// A struct representing a linear transformation using a matrix.
@@ -27,27 +27,18 @@ impl MatrixLinear {
         assert_eq!(entries.len(), n_in * n_out, "Invalid matrix dimensions");
         Self { n_in, n_out, entries }
     }
+}
 
-    /// Returns the number of input dimensions (columns).
-    pub const fn n_in(&self) -> usize {
+impl LinearOperations for MatrixLinear {
+    fn n_in(&self) -> usize {
         self.n_in
     }
 
-    /// Returns the number of output dimensions (rows).
-    pub const fn n_out(&self) -> usize {
+    fn n_out(&self) -> usize {
         self.n_out
     }
 
-    /// Applies the matrix transformation to the input vector.
-    ///
-    /// # Arguments
-    /// * `input` - A slice representing the input vector.
-    /// * `output` - A mutable slice where the result of the transformation will be stored.
-    ///
-    /// # Panics
-    /// This function will panic if the length of `input` is not equal to `n_in` or if the length of
-    /// `output` is not equal to `n_out`.
-    pub fn apply(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
+    fn apply(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
         // Check the dimensions of the input and output vectors.
         assert_eq!(input.len(), self.n_in, "Input vector size mismatch");
         assert_eq!(output.len(), self.n_out, "Output vector size mismatch");
@@ -63,16 +54,7 @@ impl MatrixLinear {
         });
     }
 
-    /// Applies the transposed matrix transformation to the input vector.
-    ///
-    /// # Arguments
-    /// * `input` - A slice representing the input vector for the transpose.
-    /// * `output` - A mutable slice where the result of the transformation will be stored.
-    ///
-    /// # Panics
-    /// This function will panic if the length of `input` is not equal to `n_out` or if the length
-    /// of `output` is not equal to `n_in`.
-    pub fn apply_transposed(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
+    fn apply_transposed(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
         // Check the dimensions of the input and output vectors.
         assert_eq!(input.len(), self.n_out, "Input vector size mismatch");
         assert_eq!(output.len(), self.n_in, "Output vector size mismatch");

@@ -3,6 +3,7 @@ pub mod binary_field;
 pub mod bit_iterator;
 pub mod frobenius;
 pub mod frobenius_cobasis;
+pub mod linear_trait;
 pub mod matrix;
 pub mod matrix_efficient;
 pub mod matrix_lin;
