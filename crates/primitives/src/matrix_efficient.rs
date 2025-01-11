@@ -3,7 +3,6 @@ use crate::{
     frobenius::FROBENIUS,
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
-use num_traits::Zero;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
@@ -46,7 +45,7 @@ pub struct EfficientMatrix(pub [BinaryField128b; 256 * 16]);
 
 impl Default for EfficientMatrix {
     fn default() -> Self {
-        Self([BinaryField128b::zero(); 256 * 16])
+        Self([BinaryField128b::ZERO; 256 * 16])
     }
 }
 
@@ -67,7 +66,7 @@ impl EfficientMatrix {
 
         // Compute the result columns using Frobenius inverse coefficients
         let ret: [_; NUM_COLS] = array::from_fn(|j| {
-            minus_indices.iter().enumerate().fold(BinaryField128b::zero(), |acc, (i, &minus_i)| {
+            minus_indices.iter().enumerate().fold(BinaryField128b::ZERO, |acc, (i, &minus_i)| {
                 acc + gammas[i] * BinaryField128b::from(FROBENIUS[minus_i][j])
             })
         });
@@ -151,12 +150,12 @@ impl EfficientMatrix {
     /// An instance of `EfficientMatrix` with precomputed subset sums.
     pub fn from_cols(cols: &[BinaryField128b; NUM_COLS]) -> Self {
         // Initialize storage for precomputed subset sums
-        let mut precomp = [BinaryField128b::zero(); 256 * 16];
+        let mut precomp = [BinaryField128b::ZERO; 256 * 16];
 
         // Compute sums in parallel for each set of 8 columns
         cols.par_chunks(8).zip(precomp.par_chunks_mut(256)).for_each(|(cols, sums)| {
             // Initialize the first sum as zero
-            sums[0] = BinaryField128b::zero();
+            sums[0] = BinaryField128b::ZERO;
 
             // Compute subset sums
             for i in 1..256 {
@@ -187,7 +186,7 @@ impl EfficientMatrix {
         // Accumulate contributions using an iterator, starting from the first element.
         rhs.iter()
             .enumerate()
-            .fold(BinaryField128b::zero(), |acc, (i, &byte)| acc + self[byte as usize + 256 * i])
+            .fold(BinaryField128b::ZERO, |acc, (i, &byte)| acc + self[byte as usize + 256 * i])
     }
 }
 
@@ -208,14 +207,14 @@ mod tests {
     #[test]
     fn test_from_cols_all_zeros() {
         // Initialize input with all zeros.
-        let cols = [BinaryField128b::zero(); 128];
+        let cols = [BinaryField128b::ZERO; 128];
 
         // Call the `from_cols` function.
         let matrix = EfficientMatrix::from_cols(&cols);
 
         // Manually compute the expected result.
         // All precomputed sums will be zero because the input columns are all zero.
-        let expected = EfficientMatrix([BinaryField128b::zero(); 256 * 16]);
+        let expected = EfficientMatrix([BinaryField128b::ZERO; 256 * 16]);
 
         // Assert equality.
         assert_eq!(matrix, expected, "Precomputed sums for all-zero input should be zero.");
@@ -224,7 +223,7 @@ mod tests {
     #[test]
     fn test_from_cols_single_non_zero_column() {
         // Initialize input with one non-zero column and the rest zeros.
-        let mut cols = [BinaryField128b::zero(); 128];
+        let mut cols = [BinaryField128b::ZERO; 128];
         // Set only the first column to 1.
         cols[0] = BinaryField128b::from(1);
 
@@ -232,7 +231,7 @@ mod tests {
         let matrix = EfficientMatrix::from_cols(&cols);
 
         // Manually compute the expected result for a few indices.
-        let mut expected_precomp = [BinaryField128b::zero(); 256 * 16];
+        let mut expected_precomp = [BinaryField128b::ZERO; 256 * 16];
 
         // Explanation of manual computation:
         // Each index `i` corresponds to a binary number. The top bit of `i`
@@ -248,7 +247,7 @@ mod tests {
             // - If the index is even, the sum should be zero (not including column 0).
             // - If the index is odd, the sum should be column 0 (the only non-zero column).
             if i % 2 == 0 {
-                *precomp = BinaryField128b::zero();
+                *precomp = BinaryField128b::ZERO;
             } else {
                 *precomp = cols[0];
             }
@@ -275,7 +274,7 @@ mod tests {
         let c4 = BinaryField128b::from(1011);
 
         // Initialize input with some non-zero columns.
-        let mut cols = [BinaryField128b::zero(); 128];
+        let mut cols = [BinaryField128b::ZERO; 128];
         cols[0] = c0;
         cols[1] = c1;
         cols[2] = c2;
@@ -314,14 +313,14 @@ mod tests {
     #[test]
     fn test_from_rows_all_zeros() {
         // Initialize input rows with all zeros.
-        let rows = [BinaryField128b::zero(); 128];
+        let rows = [BinaryField128b::ZERO; 128];
 
         // Call the `from_rows` function.
         let matrix = EfficientMatrix::from_rows(&rows);
 
         // Manually compute the expected result.
         // All columns should also be zero since the input rows are all zero.
-        let expected = EfficientMatrix([BinaryField128b::zero(); 256 * 16]);
+        let expected = EfficientMatrix([BinaryField128b::ZERO; 256 * 16]);
 
         // Assert equality.
         assert_eq!(matrix, expected, "Resulting matrix should be all zeros.");
@@ -341,7 +340,7 @@ mod tests {
         let matrix = EfficientMatrix::from_rows(&rows);
 
         // Initialize input columns with all zeros.
-        let mut cols = [BinaryField128b::zero(); 128];
+        let mut cols = [BinaryField128b::ZERO; 128];
         // Set only the first column to u128::MAX
         // The objective is to match the following matrix:
         // [1, 0, 0, ..., 0, , 0, 0, ..., 0]
@@ -360,7 +359,7 @@ mod tests {
     #[test]
     fn test_from_rows_single_element_in_first_row() {
         // Initialize rows with all zeros.
-        let mut rows = [BinaryField128b::zero(); 128];
+        let mut rows = [BinaryField128b::ZERO; 128];
         // Set only the first row's first element to 1.
         // In little-endian binary representation the matrix will look like:
         // [1, 0, 0, ..., 0, , 0, 0, ..., 0]
@@ -374,7 +373,7 @@ mod tests {
 
         // Manually compute the expected result:
         // Only the first column will have the first bit set (1).
-        let mut cols = [BinaryField128b::zero(); 128];
+        let mut cols = [BinaryField128b::ZERO; 128];
         // In little-endian binary representation the matrix will look like:
         // [1, 0, 0, ..., 0, , 0, 0, ..., 0]
         // [0, 0, 0, ..., 0, , 0, 0, ..., 0]
@@ -483,7 +482,7 @@ mod tests {
         let matrix = EfficientMatrix::default();
 
         // Input vector filled with zeros.
-        let input = BinaryField128b::zero();
+        let input = BinaryField128b::ZERO;
 
         // Applying the matrix should result in zero output.
         let result = matrix.apply(input);
@@ -491,7 +490,7 @@ mod tests {
         // Expected output is zero.
         assert_eq!(
             result,
-            BinaryField128b::zero(),
+            BinaryField128b::ZERO,
             "Applying all-zero matrix to zero vector should result in zero."
         );
     }
@@ -499,7 +498,7 @@ mod tests {
     #[test]
     fn test_apply_single_nonzero_byte() {
         // Create an EfficientMatrix with a single non-zero value.
-        let mut matrix_data = [BinaryField128b::zero(); 256 * 16];
+        let mut matrix_data = [BinaryField128b::ZERO; 256 * 16];
         matrix_data[1] = BinaryField128b::from(42); // Set a specific value.
         let matrix = EfficientMatrix(matrix_data);
 
@@ -549,7 +548,7 @@ mod tests {
     #[test]
     fn test_frobenius_inv_lc_all_zeros() {
         // Initialize `gammas` with all zeros
-        let gammas = [BinaryField128b::zero(); NUM_COLS];
+        let gammas = [BinaryField128b::ZERO; NUM_COLS];
 
         // Create the matrix
         let matrix = EfficientMatrix::from_frobenius_inv_lc(&gammas);
@@ -564,7 +563,7 @@ mod tests {
     #[test]
     fn test_frobenius_inv_lc_single_gamma() {
         // Initialize `gammas` with a single non-zero element
-        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        let mut gammas = [BinaryField128b::ZERO; NUM_COLS];
         // Set the first gamma to be non-zero
         gammas[0] = BinaryField128b::from(5467);
 
@@ -589,7 +588,7 @@ mod tests {
     #[allow(clippy::large_stack_frames)]
     fn test_frobenius_inv_lc_multiple_nonzero_gammas() {
         // Initialize `gammas` with multiple non-zero elements
-        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        let mut gammas = [BinaryField128b::ZERO; NUM_COLS];
         // First gamma
         gammas[0] = BinaryField128b::from(383);
         // Second gamma
@@ -617,7 +616,7 @@ mod tests {
     #[test]
     fn test_frobenius_inv_lc_wraparound_indices() {
         // Initialize `gammas` with the last element non-zero
-        let mut gammas = [BinaryField128b::zero(); NUM_COLS];
+        let mut gammas = [BinaryField128b::ZERO; NUM_COLS];
         // Last gamma
         gammas[127] = BinaryField128b::from(5363);
 

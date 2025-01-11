@@ -1,7 +1,6 @@
 use hashcaster_primitives::{
     binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE,
 };
-use num_traits::Zero;
 use std::ops::{Deref, DerefMut};
 
 /// Evaluations of a polynomial at some points.
@@ -53,7 +52,7 @@ impl Evaluations {
 
         // Compute the summation:
         // Iterate over the evaluations and corresponding cobasis coefficients.
-        self.iter().enumerate().fold(BinaryField128b::zero(), |acc, (j, twist)| {
+        self.iter().enumerate().fold(BinaryField128b::ZERO, |acc, (j, twist)| {
             // For each pair,
             // - multiply the twist by the cobasis coefficient
             // - add to the accumulator.
@@ -95,7 +94,7 @@ impl Evaluations {
             twisted_evals.push(
                 (0..128)
                     .map(|i| BinaryField128b::basis(i) * self[i])
-                    .fold(BinaryField128b::zero(), |a, b| a + b),
+                    .fold(BinaryField128b::ZERO, |a, b| a + b),
             );
         }
 
@@ -128,7 +127,7 @@ impl Evaluations {
         }
 
         // Use a fixed-size array to store the untwisted evaluations.
-        let mut untwisted = [BinaryField128b::zero(); 128];
+        let mut untwisted = [BinaryField128b::ZERO; 128];
 
         // Compute the untwisted evaluations using the `pi` function.
         for (i, ut) in untwisted.iter_mut().enumerate() {
@@ -169,7 +168,6 @@ impl DerefMut for Evaluations {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::One;
 
     #[test]
     fn test_pi() {
@@ -199,8 +197,8 @@ mod tests {
             // - If the result equals 0 in the binary field, it represents a bit value of 0.
             // - If the result equals 1 in the binary field, it represents a bit value of 1.
             let lhs = match bit {
-                b if b == BinaryField128b::zero() => 0,
-                b if b == BinaryField128b::one() => 1,
+                b if b == BinaryField128b::ZERO => 0,
+                b if b == BinaryField128b::ONE => 1,
                 _ => panic!(),
             };
 
@@ -213,18 +211,18 @@ mod tests {
 
     #[test]
     fn test_pi_all_zeroes() {
-        let orbit: Evaluations = vec![BinaryField128b::zero(); 128].into();
+        let orbit: Evaluations = vec![BinaryField128b::ZERO; 128].into();
 
         for i in 0..128 {
-            assert_eq!(orbit.pi(i), BinaryField128b::zero(), "Failed for index {i}");
+            assert_eq!(orbit.pi(i), BinaryField128b::ZERO, "Failed for index {i}");
         }
     }
 
     #[test]
     fn test_pi_single_non_zero() {
-        let mut orbit = vec![BinaryField128b::zero(); 128];
+        let mut orbit = vec![BinaryField128b::ZERO; 128];
         // Set a single non-zero value.
-        orbit[5] = BinaryField128b::one();
+        orbit[5] = BinaryField128b::ONE;
         let orbit: Evaluations = orbit.into();
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
@@ -236,7 +234,7 @@ mod tests {
     #[test]
     fn test_pi_alternating() {
         let orbit: Evaluations = (0..128)
-            .map(|i| if i % 2 == 0 { BinaryField128b::one() } else { BinaryField128b::zero() })
+            .map(|i| if i % 2 == 0 { BinaryField128b::ONE } else { BinaryField128b::ZERO })
             .collect::<Vec<_>>()
             .into();
 
@@ -246,7 +244,7 @@ mod tests {
                 .enumerate()
                 .filter(|(j, _)| j % 2 == 0) // Only include contributions from even indices.
                 .map(|(_, &val)| BinaryField128b::new(val))
-                .fold(BinaryField128b::zero(), |acc, x| acc + x);
+                .fold(BinaryField128b::ZERO, |acc, x| acc + x);
 
             assert_eq!(orbit.pi(i), expected, "Failed for index {i}");
         }
@@ -260,7 +258,7 @@ mod tests {
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
                 .map(|j| BinaryField128b::new(cobasis[j]) * orbit[j])
-                .fold(BinaryField128b::zero(), |acc, x| acc + x);
+                .fold(BinaryField128b::ZERO, |acc, x| acc + x);
 
             assert_eq!(orbit.pi(i), expected, "Failed for index {i}");
         }
@@ -293,28 +291,28 @@ mod tests {
     #[test]
     fn test_twist_all_zeros() {
         // All evaluations are initially zero.
-        let mut evaluations: Evaluations = vec![BinaryField128b::zero(); 128].into();
+        let mut evaluations: Evaluations = vec![BinaryField128b::ZERO; 128].into();
 
         // Apply the `twist` transformation.
         evaluations.twist();
 
         // Assert that all evaluations remain zero after the transformation.
         evaluations.iter().for_each(|&val| {
-            assert_eq!(val, BinaryField128b::zero(), "Twist failed for all-zero input.");
+            assert_eq!(val, BinaryField128b::ZERO, "Twist failed for all-zero input.");
         });
     }
 
     #[test]
     fn test_untwist_all_zeros() {
         // All evaluations are initially zero.
-        let mut evaluations: Evaluations = vec![BinaryField128b::zero(); 128].into();
+        let mut evaluations: Evaluations = vec![BinaryField128b::ZERO; 128].into();
 
         // Apply the `untwist` transformation.
         evaluations.untwist();
 
         // Assert that all evaluations remain zero after the transformation.
         evaluations.iter().for_each(|&val| {
-            assert_eq!(val, BinaryField128b::zero(), "Untwist failed for all-zero input.");
+            assert_eq!(val, BinaryField128b::ZERO, "Untwist failed for all-zero input.");
         });
     }
 }

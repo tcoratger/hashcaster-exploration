@@ -5,7 +5,6 @@ use hashcaster_poly::{
     point::{Point, Points},
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::identities::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array::from_fn;
 
@@ -30,7 +29,7 @@ impl<const N: usize> Default for ProdCheck<N> {
         Self {
             p_polys: core::array::from_fn(|_| Default::default()),
             q_polys: core::array::from_fn(|_| Default::default()),
-            claim: BinaryField128b::zero(),
+            claim: BinaryField128b::ZERO,
             challenges: Default::default(),
             num_vars: 0,
             cached_round_msg: None,
@@ -61,7 +60,7 @@ impl<const N: usize> ProdCheck<N> {
         if check_init_claim {
             // Compute the expected claim by multiplying each pair of polynomials.
             let expected_claim =
-                p_polys.iter().zip(&q_polys).fold(BinaryField128b::zero(), |acc, (p, q)| {
+                p_polys.iter().zip(&q_polys).fold(BinaryField128b::ZERO, |acc, (p, q)| {
                     acc + p
                         .iter()
                         .zip(q)
@@ -133,11 +132,11 @@ impl<const N: usize> ProdCheck<N> {
         let mut poly = iter
             .map(|i| {
                 // Contribution for `X_i = 0`
-                let mut pq_zero = BinaryField128b::zero();
+                let mut pq_zero = BinaryField128b::ZERO;
                 // Contribution for `X_i = 1`
-                let mut pq_one = BinaryField128b::zero();
+                let mut pq_one = BinaryField128b::ZERO;
                 // Contribution of sums across both halves
-                let mut pq_inf = BinaryField128b::zero();
+                let mut pq_inf = BinaryField128b::ZERO;
 
                 // Iterate through all polynomials to compute contributions.
                 for j in 0..N {
@@ -168,7 +167,7 @@ impl<const N: usize> ProdCheck<N> {
                 [pq_zero, pq_one, pq_inf]
             })
             // Combine results from all indices into three accumulated terms.
-            .reduce(|| [BinaryField128b::zero(); 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f]);
+            .reduce(|| [BinaryField128b::ZERO; 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f]);
 
         // Adjust the coefficients for the round polynomial.
         // The second coefficient includes contributions from all terms.
@@ -226,9 +225,9 @@ impl<const N: usize> ProdCheck<N> {
 
         // Prepare new (halved) polynomials for `P` and `Q`.
         let mut p_new: [MultilinearLagrangianPolynomial; N] =
-            from_fn(|_| vec![BinaryField128b::zero(); half].into());
+            from_fn(|_| vec![BinaryField128b::ZERO; half].into());
         let mut q_new: [MultilinearLagrangianPolynomial; N] =
-            from_fn(|_| vec![BinaryField128b::zero(); half].into());
+            from_fn(|_| vec![BinaryField128b::ZERO; half].into());
 
         // Halve the polynomials using the challenge.
         for i in 0..N {
@@ -475,7 +474,7 @@ mod tests {
         ];
 
         // This should panic.
-        ProdCheck::new(p_polys, q_polys, BinaryField128b::zero(), true);
+        ProdCheck::new(p_polys, q_polys, BinaryField128b::ZERO, true);
     }
 
     #[test]
@@ -504,7 +503,7 @@ mod tests {
         ];
 
         // This should panic.
-        ProdCheck::new(p_polys, q_polys, BinaryField128b::zero(), true);
+        ProdCheck::new(p_polys, q_polys, BinaryField128b::ZERO, true);
     }
 
     #[test]
@@ -809,7 +808,7 @@ mod tests {
 
         // Compute the initial claim: the sum of the element-wise products of `P` and `Q`.
         let mut current_claim =
-            p_polys.iter().zip(&q_polys).fold(BinaryField128b::zero(), |acc, (p, q)| {
+            p_polys.iter().zip(&q_polys).fold(BinaryField128b::ZERO, |acc, (p, q)| {
                 acc + p.iter().zip(q).map(|(&p_val, &q_val)| p_val * q_val).sum::<BinaryField128b>()
             });
 
@@ -861,7 +860,7 @@ mod tests {
             .iter()
             .zip(&q_evaluations)
             .map(|(&p_eval, &q_eval)| p_eval * q_eval)
-            .fold(BinaryField128b::zero(), |acc, val| acc + val);
+            .fold(BinaryField128b::ZERO, |acc, val| acc + val);
 
         // Ensure the final computed claim matches the current claim in the protocol.
         assert_eq!(final_claim, current_claim);

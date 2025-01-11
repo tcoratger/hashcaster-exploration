@@ -111,7 +111,6 @@ impl LinearOperations for ThetaCD {
 mod tests {
     use super::*;
     use hashcaster_primitives::binary_field::BinaryField128b;
-    use num_traits::Zero;
 
     #[test]
     fn test_theta_cd_apply() {
@@ -125,7 +124,7 @@ mod tests {
         }
 
         // Initialize the output array to zeros.
-        let mut output = [BinaryField128b::zero(); 320];
+        let mut output = [BinaryField128b::ZERO; 320];
 
         // Apply the ThetaCD transformation.
         theta_cd.apply(&input, &mut output);
@@ -164,7 +163,7 @@ mod tests {
         input[4 * 64..5 * 64].fill(c4); // C[4]
 
         // Initialize the output array to zeros.
-        let mut output = [BinaryField128b::zero(); 320];
+        let mut output = [BinaryField128b::ZERO; 320];
 
         // Apply the ThetaCD transformation.
         theta_cd.apply(&input, &mut output);
@@ -192,7 +191,7 @@ mod tests {
 
         // Define a simple input where each column has a single distinct value.
         // Each 64-bit segment is initialized with the same value for simplicity.
-        let mut input = [BinaryField128b::zero(); 320];
+        let mut input = [BinaryField128b::ZERO; 320];
         input[0 * 64..1 * 64].fill(c0); // C[0]
         input[1 * 64..2 * 64].fill(c1); // C[1]
         input[2 * 64..3 * 64].fill(c2); // C[2]
@@ -200,7 +199,7 @@ mod tests {
         input[4 * 64..5 * 64].fill(c4); // C[4]
 
         // Initialize the output array to zeros.
-        let mut output = [BinaryField128b::zero(); 320];
+        let mut output = [BinaryField128b::ZERO; 320];
 
         // Apply the transposed transformation.
         theta_cd.apply_transposed(&input, &mut output);
@@ -226,7 +225,7 @@ mod tests {
 
         // **Prepare output storage for the result of `apply`**
         // - This will store the computed `D[x]` values (320 elements).
-        let mut output_apply = vec![BinaryField128b::zero(); 320];
+        let mut output_apply = vec![BinaryField128b::ZERO; 320];
 
         // **Apply the ThetaCD transformation**
         // - Compute `D[x]` values from the random input `C[x]`.
@@ -238,7 +237,7 @@ mod tests {
 
         // **Prepare output storage for the result of `apply_transposed`**
         // - This will store the distributed column parity values `C[x]`.
-        let mut output_transposed = vec![BinaryField128b::zero(); 320];
+        let mut output_transposed = vec![BinaryField128b::ZERO; 320];
 
         // **Apply the transposed ThetaCD transformation**
         // - Compute `C[x]` values from the random input `D[x]`.
@@ -249,14 +248,14 @@ mod tests {
         let lhs = output_apply
             .iter()
             .zip(input_transposed.iter())
-            .fold(BinaryField128b::zero(), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::ZERO, |acc, (a, b)| acc + (*a * *b));
 
         // **Compute dot product of `apply_transposed` output and `apply` input**
         // - This computes `rhs = sum(C[x] * C_transpose_input[x])`.
         let rhs = output_transposed
             .iter()
             .zip(input_apply.iter())
-            .fold(BinaryField128b::zero(), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::ZERO, |acc, (a, b)| acc + (*a * *b));
 
         // **Validate the equality of `lhs` and `rhs`**
         // - **Mathematical justification**:

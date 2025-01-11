@@ -1,6 +1,6 @@
 use crate::point::Point;
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::{MulAddAssign, Zero};
+use num_traits::MulAddAssign;
 use std::ops::{Deref, DerefMut, Mul, MulAssign};
 
 /// Represents a univariate polynomial with coefficients over a binary field.
@@ -52,7 +52,7 @@ impl UnivariatePolynomial {
     /// `P(x) = (((a_n \cdot x + a_{n-1}) \cdot x + a_{n-2}) \cdot x + ... + a_0)`
     pub fn evaluate_at(&self, at: &Point) -> BinaryField128b {
         // Start with an accumulator initialized to zero.
-        self.coeffs.iter().rev().fold(BinaryField128b::zero(), |mut acc, &coeff| {
+        self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
             // Multiply the accumulator by `at` and add the current coefficient.
             acc.mul_add_assign(**at, coeff);
             // Return the updated accumulator for the next iteration.
@@ -208,7 +208,6 @@ impl DerefMut for UnivariatePolynomial {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::One;
 
     #[test]
     fn test_univariate_polynomial_evaluate_at() {
@@ -264,8 +263,8 @@ mod tests {
         assert_eq!(poly.coeffs, expected_coeffs, "Incorrect polynomial coefficients.");
 
         // Verify evaluation of the polynomial matches the input evaluations.
-        let at_0 = Point(BinaryField128b::zero());
-        let at_1 = Point(BinaryField128b::one());
+        let at_0 = Point(BinaryField128b::ZERO);
+        let at_1 = Point(BinaryField128b::ONE);
         assert_eq!(poly.evaluate_at(&at_0), evals[0], "Evaluation at t = 0 failed.");
         assert_eq!(poly.evaluate_at(&at_1), evals[1], "Evaluation at t = 1 failed.");
     }

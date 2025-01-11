@@ -3,7 +3,6 @@ use crate::multinear_lagrangian::{
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
 use itertools::Itertools;
-use num_traits::{One, Zero};
 use rayon::{
     iter::{
         IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator,
@@ -113,10 +112,10 @@ impl Points {
     ///   multilinear extensions and related computations.
     pub fn to_eq_poly(&self) -> MultilinearLagrangianPolynomial {
         // Initialize the coefficients with a single 1 (neutral element for multiplication).
-        let mut coeffs = vec![BinaryField128b::one()];
+        let mut coeffs = vec![BinaryField128b::ONE];
 
         // Preallocate memory for all coefficients, filling with zeros beyond the initial size.
-        coeffs.resize(1 << self.len(), BinaryField128b::zero());
+        coeffs.resize(1 << self.len(), BinaryField128b::ZERO);
 
         // Iterate over the points to construct the equality polynomial.
         self.iter().enumerate().for_each(|(i, point)| {
@@ -166,7 +165,7 @@ impl Points {
     pub fn to_eq_poly_sequence(&self) -> MultilinearLagrangianPolynomials {
         // Start with the base case: eq_0(x) = 1.
         let mut polynomials =
-            vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::one()])];
+            vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE])];
 
         // Iterate over the points in reverse order.
         for (i, multiplier) in self.iter().rev().enumerate() {
@@ -175,7 +174,7 @@ impl Points {
 
             // Allocate space for the new polynomial coefficients.
             // The new polynomial will have twice the size of the previous one.
-            let mut new_coeffs = vec![BinaryField128b::zero(); 1 << (i + 1)];
+            let mut new_coeffs = vec![BinaryField128b::ZERO; 1 << (i + 1)];
 
             // Compute the new polynomial coefficients using the recurrence relation.
             new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
@@ -232,7 +231,7 @@ impl Points {
     pub fn eq_eval(&self, other: &Self) -> Point {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::one(), |acc, (x, y)| acc * (BinaryField128b::one() + **x + **y))
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + **x + **y))
             .into()
     }
 
@@ -265,7 +264,7 @@ impl Points {
     pub fn eq_eval_slice(&self, other: &[Point]) -> Point {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::one(), |acc, (x, y)| acc * (BinaryField128b::one() + **x + **y))
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + **x + **y))
             .into()
     }
 }
@@ -326,10 +325,10 @@ mod tests {
         let result = points_a.eq_eval(&points_b);
 
         // Manually compute the expected result.
-        let expected = BinaryField128b::one() *
-            (BinaryField128b::one() + BinaryField128b::from(1) + BinaryField128b::from(4)) *
-            (BinaryField128b::one() + BinaryField128b::from(2) + BinaryField128b::from(5)) *
-            (BinaryField128b::one() + BinaryField128b::from(3) + BinaryField128b::from(6));
+        let expected = BinaryField128b::ONE *
+            (BinaryField128b::ONE + BinaryField128b::from(1) + BinaryField128b::from(4)) *
+            (BinaryField128b::ONE + BinaryField128b::from(2) + BinaryField128b::from(5)) *
+            (BinaryField128b::ONE + BinaryField128b::from(3) + BinaryField128b::from(6));
 
         // Assert that the computed result matches the expected result.
         assert_eq!(result, Point::from(expected));
@@ -350,7 +349,7 @@ mod tests {
         // Assert that the result is consistent with identical inputs.
         //
         // The expected output is One since the operation is commutative and associative.
-        assert_eq!(result, Point::from(BinaryField128b::one()));
+        assert_eq!(result, Point::from(BinaryField128b::ONE));
     }
 
     #[test]
@@ -362,8 +361,8 @@ mod tests {
         // Perform the eq_eval operation.
         let result = points_a.eq_eval(&points_b);
 
-        // The expected result for empty inputs is BinaryField128b::one().
-        assert_eq!(result, Point::from(BinaryField128b::one()));
+        // The expected result for empty inputs is BinaryField128b::ONE.
+        assert_eq!(result, Point::from(BinaryField128b::ONE));
     }
 
     #[test]
@@ -385,10 +384,10 @@ mod tests {
         let result = points_a.eq_eval_slice(&points_b);
 
         // Manually compute the expected result.
-        let expected = BinaryField128b::one() *
-            (BinaryField128b::one() + BinaryField128b::from(1) + BinaryField128b::from(4)) *
-            (BinaryField128b::one() + BinaryField128b::from(2) + BinaryField128b::from(5)) *
-            (BinaryField128b::one() + BinaryField128b::from(3) + BinaryField128b::from(6));
+        let expected = BinaryField128b::ONE *
+            (BinaryField128b::ONE + BinaryField128b::from(1) + BinaryField128b::from(4)) *
+            (BinaryField128b::ONE + BinaryField128b::from(2) + BinaryField128b::from(5)) *
+            (BinaryField128b::ONE + BinaryField128b::from(3) + BinaryField128b::from(6));
 
         // Assert that the computed result matches the expected result.
         assert_eq!(result, Point::from(expected));
@@ -411,9 +410,9 @@ mod tests {
         let result = points_a.eq_eval_slice(&points_b[..2]);
 
         // Manually compute the expected result.
-        let expected = BinaryField128b::one() *
-            (BinaryField128b::one() + BinaryField128b::from(1) + BinaryField128b::from(3)) *
-            (BinaryField128b::one() + BinaryField128b::from(2) + BinaryField128b::from(4));
+        let expected = BinaryField128b::ONE *
+            (BinaryField128b::ONE + BinaryField128b::from(1) + BinaryField128b::from(3)) *
+            (BinaryField128b::ONE + BinaryField128b::from(2) + BinaryField128b::from(4));
 
         // Assert that the computed result matches the expected result.
         assert_eq!(result, Point::from(expected));
@@ -432,7 +431,7 @@ mod tests {
         let result = points_a.eq_eval_slice(&points_b);
 
         // Assert that the result is consistent with identical inputs.
-        assert_eq!(result, Point::from(BinaryField128b::one()));
+        assert_eq!(result, Point::from(BinaryField128b::ONE));
     }
 
     #[test]
@@ -450,8 +449,8 @@ mod tests {
         // Perform the eq_eval_slice operation.
         let result = points_a.eq_eval_slice(&points_b[..0]);
 
-        // The expected result for an empty slice is BinaryField128b::one().
-        assert_eq!(result, Point::from(BinaryField128b::one()));
+        // The expected result for an empty slice is BinaryField128b::ONE.
+        assert_eq!(result, Point::from(BinaryField128b::ONE));
     }
 
     #[test]
@@ -485,7 +484,7 @@ mod tests {
         // Verify the initial polynomial is [1].
         assert_eq!(
             eq_sequence[0],
-            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::one()])
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE])
         );
 
         // Cross-check each polynomial in the sequence with its direct computation.

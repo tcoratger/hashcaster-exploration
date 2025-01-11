@@ -17,6 +17,15 @@ use std::{
 pub struct BinaryField128b(u128);
 
 impl BinaryField128b {
+    /// Constant representing the zero element in the binary field.
+    pub const ZERO: Self = Self(0);
+
+    /// Constant representing the one element (multiplicative identity) in the binary field.
+    pub const ONE: Self = Self(257_870_231_182_273_679_343_338_569_694_386_847_745);
+
+    /// Constant representing the maximum element (all bits set to 1) in the binary field.
+    pub const MAX: Self = Self(u128::MAX);
+
     /// Constructs a new [`BinaryField128b`] instance from a given `u128` value.
     pub const fn new(val: u128) -> Self {
         Self(val)
@@ -536,7 +545,7 @@ mod tests {
     #[test]
     fn test_binary_field_zero() {
         // Create a BinaryField128b instance using the `zero` method
-        let zero = BinaryField128b::zero();
+        let zero = BinaryField128b::ZERO;
 
         // Assert that the value is indeed zero
         assert_eq!(zero.0, 0, "BinaryField128b::zero did not return a zero value");
@@ -708,7 +717,7 @@ mod tests {
     #[allow(clippy::op_ref, clippy::unreadable_literal)]
     fn test_mul_identity() {
         // Define the multiplicative identity (one) as a 128-bit number
-        let one = BinaryField128b::one();
+        let one = BinaryField128b::ONE;
 
         // Define a few test values
         let values = [
@@ -814,11 +823,11 @@ mod tests {
     #[test]
     fn test_compute_gammas_folding_identity() {
         // Case: Gamma = 1
-        let gamma = BinaryField128b::one();
+        let gamma = BinaryField128b::ONE;
         let result = BinaryField128b::compute_gammas_folding::<5>(gamma);
 
         // Expected result is a sequence of ones
-        let expected = [BinaryField128b::one(); 5];
+        let expected = [BinaryField128b::ONE; 5];
         assert_eq!(result, expected, "Gamma folding with identity failed");
     }
 
@@ -829,7 +838,7 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<4>(gamma);
 
         // Expected result
-        let expected = [BinaryField128b::one(), gamma, gamma * gamma, gamma * gamma * gamma];
+        let expected = [BinaryField128b::ONE, gamma, gamma * gamma, gamma * gamma * gamma];
         assert_eq!(result, expected, "Gamma folding with simple case failed");
     }
 
@@ -840,18 +849,18 @@ mod tests {
         let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
 
         // Expected result calculated manually: [1, gamma, gamma^2]
-        let expected = [BinaryField128b::one(), gamma, gamma * gamma];
+        let expected = [BinaryField128b::ONE, gamma, gamma * gamma];
         assert_eq!(result, expected, "Gamma folding with large gamma failed");
     }
 
     #[test]
     fn test_compute_gammas_folding_zero_gamma() {
         // Case: Gamma = 0
-        let gamma = BinaryField128b::zero();
+        let gamma = BinaryField128b::ZERO;
         let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
 
         // Expected result: [1, 0, 0]
-        let expected = [BinaryField128b::one(), BinaryField128b::zero(), BinaryField128b::zero()];
+        let expected = [BinaryField128b::ONE, BinaryField128b::ZERO, BinaryField128b::ZERO];
         assert_eq!(result, expected, "Gamma folding with zero gamma failed");
     }
 
@@ -878,7 +887,7 @@ mod tests {
 
     #[test]
     fn test_muladd_with_zero() {
-        let zero = BinaryField128b::zero();
+        let zero = BinaryField128b::ZERO;
         let a = BinaryField128b::new(7);
         let b = BinaryField128b::new(11);
 
@@ -889,7 +898,7 @@ mod tests {
 
     #[test]
     fn test_muladd_with_one() {
-        let one = BinaryField128b::one();
+        let one = BinaryField128b::ONE;
         let a = BinaryField128b::new(13);
         let b = BinaryField128b::new(17);
 
@@ -930,21 +939,21 @@ mod tests {
     #[test]
     fn test_muladdassign_with_zero() {
         let mut result = BinaryField128b::new(8);
-        let zero = BinaryField128b::zero();
+        let zero = BinaryField128b::ZERO;
 
         // Multiplying by zero should leave the accumulator unchanged
         result.mul_add_assign(zero, zero);
         assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero failed");
 
         // Adding zero should leave the result unchanged
-        result.mul_add_assign(BinaryField128b::one(), zero);
+        result.mul_add_assign(BinaryField128b::ONE, zero);
         assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero addition failed");
     }
 
     #[test]
     fn test_muladdassign_with_one() {
         let mut result = BinaryField128b::new(9);
-        let one = BinaryField128b::one();
+        let one = BinaryField128b::ONE;
         let a = BinaryField128b::new(4);
 
         // Using MulAddAssign

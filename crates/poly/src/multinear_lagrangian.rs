@@ -138,7 +138,7 @@ impl MultilinearLagrangianPolynomial {
             let block = &self[block_start..block_start + 8];
 
             // Initialize an array to store the 256 sums for this block.
-            let mut block_sums = [BinaryField128b::zero(); 256];
+            let mut block_sums = [BinaryField128b::ZERO; 256];
 
             // Iterate over all subsets (from 1 to 255) to compute their sums.
             for subset in 1..256 {
@@ -309,7 +309,7 @@ impl MultilinearLagrangianPolynomials {
         // - `num_chunks` is the number of chunks,
         // - `128` corresponds to the number of slots for each chunk,
         // - `n` is the number of input polynomials.
-        let mut ret = vec![BinaryField128b::zero(); num_chunks * 128 * self.len()];
+        let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * self.len()];
 
         // Create an atomic pointer to the `ret` vector for shared mutable access.
         let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
@@ -401,8 +401,6 @@ impl DerefMut for MultilinearLagrangianPolynomials {
 
 #[cfg(test)]
 mod tests {
-    use num_traits::One;
-
     use super::*;
 
     #[test]
@@ -451,14 +449,14 @@ mod tests {
 
         // Evaluate the equality polynomial at the given points.
         let expected_eq_poly =
-            result[0] * (BinaryField128b::one() - pt1) * (BinaryField128b::one() - pt2) +
-                result[2] * (BinaryField128b::one() - pt1) * pt2 +
-                result[1] * (BinaryField128b::one() - pt2) * pt1 +
+            result[0] * (BinaryField128b::ONE - pt1) * (BinaryField128b::ONE - pt2) +
+                result[2] * (BinaryField128b::ONE - pt1) * pt2 +
+                result[1] * (BinaryField128b::ONE - pt2) * pt1 +
                 result[3] * pt1 * pt2;
 
         // Verify that the equality polynomial evaluates to 1.
         // This ensures that the computed polynomial satisfies the expected equality conditions.
-        assert_eq!(expected_eq_poly, BinaryField128b::one());
+        assert_eq!(expected_eq_poly, BinaryField128b::ONE);
     }
 
     #[test]
@@ -546,7 +544,7 @@ mod tests {
             let result = points.to_eq_poly();
 
             // Step 3: Reconstruct the equality polynomial manually to verify correctness.
-            let mut expected_eq_poly = BinaryField128b::zero();
+            let mut expected_eq_poly = BinaryField128b::ZERO;
             for i in 0..(1 << num_points) {
                 // Convert `i` to binary representation to match the current point combination.
                 let binary_combination: Vec<bool> =
@@ -558,14 +556,14 @@ mod tests {
                     term *= if *bit {
                         **point // Include the point if the bit is 1.
                     } else {
-                        BinaryField128b::one() - **point // Complement if the bit is 0.
+                        BinaryField128b::ONE - **point // Complement if the bit is 0.
                     };
                 }
                 expected_eq_poly += term;
             }
 
             // Step 4: Assert that the computed equality polynomial evaluates to 1.
-            assert_eq!(expected_eq_poly, BinaryField128b::one());
+            assert_eq!(expected_eq_poly, BinaryField128b::ONE);
         }
     }
 
@@ -594,12 +592,11 @@ mod tests {
         //        + p(0, 1) * (1 - pt1) * pt0
         //        + p(1, 0) * pt1 * (1 - pt0)
         //        + p(1, 1) * pt1 * pt0
-        let expected_result = coeff0 *
-            (BinaryField128b::one() - *points[0]) *
-            (BinaryField128b::one() - *points[1]) +
-            coeff2 * (BinaryField128b::one() - *points[0]) * *points[1] +
-            coeff1 * *points[0] * (BinaryField128b::one() - *points[1]) +
-            coeff3 * *points[0] * *points[1];
+        let expected_result =
+            coeff0 * (BinaryField128b::ONE - *points[0]) * (BinaryField128b::ONE - *points[1]) +
+                coeff2 * (BinaryField128b::ONE - *points[0]) * *points[1] +
+                coeff1 * *points[0] * (BinaryField128b::ONE - *points[1]) +
+                coeff3 * *points[0] * *points[1];
 
         // Assert the result matches the expectation.
         assert_eq!(result, expected_result);
@@ -671,12 +668,12 @@ mod tests {
             let block = &polynomial[block_start..block_start + 8];
 
             // Initialize an array to store sums for all 256 subsets of the block.
-            let mut block_sums = [BinaryField128b::zero(); 256];
+            let mut block_sums = [BinaryField128b::ZERO; 256];
 
             // Compute all possible sums of the coefficients in the block.
             for (subset, block_sums_subset) in block_sums.iter_mut().enumerate() {
                 // Initialize the sum for the current subset.
-                let mut sum = BinaryField128b::zero();
+                let mut sum = BinaryField128b::ZERO;
 
                 // Iterate through the 8 bits of the subset index.
                 for (bit, &block_bit) in block.iter().enumerate().take(8) {

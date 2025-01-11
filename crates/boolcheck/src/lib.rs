@@ -7,7 +7,6 @@ use hashcaster_poly::{
     univariate::UnivariatePolynomial,
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::{One, Zero};
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
@@ -82,7 +81,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
             bit_mapping: Vec::new(),
             eq_sequence: MultilinearLagrangianPolynomials::default(),
             round_polys: Vec::new(),
-            claim: BinaryField128b::zero(),
+            claim: BinaryField128b::ZERO,
             gammas: array::from_fn(|_| Default::default()),
             algebraic_operations: Default::default(),
         }
@@ -187,7 +186,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
                     // Intermediate polynomial for the current round.
                     //
                     // This polynomial is a degree-2 polynomial.
-                    let mut pd2_part = [BinaryField128b::zero(); 3];
+                    let mut pd2_part = [BinaryField128b::ZERO; 3];
 
                     (0..(1 << phase1_dimensions)).for_each(|j| {
                         // The offset is a way to locate the correct position in the extended table
@@ -218,7 +217,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
                     //  W(t) = Σ_{x_{>i}} (P ∧ Q)(r_{<i}, t, x_{>i}) * eq(x_{>i}; q_{>i}).
                     // ```
                     // as a sum of the intermediate polynomials for all `t = 0, 1, ∞`.
-                    || [BinaryField128b::zero(); 3],
+                    || [BinaryField128b::ZERO; 3],
                     |a, b| [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
                 )
         } else {
@@ -254,10 +253,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
                     self.compute_algebraic(poly_coords, i, 1 << (number_variables - self.c - 1))
                         .map(|x| x * eq_poly_round[i])
                 })
-                .reduce(
-                    || [BinaryField128b::zero(); 3],
-                    |[a, b, c], [d, e, f]| [a + d, b + e, c + f],
-                )
+                .reduce(|| [BinaryField128b::ZERO; 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f])
         };
 
         // We want to compute:
@@ -282,8 +278,8 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         // This is the equality polynomial for the current round (degree-1 univariate
         // polynomial).
         let eq_t = UnivariatePolynomial::new(vec![
-            *self.points[round] + BinaryField128b::one(),
-            BinaryField128b::one(),
+            *self.points[round] + BinaryField128b::ONE,
+            BinaryField128b::ONE,
         ]);
 
         // In the final step, we multiply the univariate polynomial by the equality polynomial:
@@ -325,7 +321,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
 
         // Initialize the accumulators for each of the 3 output values to zero.
-        let mut acc = [BinaryField128b::zero(); 3];
+        let mut acc = [BinaryField128b::ZERO; 3];
 
         // Iterate over the output size `M` and compute the folded sums for each output value.
         for i in 0..M {
@@ -616,7 +612,7 @@ mod tests {
 
         // Add a zero element to the end of the evaluations for padding.
         // TODO: hack to be removed in the future
-        frob_evals.push(BinaryField128b::zero());
+        frob_evals.push(BinaryField128b::ZERO);
 
         // Compute algebraic AND
         let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);

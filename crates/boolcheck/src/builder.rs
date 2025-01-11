@@ -8,7 +8,6 @@ use hashcaster_poly::{
     univariate::UnivariatePolynomial,
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::identities::Zero;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
@@ -274,14 +273,14 @@ where
         let base_stride = 1 << (c + 1);
 
         // Preallocate the result vector to store the extended table.
-        let mut result = vec![BinaryField128b::zero(); pow3 * pow2];
+        let mut result = vec![BinaryField128b::ZERO; pow3 * pow2];
 
         // Parallelize over chunks of the result to maximize performance.
         let chunk_id_iter = result.par_chunks_mut(pow3);
 
         chunk_id_iter.enumerate().for_each(|(chunk_id, result_chunk)| {
             // `tables_ext` stores intermediate results for each ternary index.
-            let mut tables_ext = vec![[BinaryField128b::zero(); N]; pow3_adj];
+            let mut tables_ext = vec![[BinaryField128b::ZERO; N]; pow3_adj];
 
             // Base offset to determine which part of the input tables we are processing.
             let base_tab_offset = chunk_id * base_stride;
@@ -318,7 +317,7 @@ where
                     }
                 } else {
                     // Case 2: Large indices (recursive range).
-                    let mut args = [BinaryField128b::zero(); N];
+                    let mut args = [BinaryField128b::ZERO; N];
                     let tab_ext1 = &tables_ext[j - offset];
                     let tab_ext2 = &tables_ext[j - 2 * offset];
                     for (z, arg) in args.iter_mut().enumerate() {
@@ -362,7 +361,7 @@ where
 
         assert_eq!(pow3 % chunk_size, 0, "Chunk size must evenly divide total size");
 
-        let mut result = vec![BinaryField128b::zero(); pow3 * pow2];
+        let mut result = vec![BinaryField128b::ZERO; pow3 * pow2];
 
         // Préparation hors des boucles
         let tree_descendants: Vec<_> =
@@ -377,10 +376,10 @@ where
                 let global_j = base + local_j;
                 let offset = &tree_descendants[global_j];
 
-                let mut args = [BinaryField128b::zero(); N];
+                let mut args = [BinaryField128b::ZERO; N];
 
                 for (z, arg) in args.iter_mut().enumerate().take(N) {
-                    let mut acc = BinaryField128b::zero();
+                    let mut acc = BinaryField128b::ZERO;
                     for &x in offset {
                         unsafe {
                             acc +=
@@ -442,7 +441,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
         let lin = self.algebraic_operations.linear(arg);
 
         // Initialize the accumulator to zero.
-        let mut acc = BinaryField128b::zero();
+        let mut acc = BinaryField128b::ZERO;
 
         // Iterate over the output size `M` and compute the folded sum using `gammas`.
         for (i, &t) in lin.iter().enumerate() {
@@ -459,7 +458,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
         let quad = self.algebraic_operations.quadratic(arg);
 
         // Initialize the accumulator to zero.
-        let mut acc = BinaryField128b::zero();
+        let mut acc = BinaryField128b::ZERO;
 
         // Iterate over the output size `M` and compute the folded sum using `gammas`.
         for (i, &t) in quad.iter().enumerate() {
@@ -481,7 +480,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
         let alg = self.algebraic_operations.algebraic(data, idx_a, offset);
 
         // Initialize the accumulators for each of the 3 output values to zero.
-        let mut acc = [BinaryField128b::zero(); 3];
+        let mut acc = [BinaryField128b::ZERO; 3];
 
         // Iterate over the output size `M` and compute the folded sums for each output value.
         for i in 0..M {
@@ -625,7 +624,7 @@ mod tests {
         // Define the linear function (f_lin)
         // `f_lin` computes the sum of all values in the input slice.
         let f_lin = |args: &[BinaryField128b; 3]| {
-            let mut res = BinaryField128b::zero();
+            let mut res = BinaryField128b::ZERO;
             for &x in args {
                 res += x;
             }
@@ -635,7 +634,7 @@ mod tests {
         // Define the quadratic function (f_quad)
         // `f_quad` computes the sum of the squares of all values in the input slice.
         let f_quad = |args: &[BinaryField128b; 3]| {
-            let mut res = BinaryField128b::zero();
+            let mut res = BinaryField128b::ZERO;
             for &x in args {
                 res += x * x;
             }

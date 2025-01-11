@@ -5,7 +5,6 @@ use hashcaster_poly::{
     univariate::UnivariatePolynomial,
 };
 use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
-use num_traits::Zero;
 use std::array;
 
 /// A builder for constructing and managing the state of the LinCheck protocol.
@@ -112,7 +111,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
         // Initialize restricted polynomials with zero coefficients.
         // Initializes `N` restricted polynomials, each with `2^num_active_vars` coefficients.
         let mut p_polys: [_; N] = array::from_fn(|_| {
-            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::zero(); chunk_size])
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ZERO; chunk_size])
         });
 
         // Restrict input polynomials using dormant equality polynomial.
@@ -142,7 +141,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
         // Apply the transposed matrix operation to compute `q`.
         // `q = Mᵀ * gamma_eqs`.
         let mut q =
-            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::zero(); N * chunk_size]);
+            MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ZERO; N * chunk_size]);
         self.matrix.apply_transposed(&gamma_eqs, &mut q);
 
         // Split `q` into separate polynomials.

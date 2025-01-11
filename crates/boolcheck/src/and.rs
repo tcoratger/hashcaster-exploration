@@ -1,6 +1,5 @@
 use crate::algebraic::AlgebraicOps;
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::Zero;
 
 /// A structure that implements the behavior of the AND operations.
 #[derive(Debug, Clone, Default)]
@@ -18,7 +17,7 @@ impl<const I: usize, const O: usize> AlgebraicOps<I, O> for AndPackage<I, O> {
         // Calculate the index for the second operand with the specified offset.
         let mut idx_b = idx_a + offset * 128;
 
-        let mut ret = [[BinaryField128b::zero(); O]; 3];
+        let mut ret = [[BinaryField128b::ZERO; O]; 3];
 
         // Iterate over the 128 basis elements of the binary field.
         for i in 0..128 {
@@ -48,7 +47,7 @@ impl<const I: usize, const O: usize> AlgebraicOps<I, O> for AndPackage<I, O> {
 
     fn linear(&self, _data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
         // Return a zero-initialized array as the result of the linear compression.
-        [BinaryField128b::zero(); O]
+        [BinaryField128b::ZERO; O]
     }
 
     fn quadratic(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
@@ -87,7 +86,7 @@ mod tests {
             .flat_map(|x| (0..128).map(|i| BinaryField128b::from((x.into_inner() >> i) & 1 != 0)))
             .collect::<Vec<_>>();
 
-        input_coords.push(BinaryField128b::zero());
+        input_coords.push(BinaryField128b::ZERO);
 
         let rhs = and_package.algebraic(&input_coords, 0, 1);
 

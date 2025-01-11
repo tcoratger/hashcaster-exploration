@@ -1,7 +1,6 @@
 use hashcaster_boolcheck::algebraic::AlgebraicOps;
 use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::{One, Zero};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
@@ -21,7 +20,7 @@ use std::{
 /// # Returns
 /// - A `BinaryField128b` instance representing the "negation".
 fn neg(x: BinaryField128b) -> BinaryField128b {
-    BinaryField128b::from(0u128.wrapping_sub(1)) + x
+    BinaryField128b::MAX + x
 }
 
 /// Computes the chi-compressed transformation for 5 field elements.
@@ -96,11 +95,11 @@ impl AlgebraicOps<5, 5> for ChiPackage {
         offset: usize,
     ) -> [[BinaryField128b; 5]; 3] {
         let mut idxs: [usize; 5] = array::from_fn(|j| idx_a * 2 + j * offset * 128);
-        let mut ret = [[BinaryField128b::zero(); 5]; 3];
+        let mut ret = [[BinaryField128b::ZERO; 5]; 3];
 
         (0..128).for_each(|i| {
             let basis = BinaryField128b::basis(i);
-            let one = BinaryField128b::one();
+            let one = BinaryField128b::ONE;
 
             // Linear and quadratic terms
             (0..5).for_each(|j| {
@@ -145,7 +144,7 @@ pub fn chi_round_witness(
 
     // Initialize result vectors
     let mut ret =
-        array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![BinaryField128b::zero(); l]));
+        array::from_fn(|_| MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ZERO; l]));
 
     // Create atomic pointers for each result vector
     let ret_ptrs: Vec<_> = ret.iter_mut().map(|r| AtomicPtr::new(r.as_mut_ptr())).collect();
@@ -341,7 +340,7 @@ mod tests {
         assert_eq!(frob_evals.0, expected_coord_evals, "Frobenius evaluations mismatch");
 
         // Trick for padding
-        frob_evals.push(BinaryField128b::zero());
+        frob_evals.push(BinaryField128b::ZERO);
 
         // Compute the claimed evaluations and fold them
         let claimed_evaluations =

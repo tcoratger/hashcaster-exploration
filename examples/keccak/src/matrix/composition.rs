@@ -1,5 +1,4 @@
 use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
-use num_traits::Zero;
 
 /// A struct representing the composition of two linear operations, `A` and `B`.
 ///
@@ -46,7 +45,7 @@ impl<A: LinearOperations, B: LinearOperations> LinearOperations for CombinedMatr
     /// # Panics
     /// - Panics if `input.len() != b.n_in()` or `output.len() != a.n_out()`.
     fn apply(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
-        let mut tmp = vec![BinaryField128b::zero(); self.b.n_out()];
+        let mut tmp = vec![BinaryField128b::ZERO; self.b.n_out()];
         self.b.apply(input, &mut tmp);
         self.a.apply(&tmp, output);
     }
@@ -60,7 +59,7 @@ impl<A: LinearOperations, B: LinearOperations> LinearOperations for CombinedMatr
     /// # Panics
     /// - Panics if `input.len() != a.n_out()` or `output.len() != b.n_in()`.
     fn apply_transposed(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
-        let mut tmp = vec![BinaryField128b::zero(); self.b.n_out()];
+        let mut tmp = vec![BinaryField128b::ZERO; self.b.n_out()];
         self.a.apply_transposed(input, &mut tmp);
         self.b.apply_transposed(&tmp, output);
     }

@@ -1,5 +1,4 @@
 use crate::{binary_field::BinaryField128b, linear_trait::LinearOperations};
-use num_traits::Zero;
 
 /// A struct representing a linear transformation using a matrix.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -44,7 +43,7 @@ impl LinearOperations for MatrixLinear {
         assert_eq!(output.len(), self.n_out, "Output vector size mismatch");
 
         // Initialize the output vector to zero.
-        output.iter_mut().for_each(|o| *o = BinaryField128b::zero());
+        output.iter_mut().for_each(|o| *o = BinaryField128b::ZERO);
 
         // Perform matrix-vector multiplication.
         self.entries.chunks_exact(self.n_in).zip(output.iter_mut()).for_each(|(row, out_elem)| {
@@ -60,7 +59,7 @@ impl LinearOperations for MatrixLinear {
         assert_eq!(output.len(), self.n_in, "Output vector size mismatch");
 
         // Initialize the output vector to zero.
-        output.iter_mut().for_each(|o| *o = BinaryField128b::zero());
+        output.iter_mut().for_each(|o| *o = BinaryField128b::ZERO);
 
         // Perform matrix-vector multiplication with the transposed matrix.
         input.iter().enumerate().for_each(|(i, &input_elem)| {
@@ -76,14 +75,13 @@ impl LinearOperations for MatrixLinear {
 mod tests {
     use super::*;
     use crate::binary_field::BinaryField128b;
-    use num_traits::One;
 
     #[test]
     fn test_apply_identity_matrix() {
         // Identity matrix: 2x2
         let matrix_rows = vec![
-            vec![BinaryField128b::one(), BinaryField128b::from(0)], // Row 1
-            vec![BinaryField128b::from(0), BinaryField128b::one()], // Row 2
+            vec![BinaryField128b::ONE, BinaryField128b::from(0)], // Row 1
+            vec![BinaryField128b::from(0), BinaryField128b::ONE], // Row 2
         ];
 
         // Flatten the 2D vector into a single vector
@@ -95,7 +93,7 @@ mod tests {
         // Define an input vector for the matrix multiplication
         let input = vec![BinaryField128b::from(5), BinaryField128b::from(7)];
         // Create an output vector to store the multiplication result
-        let mut output = vec![BinaryField128b::zero(); 2];
+        let mut output = vec![BinaryField128b::ZERO; 2];
 
         // Apply the identity matrix to the input vector
         matrix.apply(&input, &mut output);
@@ -108,8 +106,8 @@ mod tests {
     fn test_apply_transposed_identity_matrix() {
         // Identity matrix: 2x2
         let matrix_rows = vec![
-            vec![BinaryField128b::one(), BinaryField128b::from(0)], // Row 1
-            vec![BinaryField128b::from(0), BinaryField128b::one()], // Row 2
+            vec![BinaryField128b::ONE, BinaryField128b::from(0)], // Row 1
+            vec![BinaryField128b::from(0), BinaryField128b::ONE], // Row 2
         ];
 
         // Flatten the 2D vector into a single vector
@@ -121,7 +119,7 @@ mod tests {
         // Define an input vector for the transposed application
         let input = vec![BinaryField128b::from(3), BinaryField128b::from(4)];
         // Create an output vector to store the transposed multiplication result
-        let mut output = vec![BinaryField128b::zero(); 2];
+        let mut output = vec![BinaryField128b::ZERO; 2];
 
         // Apply the transposed identity matrix to the input vector
         matrix.apply_transposed(&input, &mut output);
@@ -156,7 +154,7 @@ mod tests {
         let d2 = BinaryField128b::from(2);
         let input = vec![d1, d2];
         // Create an output vector to store the multiplication result
-        let mut output = vec![BinaryField128b::zero(); 3];
+        let mut output = vec![BinaryField128b::ZERO; 3];
 
         // Apply the arbitrary matrix to the input vector
         matrix.apply(&input, &mut output);
@@ -193,7 +191,7 @@ mod tests {
         let d3 = BinaryField128b::from(3);
         let input = vec![d1, d2, d3];
         // Create an output vector to store the transposed multiplication result
-        let mut output = vec![BinaryField128b::zero(); 2];
+        let mut output = vec![BinaryField128b::ZERO; 2];
 
         // Apply the transposed arbitrary matrix to the input vector
         matrix.apply_transposed(&input, &mut output);
@@ -221,7 +219,7 @@ mod tests {
         // Define an invalid input vector with size mismatch
         let input = vec![BinaryField128b::from(1)];
         // Create an output vector to store the multiplication result
-        let mut output = vec![BinaryField128b::zero(); 2];
+        let mut output = vec![BinaryField128b::ZERO; 2];
 
         // Attempt to apply the matrix with an invalid input size, which should panic
         matrix.apply(&input, &mut output);
@@ -245,7 +243,7 @@ mod tests {
         // Define a valid input vector for the matrix multiplication
         let input = vec![BinaryField128b::from(1), BinaryField128b::from(2)];
         // Create an invalid output vector with size mismatch
-        let mut output = vec![BinaryField128b::zero(); 1];
+        let mut output = vec![BinaryField128b::ZERO; 1];
 
         // Attempt to apply the matrix with an invalid output size, which should panic
         matrix.apply(&input, &mut output);

@@ -11,7 +11,7 @@ use hashcaster_poly::{
 use hashcaster_primitives::{
     array_ref, binary_field::BinaryField128b, matrix_efficient::EfficientMatrix,
 };
-use num_traits::{MulAdd, Zero};
+use num_traits::MulAdd;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::array;
 
@@ -78,7 +78,7 @@ impl<const N: usize> MultiClaim<N> {
         let claim = gamma_pows[0..128]
             .iter()
             .zip(openings.iter())
-            .fold(BinaryField128b::zero(), |acc, (x, y)| x.mul_add(*y, acc));
+            .fold(BinaryField128b::ZERO, |acc, (x, y)| x.mul_add(*y, acc));
 
         // Create a multiclaim object
         // - The object is initialized with:
@@ -128,7 +128,7 @@ impl<const N: usize> MultiClaim<N> {
         // - Subsequent openings are evaluated for each polynomial at the challenges derived during
         //   the sumcheck.
         let mut ret = UnivariatePolynomial::new(
-            std::iter::once(BinaryField128b::zero())
+            std::iter::once(BinaryField128b::ZERO)
                 .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
                 .collect(),
         );
@@ -161,10 +161,10 @@ mod tests {
         let points = Points::from(vec![Point::default()]);
 
         // Create openings (all zeros)
-        let openings = vec![BinaryField128b::zero(); 128];
+        let openings = vec![BinaryField128b::ZERO; 128];
 
         // Create gamma powers (all zeros except the first one)
-        let mut gamma_pows = vec![BinaryField128b::zero(); 129];
+        let mut gamma_pows = vec![BinaryField128b::ZERO; 129];
         gamma_pows[0] = BinaryField128b::from(1);
 
         // Create polynomials (empty for now)
@@ -185,7 +185,7 @@ mod tests {
         );
         assert_eq!(
             claim.object.claim,
-            BinaryField128b::zero(),
+            BinaryField128b::ZERO,
             "Initial claim should be zero when all openings are zero."
         );
     }
@@ -275,7 +275,7 @@ mod tests {
         let mut claim = gamma_pows
             .iter()
             .zip(evaluations_inv_orbit.iter())
-            .fold(BinaryField128b::zero(), |acc, (x, y)| x.mul_add(*y, acc));
+            .fold(BinaryField128b::ZERO, |acc, (x, y)| x.mul_add(*y, acc));
 
         // Setup an empty vector to store the challanges in the main loop
         let mut challenges = Points::from(Vec::<Point>::with_capacity(NUM_VARS));
@@ -307,7 +307,7 @@ mod tests {
         let eq_evaluations = gamma_pows
             .iter()
             .zip(points_inv_orbit.iter())
-            .fold(BinaryField128b::zero(), |acc, (gamma, pts)| {
+            .fold(BinaryField128b::ZERO, |acc, (gamma, pts)| {
                 gamma.mul_add(*pts.eq_eval(&challenges), acc)
             });
 

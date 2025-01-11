@@ -18,7 +18,6 @@ pub mod tests {
     use frobenius::FROBENIUS;
     use frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE;
     use matrix::Matrix;
-    use num_traits::{One, Zero};
 
     /// Converts a slice of booleans to a `u128` integer.
     pub fn u128_from_bits(bits: &[bool]) -> u128 {
@@ -124,7 +123,7 @@ pub mod tests {
                 // Initialize the accumulator \( s \) to zero.
                 // \( s \) will accumulate the sum of Frobenius transformations \( x^{2^k} \) over
                 // 128 iterations.
-                let mut s = BinaryField128b::zero();
+                let mut s = BinaryField128b::ZERO;
 
                 // Apply the Frobenius map iteratively: \( x \mapsto x^2 \), 128 times.
                 // This corresponds to summing \( x^{2^k} \) for \( k = 0 \) to \( 127 \).
@@ -137,7 +136,7 @@ pub mod tests {
 
                 // If the accumulated value \( s \) equals 1, set the matrix cell to `true`.
                 // This ensures \( \pi_i(b_j) = 1 \) for the correct pairing.
-                *cell = s == BinaryField128b::one();
+                *cell = s == BinaryField128b::ONE;
             });
         });
 

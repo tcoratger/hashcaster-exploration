@@ -1,9 +1,6 @@
-use std::ops::Deref;
-
-use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::identities::Zero;
-
 use crate::univariate::UnivariatePolynomial;
+use hashcaster_primitives::binary_field::BinaryField128b;
+use std::ops::Deref;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CompressedPoly(Vec<BinaryField128b>);
@@ -14,7 +11,7 @@ impl CompressedPoly {
     }
 
     pub fn compress(poly: &[BinaryField128b]) -> (Self, BinaryField128b) {
-        let sum = poly.iter().skip(1).fold(BinaryField128b::zero(), |a, b| a + b);
+        let sum = poly.iter().skip(1).fold(BinaryField128b::ZERO, |a, b| a + b);
         (Self(std::iter::once(&poly[0]).chain(&poly[2..]).copied().collect()), sum)
     }
 
@@ -60,7 +57,7 @@ impl CompressedPoly {
         // Example: Compressed coefficients = [3, 5, 6].
         // Sum of stored coefficients = 3 + 5 + 6 = 14.
         // c1 = ev_1 - (sum of stored coefficients excluding c1) = 21 - 14 = 7.
-        let c1 = self.iter().fold(BinaryField128b::zero(), |a, b| a + *b) + ev_1;
+        let c1 = self.iter().fold(BinaryField128b::ZERO, |a, b| a + *b) + ev_1;
 
         // Step 4: Combine all coefficients:
         // - Start with `c0`,
@@ -161,7 +158,7 @@ mod tests {
 
         let (_, sum) = CompressedPoly::compress(&poly);
 
-        assert_eq!(sum, BinaryField128b::zero(), "Sum of zero coefficients should be zero");
+        assert_eq!(sum, BinaryField128b::ZERO, "Sum of zero coefficients should be zero");
     }
 
     #[test]

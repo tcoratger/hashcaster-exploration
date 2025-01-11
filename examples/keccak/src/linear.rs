@@ -1,7 +1,6 @@
 use crate::{matrix::composition::CombinedMatrix, rho_pi::RhoPi, theta::Theta};
 use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
 use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
-use num_traits::Zero;
 use std::array;
 
 /// A linear operator combining the RhoPi and Theta transformations for the Keccak permutation.
@@ -104,7 +103,7 @@ impl LinearOperations for KeccakLinear {
     /// - `output`: A mutable slice of size `n_out()` to store the transformed state.
     fn apply(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
         // Create a 3x1600 intermediate state representation.
-        let mut state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Split the input into blocks and map them to the intermediate state.
         for i in 0..5 {
@@ -117,7 +116,7 @@ impl LinearOperations for KeccakLinear {
         }
 
         // Create a 3x1600 intermediate output state.
-        let mut output_state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the combined RhoPi and Theta transformations to each sub-state.
         for j in 0..3 {
@@ -143,7 +142,7 @@ impl LinearOperations for KeccakLinear {
     /// - `output`: A mutable slice of size `n_out()` to store the transformed state.
     fn apply_transposed(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
         // Create a 3x1600 intermediate state representation.
-        let mut state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Split the input into blocks and map them to the intermediate state.
         for i in 0..5 {
@@ -155,7 +154,7 @@ impl LinearOperations for KeccakLinear {
         }
 
         // Create a 3x1600 intermediate output state.
-        let mut output_state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the inverse transformations to each sub-state.
         for j in 0..3 {
@@ -209,12 +208,12 @@ pub fn keccak_linround_witness(
 
     // Initialize output vectors, one for each input slice.
     let mut output =
-        array::from_fn(|_| MultilinearLagrangianPolynomial::from(vec![BinaryField128b::zero(); l]));
+        array::from_fn(|_| MultilinearLagrangianPolynomial::from(vec![BinaryField128b::ZERO; l]));
 
     // Process each batch of 1024 elements.
     (0..l / 1024).for_each(|batch_index| {
         // Prepare the input state for the current batch.
-        let mut input_state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut input_state = [[BinaryField128b::ZERO; 1600]; 3];
         input.iter().enumerate().for_each(|(i, block)| {
             // Map the input slice to the intermediate state representation.
             (0..3).for_each(|j| {
@@ -225,7 +224,7 @@ pub fn keccak_linround_witness(
         });
 
         // Initialize the output state for the current batch.
-        let mut output_state = [[BinaryField128b::zero(); 1600]; 3];
+        let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the Keccak linear operator to each part of the state.
         (0..3).for_each(|j| m.apply(&input_state[j], &mut output_state[j]));
@@ -270,7 +269,7 @@ mod tests {
 
         // **Apply the KeccakLinear transformation**
         // - `m_a` will store the result of applying the transformation to `a`.
-        let mut m_a = vec![BinaryField128b::zero(); 1024 * 5];
+        let mut m_a = vec![BinaryField128b::ZERO; 1024 * 5];
         keccak_linear.apply(&a, &mut m_a);
 
         // **Generate another random input vector `b`**
@@ -279,24 +278,20 @@ mod tests {
 
         // **Apply the transposed transformation**
         // - `m_b` will store the result of applying the transpose operation to `b`.
-        let mut m_b = vec![BinaryField128b::zero(); 1024 * 5];
+        let mut m_b = vec![BinaryField128b::ZERO; 1024 * 5];
         keccak_linear.apply_transposed(&b, &mut m_b);
 
         // **Compute the dot product of the forward-transformed `m_a` with `b`**
         // - This computes `lhs = sum(m_a[i] * b[i])`, where `m_a` is the result of applying the
         //   forward transformation to `a`.
-        let lhs = m_a
-            .iter()
-            .zip(b.iter())
-            .fold(BinaryField128b::zero(), |acc, (a, b)| a.mul_add(*b, acc));
+        let lhs =
+            m_a.iter().zip(b.iter()).fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc));
 
         // **Compute the dot product of the transpose-transformed `m_b` with `a`**
         // - This computes `rhs = sum(m_b[i] * a[i])`, where `m_b` is the result of applying the
         //   transposed transformation to `b`.
-        let rhs = m_b
-            .iter()
-            .zip(a.iter())
-            .fold(BinaryField128b::zero(), |acc, (a, b)| a.mul_add(*b, acc));
+        let rhs =
+            m_b.iter().zip(a.iter()).fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc));
 
         // **Validate the equality of `lhs` and `rhs`**
         // - **Mathematical justification**:
@@ -337,7 +332,7 @@ mod tests {
         // Validate against `KeccakLinear` transformation.
         for batch_index in 0..NUM_BATCHES {
             // Flatten the input for this batch.
-            let mut flat_input = vec![BinaryField128b::zero(); 5 * BATCH_SIZE];
+            let mut flat_input = vec![BinaryField128b::ZERO; 5 * BATCH_SIZE];
             for i in 0..5 {
                 flat_input[i * BATCH_SIZE..(i + 1) * BATCH_SIZE].copy_from_slice(
                     &input_slices[i][batch_index * BATCH_SIZE..(batch_index + 1) * BATCH_SIZE],
@@ -345,7 +340,7 @@ mod tests {
             }
 
             // Apply the KeccakLinear transformation.
-            let mut flat_output = vec![BinaryField128b::zero(); 5 * BATCH_SIZE];
+            let mut flat_output = vec![BinaryField128b::ZERO; 5 * BATCH_SIZE];
             keccak_linear.apply(&flat_input, &mut flat_output);
 
             // Validate that the flattened output matches the corresponding witness output.
@@ -436,7 +431,7 @@ mod tests {
             .iter()
             .zip(q_evaluations.iter())
             .map(|(a, b)| *a * b)
-            .fold(BinaryField128b::zero(), |a, b| a + b);
+            .fold(BinaryField128b::ZERO, |a, b| a + b);
 
         // Validate the claim
         assert_eq!(claim, expected_claim);

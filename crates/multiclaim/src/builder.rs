@@ -5,7 +5,6 @@ use hashcaster_poly::{
     point::{Point, Points},
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
-use num_traits::Zero;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array;
 
@@ -90,9 +89,8 @@ impl<const N: usize> MulticlaimBuilder<N> {
             .into_par_iter()
             .map(|i| {
                 // Fold contributions from all polynomials for the current index.
-                (0..N).fold(BinaryField128b::zero(), |p, j| {
-                    p + self.polys[j][i] * gamma_pows[128 * j]
-                })
+                (0..N)
+                    .fold(BinaryField128b::ZERO, |p, j| p + self.polys[j][i] * gamma_pows[128 * j])
             })
             .collect();
 
@@ -100,7 +98,7 @@ impl<const N: usize> MulticlaimBuilder<N> {
         let openings: Vec<_> = (0..128)
             .map(|i| {
                 // Fold contributions from all openings for the current Frobenius point.
-                (0..N).fold(BinaryField128b::zero(), |o, j| {
+                (0..N).fold(BinaryField128b::ZERO, |o, j| {
                     o + self.openings[i + j * 128] * gamma_pows[128 * j]
                 })
             })
@@ -116,7 +114,6 @@ mod tests {
     use super::*;
     use hashcaster_poly::point::{Point, Points};
     use hashcaster_primitives::binary_field::BinaryField128b;
-    use num_traits::Zero;
 
     #[test]
     fn test_multiclaim_builder_default() {
@@ -259,7 +256,7 @@ mod tests {
         assert_eq!(claim.object.p_polys, [poly.into()]);
 
         // Compute the expected claim value manually
-        let mut expected_claim = BinaryField128b::zero();
+        let mut expected_claim = BinaryField128b::ZERO;
         for i in 0..128 {
             expected_claim += (openings[i] + openings[i + 128] * gamma_pows[128]) * gamma_pows[i];
         }
