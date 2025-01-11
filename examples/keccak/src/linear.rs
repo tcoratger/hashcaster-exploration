@@ -1,14 +1,69 @@
+use std::array;
+
 use crate::{matrix::composition::CombinedMatrix, rho_pi::RhoPi, theta::Theta};
+use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
 use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use num_traits::Zero;
 
-/// A combined linear operation for Keccak, integrating RhoPi and Theta transformations.
+/// A linear operator combining the RhoPi and Theta transformations for the Keccak permutation.
 ///
 /// ## Overview
-/// - `KeccakLinear` encapsulates the RhoPi and Theta transformations as a single linear operator.
-/// - These transformations are part of the Keccak permutation, ensuring diffusion and mixing.
+/// - `KeccakLinearUnbatched` encapsulates the RhoPi and Theta transformations as a single combined
+///   linear operator.
+/// - These transformations are core components of the Keccak permutation, responsible for ensuring
+///   state mixing and diffusion.
+///
+/// ## Structure
+/// - The `CombinedMatrix` struct combines the RhoPi transformation, which rearranges and rotates
+///   state elements, with the Theta transformation, which applies column-wise parity adjustments.
 #[derive(Debug)]
-pub struct KeccakLinear(CombinedMatrix<RhoPi, Theta>);
+pub struct KeccakLinearUnbatched(CombinedMatrix<RhoPi, Theta>);
+
+impl Default for KeccakLinearUnbatched {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeccakLinearUnbatched {
+    /// Creates a new `KeccakLinearUnbatched` operator by combining RhoPi and Theta transformations.
+    ///
+    /// ## Returns
+    /// - A new `KeccakLinearUnbatched` instance.
+    pub fn new() -> Self {
+        Self(CombinedMatrix::new(RhoPi {}, Theta::new()))
+    }
+}
+
+impl LinearOperations for KeccakLinearUnbatched {
+    fn n_in(&self) -> usize {
+        self.0.n_in()
+    }
+
+    fn n_out(&self) -> usize {
+        self.0.n_out()
+    }
+
+    fn apply(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
+        self.0.apply(input, output);
+    }
+
+    fn apply_transposed(&self, input: &[BinaryField128b], output: &mut [BinaryField128b]) {
+        self.0.apply_transposed(input, output);
+    }
+}
+
+/// A batched implementation of the Keccak linear operator.
+///
+/// ## Overview
+/// - `KeccakLinear` extends `KeccakLinearUnbatched` by introducing a structured mapping between
+///   flattened input/output states and internal intermediate states.
+///
+/// ## Features
+/// - Handles the flattened 5x1024 Keccak state with efficient transformations.
+/// - Provides utility functions for creating, applying, and validating transformations.
+#[derive(Debug)]
+pub struct KeccakLinear(KeccakLinearUnbatched);
 
 impl Default for KeccakLinear {
     fn default() -> Self {
@@ -17,13 +72,12 @@ impl Default for KeccakLinear {
 }
 
 impl KeccakLinear {
-    /// Creates a new instance of `KeccakLinear` by combining RhoPi and Theta transformations.
+    /// Creates a new instance of `KeccakLinear` using the combined RhoPi and Theta transformations.
     ///
     /// ## Returns
     /// - A new `KeccakLinear` instance.
     pub fn new() -> Self {
-        // Combine RhoPi and Theta transformations using `CombinedMatrix`.
-        Self(CombinedMatrix::new(RhoPi {}, Theta::new()))
+        Self(KeccakLinearUnbatched::new())
     }
 }
 
@@ -121,9 +175,83 @@ impl LinearOperations for KeccakLinear {
     }
 }
 
+/// Implementation of Keccak linear round witness computation.
+///
+/// ## Overview
+/// This function processes a series of input blocks using the `KeccakLinearUnbatched` operator,
+/// applying the Keccak linear round transformations batch by batch.
+///
+/// ## Parameters
+/// - `input`: A fixed-size array of 5 slices, each representing a segment of the Keccak state.
+///
+/// ## Returns
+/// - A fixed-size array of 5 vectors, each containing the transformed output.
+///
+/// ## Assumptions
+/// - All input slices must have the same length (`l`), which must be a multiple of 1024.
+///
+/// ## Steps
+/// 1. Validate input lengths and divisibility.
+/// 2. Initialize the Keccak linear operator and output storage.
+/// 3. Process each batch of 1024 elements, applying transformations sequentially.
+/// 4. Return the transformed output vectors.
+pub fn keccak_linround_witness(
+    input: [&[BinaryField128b]; 5],
+) -> [MultilinearLagrangianPolynomial; 5] {
+    // Get the length of the first input slice.
+    let l = input[0].len();
+
+    // Validate that all input slices have the same length and that the length is a multiple of
+    // 1024.
+    assert!(input.iter().all(|x| x.len() == l) && l % 1024 == 0, "Invalid input length");
+
+    // Initialize the Keccak linear operator.
+    let m = KeccakLinearUnbatched::new();
+
+    // Initialize output vectors, one for each input slice.
+    let mut output =
+        array::from_fn(|_| MultilinearLagrangianPolynomial::from(vec![BinaryField128b::zero(); l]));
+
+    // Process each batch of 1024 elements.
+    (0..l / 1024).for_each(|batch_index| {
+        // Prepare the input state for the current batch.
+        let mut input_state = [[BinaryField128b::zero(); 1600]; 3];
+        input.iter().enumerate().for_each(|(i, block)| {
+            // Map the input slice to the intermediate state representation.
+            (0..3).for_each(|j| {
+                input_state[j][i * 320..(i + 1) * 320].copy_from_slice(
+                    &block[batch_index * 1024 + j * 320..batch_index * 1024 + (j + 1) * 320],
+                );
+            });
+        });
+
+        // Initialize the output state for the current batch.
+        let mut output_state = [[BinaryField128b::zero(); 1600]; 3];
+
+        // Apply the Keccak linear operator to each part of the state.
+        (0..3).for_each(|j| m.apply(&input_state[j], &mut output_state[j]));
+
+        // Map the transformed output state back to the flattened output vectors.
+        output.iter_mut().enumerate().for_each(|(i, block)| {
+            (0..3).for_each(|j| {
+                block[batch_index * 1024 + j * 320..batch_index * 1024 + (j + 1) * 320]
+                    .copy_from_slice(&output_state[j][i * 320..(i + 1) * 320]);
+            });
+        });
+    });
+
+    // Return the transformed output vectors.
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hashcaster_lincheck::{builder::LinCheckBuilder, prodcheck::ProdCheckOutput};
+    use hashcaster_poly::{
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    };
     use num_traits::MulAdd;
 
     #[test]
@@ -179,5 +307,146 @@ mod tests {
         // - This test verifies that the transpose operation is correctly implemented and maintains
         //   the mathematical properties of a linear operator.
         assert_eq!(lhs, rhs);
+    }
+
+    #[test]
+    fn test_keccak_linround_witness_against_keccak_linear() {
+        // Define the number of batches (e.g., 2) and the size of each batch (1024 elements).
+        const NUM_BATCHES: usize = 2;
+        const BATCH_SIZE: usize = 1024;
+
+        // Create a new instance of the KeccakLinear operator.
+        let keccak_linear = KeccakLinear::new();
+
+        // Generate random input data for all 5 inputs.
+        let input_data: [Vec<_>; 5] = array::from_fn(|_| {
+            (0..NUM_BATCHES * BATCH_SIZE).map(|_| BinaryField128b::random()).collect()
+        });
+
+        // Create slices for the input to `keccak_linround_witness`.
+        let input_slices: [_; 5] = [
+            input_data[0].as_slice(),
+            input_data[1].as_slice(),
+            input_data[2].as_slice(),
+            input_data[3].as_slice(),
+            input_data[4].as_slice(),
+        ];
+
+        // Call the `keccak_linround_witness` function.
+        let witness_output = keccak_linround_witness(input_slices);
+
+        // Validate against `KeccakLinear` transformation.
+        for batch_index in 0..NUM_BATCHES {
+            // Flatten the input for this batch.
+            let mut flat_input = vec![BinaryField128b::zero(); 5 * BATCH_SIZE];
+            for i in 0..5 {
+                flat_input[i * BATCH_SIZE..(i + 1) * BATCH_SIZE].copy_from_slice(
+                    &input_slices[i][batch_index * BATCH_SIZE..(batch_index + 1) * BATCH_SIZE],
+                );
+            }
+
+            // Apply the KeccakLinear transformation.
+            let mut flat_output = vec![BinaryField128b::zero(); 5 * BATCH_SIZE];
+            keccak_linear.apply(&flat_input, &mut flat_output);
+
+            // Validate that the flattened output matches the corresponding witness output.
+            for i in 0..5 {
+                assert_eq!(
+                    flat_output[i * BATCH_SIZE..(i + 1) * BATCH_SIZE],
+                    witness_output[i][batch_index * BATCH_SIZE..(batch_index + 1) * BATCH_SIZE]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_keccak_lincheck() {
+        // Setup the number of variables
+        const NUM_VARS: usize = 20;
+
+        // Setup the number of active variables
+        const NUM_ACTIVE_VARS: usize = 10;
+
+        // Setup the phase switch parameter
+        const PHASE_SWITCH: usize = 5;
+
+        // Setup a Keccak linear matrix
+        let keccak_linear = KeccakLinear::new();
+
+        // Setup NUM_VARS random points
+        let points: Points =
+            (0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect::<Vec<_>>().into();
+
+        // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
+        let polys: [MultilinearLagrangianPolynomial; 5] = array::from_fn(|_| {
+            (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into()
+        });
+
+        // Apply the Keccak linear round witness computation
+        let m_p = keccak_linround_witness(array::from_fn(|i| polys[i].as_slice()));
+
+        // Compute the initial claims
+        let initial_claims: [_; 5] = array::from_fn(|i| m_p[i].evaluate_at(&points));
+
+        // Setup the lincheck prover
+        let prover = LinCheckBuilder::new(
+            polys.clone(),
+            points.clone(),
+            keccak_linear,
+            NUM_ACTIVE_VARS,
+            initial_claims,
+        );
+
+        // Setup a random gamma for folding
+        let gamma = Point(BinaryField128b::random());
+
+        // Build the prover
+        let mut prover = prover.build(&gamma);
+
+        // Claim to be updated during the main loop
+        let mut claim = UnivariatePolynomial::from(initial_claims.to_vec()).evaluate_at(&gamma);
+
+        // Empty vector to store challenges
+        let mut challenges = Points(Vec::new());
+
+        // Main loop
+        for _ in 0..NUM_ACTIVE_VARS {
+            // Compute the round polynomial
+            let round_poly = prover.compute_round_polynomial().coeffs(claim);
+
+            // Generate a random challenge
+            let challenge = Point(BinaryField128b::random());
+
+            // Update the claim
+            claim = round_poly[0] +
+                round_poly[1] * *challenge +
+                round_poly[2] * *challenge * *challenge;
+
+            // Bind the challenge
+            prover.bind(&challenge);
+
+            // Store the challenge
+            challenges.push(challenge);
+        }
+
+        // Fetch the final evaluations
+        let ProdCheckOutput { p_evaluations, q_evaluations } = prover.finish();
+
+        // Compute the expected claim
+        let expected_claim = p_evaluations
+            .iter()
+            .zip(q_evaluations.iter())
+            .map(|(a, b)| *a * b)
+            .fold(BinaryField128b::zero(), |a, b| a + b);
+
+        // Validate the claim
+        assert_eq!(claim, expected_claim);
+
+        // Extend the challenges with points beyond the active variables
+        challenges.extend(points[NUM_ACTIVE_VARS..].iter().cloned());
+
+        for i in 0..5 {
+            assert_eq!(p_evaluations[i], polys[i].evaluate_at(&challenges));
+        }
     }
 }

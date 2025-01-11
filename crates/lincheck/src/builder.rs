@@ -4,9 +4,7 @@ use hashcaster_poly::{
     point::{Point, Points},
     univariate::UnivariatePolynomial,
 };
-use hashcaster_primitives::{
-    binary_field::BinaryField128b, linear_trait::LinearOperations, matrix_lin::MatrixLinear,
-};
+use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use num_traits::Zero;
 use std::array;
 
@@ -16,9 +14,9 @@ use std::array;
 /// - `N`: Number of input polynomials.
 /// - `M`: Number of output claims.
 #[derive(Clone, Debug)]
-pub struct LinCheckBuilder<const N: usize, const M: usize> {
+pub struct LinCheckBuilder<const N: usize, const M: usize, L: LinearOperations> {
     /// Linear transformation matrix applied to the polynomial coefficients.
-    matrix: MatrixLinear,
+    matrix: L,
     /// Input polynomials to be evaluated.
     polys: [MultilinearLagrangianPolynomial; N],
     /// Points for polynomial evaluation.
@@ -31,7 +29,9 @@ pub struct LinCheckBuilder<const N: usize, const M: usize> {
     initial_claims: [BinaryField128b; M],
 }
 
-impl<const N: usize, const M: usize> Default for LinCheckBuilder<N, M> {
+impl<const N: usize, const M: usize, L: LinearOperations + Default> Default
+    for LinCheckBuilder<N, M, L>
+{
     fn default() -> Self {
         Self {
             matrix: Default::default(),
@@ -44,7 +44,7 @@ impl<const N: usize, const M: usize> Default for LinCheckBuilder<N, M> {
     }
 }
 
-impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
+impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, L> {
     /// Constructs a new `LinCheckBuilder` instance.
     ///
     /// # Parameters
@@ -60,7 +60,7 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
     pub fn new(
         polys: [MultilinearLagrangianPolynomial; N],
         points: Points,
-        matrix: MatrixLinear,
+        matrix: L,
         num_active_vars: usize,
         initial_claims: [BinaryField128b; M],
     ) -> Self {
@@ -168,12 +168,14 @@ impl<const N: usize, const M: usize> LinCheckBuilder<N, M> {
 
 #[cfg(test)]
 mod tests {
+    use hashcaster_primitives::matrix_lin::MatrixLinear;
+
     use super::*;
 
     #[test]
     fn test_default_lincheck() {
         // Create a default LinCheckBuilder instance
-        let lincheck: LinCheckBuilder<2, 2> = LinCheckBuilder::default();
+        let lincheck: LinCheckBuilder<2, 2, MatrixLinear> = LinCheckBuilder::default();
 
         // Verify default values
         assert_eq!(lincheck.num_vars, 0);
