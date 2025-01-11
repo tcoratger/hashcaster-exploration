@@ -426,11 +426,12 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
                 let frob_idx = idx % 128;
                 poly_coords[(poly_idx * 128 + frob_idx) * base_index]
             })
-            .collect::<Vec<_>>()
-            .into();
+            .collect::<Evaluations>();
 
         // Apply the twist operation to each chunk of 128 evaluations.
-        frob_evals.chunks_mut(128).for_each(|chunk| Evaluations::from(chunk.to_vec()).twist());
+        frob_evals
+            .chunks_exact_mut(128)
+            .for_each(|chunk| Evaluations::from(chunk.to_vec()).twist());
 
         // Return the `BoolCheckOutput`
         BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
@@ -519,13 +520,13 @@ mod tests {
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
         let p: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
         let q: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
 
         // Start a timer to measure the execution time of the test.
         let start = std::time::Instant::now();
@@ -618,11 +619,10 @@ mod tests {
         let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
 
         // Transform vector of Field elements to Points
-        let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
+        let points: Points = points.iter().map(|p| Point::from(*p)).collect();
 
         // Transform random values to Points
-        let random_values: Points =
-            random_values.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
+        let random_values: Points = random_values.iter().map(|p| Point::from(*p)).collect();
 
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&random_values).0;
@@ -645,11 +645,11 @@ mod tests {
 
         // Generate a vector `p` with 2^num_vars elements.
         let p: MultilinearLagrangianPolynomial =
-            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect();
 
         // Generate another vector `q` with 2^num_vars elements.
         let q: MultilinearLagrangianPolynomial =
-            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect();
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -961,12 +961,10 @@ mod tests {
             vec![BinaryField128b::new(1), BinaryField128b::new(2), BinaryField128b::new(3)];
 
         // Generate a vector `p` with 2^3 = 8 elements.
-        let p: MultilinearLagrangianPolynomial =
-            (0..8).map(BinaryField128b::new).collect::<Vec<_>>().into();
+        let p: MultilinearLagrangianPolynomial = (0..8).map(BinaryField128b::new).collect();
 
         // Generate another vector `q` with 2^3 = 8 elements.
-        let q: MultilinearLagrangianPolynomial =
-            (10..18).map(BinaryField128b::new).collect::<Vec<_>>().into();
+        let q: MultilinearLagrangianPolynomial = (10..18).map(BinaryField128b::new).collect();
 
         // Compute the element-wise AND operation between `p` and `q`.
         let p_and_q = p.clone() & q.clone();
@@ -1249,7 +1247,7 @@ mod tests {
     #[test]
     fn test_number_variables_with_large_number_of_points() {
         // Generate a large number of points (e.g., 1000 points).
-        let points: Vec<BinaryField128b> = (0..1000).map(BinaryField128b::from).collect();
+        let points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
 
         // Create a BoolCheck instance with these points.
         let bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {

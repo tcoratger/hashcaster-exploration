@@ -168,6 +168,12 @@ impl<'a> IntoIterator for &'a MultilinearLagrangianPolynomial {
     }
 }
 
+impl FromIterator<BinaryField128b> for MultilinearLagrangianPolynomial {
+    fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
+        Self { coeffs: iter.into_iter().collect() }
+    }
+}
+
 impl From<Vec<BinaryField128b>> for MultilinearLagrangianPolynomial {
     fn from(coeffs: Vec<BinaryField128b>) -> Self {
         Self::new(coeffs)
@@ -536,9 +542,7 @@ mod tests {
         for _ in 0..iterations {
             // Step 1: Generate random points for the test.
             let num_points = rng.gen_range(2..6); // Random number of points between 2 and 5.
-            let points = Points::from(
-                (0..num_points).map(|_| BinaryField128b::random()).collect::<Vec<_>>(),
-            );
+            let points: Points = (0..num_points).map(|_| BinaryField128b::random()).collect();
 
             // Step 2: Compute the equality polynomial using `new_eq_poly`.
             let result = points.to_eq_poly();
@@ -705,16 +709,15 @@ mod tests {
         let num_vars_to_restrict = 4;
 
         // Define the restriction points.
-        let points: Points =
-            (0..num_vars_to_restrict).map(BinaryField128b::new).collect::<Vec<_>>().into();
+        let points: Points = (0..num_vars_to_restrict).map(BinaryField128b::new).collect();
 
         // Define three multilinear polynomials.
         let poly0: MultilinearLagrangianPolynomial =
-            (0..(1 << num_vars)).map(BinaryField128b::new).collect::<Vec<_>>().into();
+            (0..(1 << num_vars)).map(BinaryField128b::new).collect();
         let poly1: MultilinearLagrangianPolynomial =
-            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 1)).collect::<Vec<_>>().into();
+            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 1)).collect();
         let poly2: MultilinearLagrangianPolynomial =
-            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 2)).collect::<Vec<_>>().into();
+            (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 2)).collect();
 
         // Create a sequence of multilinear polynomials.
         let polynomials = MultilinearLagrangianPolynomials(vec![poly0, poly1, poly2]);

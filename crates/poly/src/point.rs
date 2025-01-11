@@ -301,6 +301,18 @@ impl DerefMut for Points {
     }
 }
 
+impl FromIterator<Point> for Points {
+    fn from_iter<T: IntoIterator<Item = Point>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl FromIterator<BinaryField128b> for Points {
+    fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
+        Self(iter.into_iter().map(Point::from).collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,7 +485,7 @@ mod tests {
     #[test]
     fn test_eq_poly_sequence_cross_check() {
         // Generate a random vector of 20 points in the finite field.
-        let points = Points::from((0..20).map(|_| BinaryField128b::random()).collect::<Vec<_>>());
+        let points: Points = (0..20).map(|_| BinaryField128b::random()).collect();
 
         // Compute the equality polynomial sequence for the points.
         let eq_sequence = points.to_eq_poly_sequence();

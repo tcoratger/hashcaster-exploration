@@ -368,13 +368,11 @@ mod tests {
         let keccak_linear = KeccakLinear::new();
 
         // Setup NUM_VARS random points
-        let points: Points =
-            (0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect::<Vec<_>>().into();
+        let points: Points = (0..NUM_VARS).map(|_| BinaryField128b::random()).collect();
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
-        let polys: [MultilinearLagrangianPolynomial; 5] = array::from_fn(|_| {
-            (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into()
-        });
+        let polys: [MultilinearLagrangianPolynomial; 5] =
+            array::from_fn(|_| (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect());
 
         // Apply the Keccak linear round witness computation
         let m_p = keccak_linround_witness(array::from_fn(|i| polys[i].as_slice()));

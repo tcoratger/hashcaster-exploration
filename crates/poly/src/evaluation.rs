@@ -165,6 +165,12 @@ impl DerefMut for Evaluations {
     }
 }
 
+impl FromIterator<BinaryField128b> for Evaluations {
+    fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,8 +191,7 @@ mod tests {
                 // Return the previous value of `r`.
                 res
             })
-            .collect::<Vec<_>>()
-            .into();
+            .collect();
 
         // Iterate over each index `i` in the range [0, 127].
         (0..128).for_each(|i| {
@@ -235,8 +240,7 @@ mod tests {
     fn test_pi_alternating() {
         let orbit: Evaluations = (0..128)
             .map(|i| if i % 2 == 0 { BinaryField128b::ONE } else { BinaryField128b::ZERO })
-            .collect::<Vec<_>>()
-            .into();
+            .collect();
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected = cobasis
@@ -252,8 +256,7 @@ mod tests {
 
     #[test]
     fn test_pi_random_orbit() {
-        let orbit: Evaluations =
-            (0..128).map(|_| BinaryField128b::random()).collect::<Vec<_>>().into();
+        let orbit: Evaluations = (0..128).map(|_| BinaryField128b::random()).collect();
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
@@ -267,8 +270,7 @@ mod tests {
     #[test]
     fn twist_untwist() {
         // Generate a random set of 128 evaluations.
-        let lhs: Evaluations =
-            Evaluations::from((0..128).map(|_| BinaryField128b::random()).collect::<Vec<_>>());
+        let lhs: Evaluations = (0..128).map(|_| BinaryField128b::random()).collect();
 
         // Clone `lhs` to create an independent copy for transformation.
         let mut rhs = lhs.clone();

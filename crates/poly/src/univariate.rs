@@ -157,7 +157,7 @@ impl Mul<Point> for UnivariatePolynomial {
     type Output = Self;
 
     fn mul(self, point: Point) -> Self::Output {
-        self.iter().map(|&c| c * *point).collect::<Vec<_>>().into()
+        self.iter().map(|&c| c * *point).collect()
     }
 }
 
@@ -165,7 +165,7 @@ impl Mul<&Point> for UnivariatePolynomial {
     type Output = Self;
 
     fn mul(self, point: &Point) -> Self::Output {
-        self.iter().map(|&c| c * **point).collect::<Vec<_>>().into()
+        self.iter().map(|&c| c * **point).collect()
     }
 }
 
@@ -202,6 +202,12 @@ impl Deref for UnivariatePolynomial {
 impl DerefMut for UnivariatePolynomial {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.coeffs
+    }
+}
+
+impl FromIterator<BinaryField128b> for UnivariatePolynomial {
+    fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
+        Self { coeffs: iter.into_iter().collect() }
     }
 }
 

@@ -284,8 +284,7 @@ impl<const N: usize> ProdCheck<N> {
                     // Extract the single value from the polynomial.
                     p[0]
                 })
-                .collect::<Vec<_>>()
-                .into(),
+                .collect(),
             q_evaluations: self
                 .q_polys
                 .iter()
@@ -295,8 +294,7 @@ impl<const N: usize> ProdCheck<N> {
                     // Extract the single value from the polynomial.
                     q[0]
                 })
-                .collect::<Vec<_>>()
-                .into(),
+                .collect(),
         }
     }
 }
@@ -792,14 +790,14 @@ mod tests {
 
         // Generate random polynomials for `p_polys` and `q_polys`.
         // Each polynomial has `2^NUM_VARS` evaluations.
-        let p_polys: [MultilinearLagrangianPolynomial; N] = array::from_fn(|_| {
+        let p_polys: [_; N] = array::from_fn(|_| {
             MultilinearLagrangianPolynomial::new(
                 // Create a vector of random field elements of length `2^NUM_VARS`.
                 (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
             )
         });
 
-        let q_polys: [MultilinearLagrangianPolynomial; N] = array::from_fn(|_| {
+        let q_polys: [_; N] = array::from_fn(|_| {
             MultilinearLagrangianPolynomial::new(
                 // Create another vector of random field elements for `q_polys`.
                 (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),

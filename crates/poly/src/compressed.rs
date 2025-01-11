@@ -64,11 +64,7 @@ impl CompressedPoly {
         // - Add `c1`,
         // - Append the remaining coefficients from the compressed form.
         // Example: Result = [3, 7, 5, 6].
-        std::iter::once(c0)
-            .chain(std::iter::once(c1))
-            .chain(self[1..].iter().copied())
-            .collect::<Vec<_>>()
-            .into()
+        std::iter::once(c0).chain(std::iter::once(c1)).chain(self[1..].iter().copied()).collect()
     }
 }
 

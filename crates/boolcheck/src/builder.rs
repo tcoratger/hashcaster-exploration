@@ -599,13 +599,13 @@ mod tests {
         // Generate test data for the input tables
         // Table1: Contains consecutive integers starting at 0 up to 7.
         let table1: MultilinearLagrangianPolynomial =
-            (0u128..(1 << dims)).map(Into::into).collect::<Vec<_>>().into();
+            (0u128..(1 << dims)).map(Into::into).collect();
         // Table2: Contains integers starting at 10 up to 17.
         let table2: MultilinearLagrangianPolynomial =
-            (10u128..(10 + (1 << dims))).map(Into::into).collect::<Vec<_>>().into();
+            (10u128..(10 + (1 << dims))).map(Into::into).collect();
         // Table3: Contains integers starting at 20 up to 27.
         let table3: MultilinearLagrangianPolynomial =
-            (20u128..(20 + (1 << dims))).map(Into::into).collect::<Vec<_>>().into();
+            (20u128..(20 + (1 << dims))).map(Into::into).collect();
 
         // Combine the three tables into an array.
         let tabs = [table1, table2, table3];

@@ -245,18 +245,15 @@ mod tests {
         );
 
         // Create points for evaluation
-        let points = Points::from(
-            (0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect::<Vec<_>>(),
-        );
+        let points: Points = (0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect();
 
         // Map the points to the inverse Frobenius orbit
-        let points_inv_orbit: Vec<Points> = (0..128)
-            .map(|i| points.iter().map(|x| Point(x.frobenius(-i))).collect::<Vec<_>>().into())
-            .collect();
+        let points_inv_orbit: Vec<Points> =
+            (0..128).map(|i| points.iter().map(|x| Point(x.frobenius(-i))).collect()).collect();
 
         // Evaluate the polynomial at the points on the inverse Frobenius orbit
         let evaluations_inv_orbit: Evaluations =
-            (0..128).map(|i| poly.evaluate_at(&points_inv_orbit[i])).collect::<Vec<_>>().into();
+            (0..128).map(|i| poly.evaluate_at(&points_inv_orbit[i])).collect();
 
         // Setup a multiclaim builder
         let prover_builder =

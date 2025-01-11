@@ -16,10 +16,7 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
     // Generate test data for the input tables
     let tables: [MultilinearLagrangianPolynomial; N] = array::from_fn(|i| {
         #[allow(clippy::cast_sign_loss)]
-        (i as u128 * 10..i as u128 * 10 + table_size as u128)
-            .map(BinaryField128b::from)
-            .collect::<Vec<_>>()
-            .into()
+        (i as u128 * 10..i as u128 * 10 + table_size as u128).map(BinaryField128b::from).collect()
     });
 
     // Create a BoolCheckBuilder instance with test data

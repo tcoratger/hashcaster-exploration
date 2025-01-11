@@ -111,7 +111,7 @@ mod tests {
         ];
 
         // Flatten the 2D vector into a single vector
-        let flattened_matrix: Vec<BinaryField128b> = matrix_rows.into_iter().flatten().collect();
+        let flattened_matrix: Vec<_> = matrix_rows.into_iter().flatten().collect();
 
         // Create the identity matrix with 2 inputs and 2 outputs
         let matrix = MatrixLinear::new(2, 2, flattened_matrix);
@@ -144,7 +144,7 @@ mod tests {
         ];
 
         // Flatten the 2D vector into a single vector
-        let flattened_matrix: Vec<BinaryField128b> = matrix_rows.into_iter().flatten().collect();
+        let flattened_matrix: Vec<_> = matrix_rows.into_iter().flatten().collect();
 
         // Create the matrix with 2 inputs and 3 outputs
         let matrix = MatrixLinear::new(2, 3, flattened_matrix);
@@ -180,7 +180,7 @@ mod tests {
         ];
 
         // Flatten the 2D vector into a single vector
-        let flattened_matrix: Vec<BinaryField128b> = matrix_rows.into_iter().flatten().collect();
+        let flattened_matrix: Vec<_> = matrix_rows.into_iter().flatten().collect();
 
         // Create the matrix with 2 inputs and 3 outputs
         let matrix = MatrixLinear::new(2, 3, flattened_matrix);
@@ -211,7 +211,7 @@ mod tests {
         ];
 
         // Flatten the 2D vector into a single vector
-        let flattened_matrix: Vec<BinaryField128b> = matrix_rows.into_iter().flatten().collect();
+        let flattened_matrix: Vec<_> = matrix_rows.into_iter().flatten().collect();
 
         // Create the identity matrix with 2 inputs and 2 outputs
         let matrix = MatrixLinear::new(2, 2, flattened_matrix);
@@ -235,7 +235,7 @@ mod tests {
         ];
 
         // Flatten the 2D vector into a single vector
-        let flattened_matrix: Vec<BinaryField128b> = matrix_rows.into_iter().flatten().collect();
+        let flattened_matrix: Vec<_> = matrix_rows.into_iter().flatten().collect();
 
         // Create the identity matrix with 2 inputs and 2 outputs
         let matrix = MatrixLinear::new(2, 2, flattened_matrix);
