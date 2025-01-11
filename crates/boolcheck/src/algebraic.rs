@@ -10,7 +10,9 @@ pub trait AlgebraicOps<const I: usize, const O: usize> {
     /// Performs an algebraic evaluation based on the provided data and indices.
     fn algebraic(
         &self,
-        data: [impl Index<usize, Output = BinaryField128b>; 4],
+        data: &[BinaryField128b],
+        idx_a: usize,
+        offset: usize,
     ) -> [[BinaryField128b; O]; 3];
 
     /// Executes the linear part of a boolean formulas.

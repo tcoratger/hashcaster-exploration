@@ -1,5 +1,4 @@
-use algebraic::{AlgebraicOps, StrideMode, StrideWrapper};
-use and::AndPackage;
+use algebraic::AlgebraicOps;
 use hashcaster_poly::{
     compressed::CompressedPoly,
     evaluation::Evaluations,
@@ -9,18 +8,16 @@ use hashcaster_poly::{
 };
 use hashcaster_primitives::binary_field::BinaryField128b;
 use num_traits::{One, Zero};
-use package::BooleanPackage;
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
-use std::{array, ops::Index};
+use std::array;
 
 pub mod algebraic;
 pub mod and;
 pub mod bool_trait;
 pub mod builder;
-pub mod package;
 pub mod ternary_mapping;
 
 /// A struct representing Boolean check protocol.
@@ -33,7 +30,7 @@ pub mod ternary_mapping;
 /// - `N`: The number of multilinear polynomials used in the protocol.
 /// - `M`: The number of folding challenges (gammas) used for compression.
 #[derive(Clone, Debug)]
-pub struct BoolCheck<const N: usize, const M: usize> {
+pub struct BoolCheck<const N: usize, const M: usize, A: AlgebraicOps<N, M>> {
     /// The evaluation points for the multilinear polynomials.
     pub points: Points,
 
@@ -64,14 +61,16 @@ pub struct BoolCheck<const N: usize, const M: usize> {
     /// The current claim being verified in the protocol.
     pub claim: BinaryField128b,
 
-    /// The Boolean package specifying the operation (e.g., AND) being performed.
-    pub boolean_package: BooleanPackage,
-
     /// An array of folding challenges used for polynomial compression.
     pub gammas: [BinaryField128b; M],
+
+    /// Abstract algebraic operations.
+    pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize> Default for BoolCheck<N, M> {
+impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
+    for BoolCheck<N, M, A>
+{
     fn default() -> Self {
         Self {
             points: Points::default(),
@@ -84,13 +83,13 @@ impl<const N: usize, const M: usize> Default for BoolCheck<N, M> {
             eq_sequence: MultilinearLagrangianPolynomials::default(),
             round_polys: Vec::new(),
             claim: BinaryField128b::zero(),
-            boolean_package: BooleanPackage::And,
             gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         }
     }
 }
 
-impl<const N: usize, const M: usize> BoolCheck<N, M> {
+impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCheck<N, M, A> {
     /// Returns the current round of the protocol.
     ///
     /// The current round is represented by the number of challenges that have been submitted to the
@@ -252,25 +251,8 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    let offset = 1 << (number_variables - self.c - 1);
-                    let arr = &poly_coords[2 * i..];
-                    self.compute_algebraic([
-                        StrideWrapper { arr, start: 0, offset, mode: StrideMode::Wrapper0 },
-                        StrideWrapper {
-                            arr,
-                            start: 128 * offset,
-                            offset,
-                            mode: StrideMode::Wrapper0,
-                        },
-                        StrideWrapper { arr, start: 0, offset, mode: StrideMode::Wrapper1 },
-                        StrideWrapper {
-                            arr,
-                            start: 128 * offset,
-                            offset,
-                            mode: StrideMode::Wrapper1,
-                        },
-                    ])
-                    .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic(poly_coords, i, 1 << (number_variables - self.c - 1))
+                        .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(
                     || [BinaryField128b::zero(); 3],
@@ -335,19 +317,25 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
 
     pub fn compute_algebraic(
         &self,
-        data: [impl Index<usize, Output = BinaryField128b>; 4],
+        data: &[BinaryField128b],
+        idx_a: usize,
+        offset: usize,
     ) -> [BinaryField128b; 3] {
-        match self.boolean_package {
-            BooleanPackage::And => {
-                // Compute the AND operation using the `AndPackage`.
-                let acc = AndPackage::<N, 1>.algebraic(data);
+        // Compute the algebraic operations for the given data slice.
+        let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
 
-                // Compress results using gammas.
-                //
-                // Gamma is a folding factor that is used to compress the polynomial.
-                [acc[0][0] * self.gammas[0], acc[1][0] * self.gammas[0], acc[2][0] * self.gammas[0]]
-            }
+        // Initialize the accumulators for each of the 3 output values to zero.
+        let mut acc = [BinaryField128b::zero(); 3];
+
+        // Iterate over the output size `M` and compute the folded sums for each output value.
+        for i in 0..M {
+            acc[0] += tmp[0][i] * self.gammas[i];
+            acc[1] += tmp[1][i] * self.gammas[i];
+            acc[2] += tmp[2][i] * self.gammas[i];
         }
+
+        // Return the array of compressed results.
+        acc
     }
 
     pub fn bind(&mut self, r: &Point) {
@@ -436,17 +424,17 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
 
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - c - 1);
-        let mut frob_evals: Vec<Evaluations> = self
-            .polys
-            .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                (0..128).map(|j| poly_coords[(i * 128 + j) * base_index]).collect::<Vec<_>>().into()
+        let mut frob_evals: Evaluations = (0..128 * self.polys.len())
+            .map(|idx| {
+                let poly_idx = idx / 128;
+                let frob_idx = idx % 128;
+                poly_coords[(poly_idx * 128 + frob_idx) * base_index]
             })
-            .collect();
+            .collect::<Vec<_>>()
+            .into();
 
-        // For each chunk of 128 evaluations, apply the twist operation.
-        frob_evals.iter_mut().for_each(hashcaster_poly::evaluation::Evaluations::twist);
+        // Apply the twist operation to each chunk of 128 evaluations.
+        frob_evals.chunks_mut(128).for_each(|chunk| Evaluations::from(chunk.to_vec()).twist());
 
         // Return the `BoolCheckOutput`
         BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
@@ -455,8 +443,8 @@ impl<const N: usize, const M: usize> BoolCheck<N, M> {
 
 #[derive(Clone, Debug, Default)]
 pub struct BoolCheckOutput {
-    /// A vector containing the evaluations of the polynomials on a Frobenius subdomain.
-    pub frob_evals: Vec<Evaluations>,
+    /// Evaluations of the polynomials on a Frobenius subdomain.
+    pub frob_evals: Evaluations,
 
     /// A vector of compressed polynomials computed during the protocol's rounds.
     pub round_polys: Vec<CompressedPoly>,
@@ -465,16 +453,15 @@ pub struct BoolCheckOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use algebraic::{StrideMode, StrideWrapper};
+    use and::AndPackage;
     use builder::BoolCheckBuilder;
     use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
-    use package::BooleanPackage;
 
     #[test]
     fn test_current_rounds() {
         // Define a sample BoolCheck instance.
         // No challenges have been submitted yet.
-        let mut bool_check = BoolCheck::<0, 0>::default();
+        let mut bool_check = BoolCheck::<0, 0, AndPackage<0, 0>>::default();
 
         // Assert the initial round (no challenges yet).
         assert_eq!(bool_check.current_round(), 0);
@@ -501,20 +488,25 @@ mod tests {
         // Create a BoolCheck instance with a defined number of points (variables).
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
-        let bool_check = BoolCheck::<0, 0> { points: points.clone().into(), ..Default::default() };
+        let bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {
+            points: points.clone().into(),
+            ..Default::default()
+        };
 
         // Assert that the number of variables matches the length of the points vector.
         assert_eq!(bool_check.number_variables(), points.len());
 
         // Test with no points (empty vector).
         let empty_bool_check =
-            BoolCheck::<0, 0> { points: Points::default(), ..Default::default() };
+            BoolCheck::<0, 0, AndPackage<0, 0>> { points: Points::default(), ..Default::default() };
         assert_eq!(empty_bool_check.number_variables(), 0);
 
         // Test with a large number of points.
         let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
-        let large_bool_check =
-            BoolCheck::<0, 0> { points: large_points.clone().into(), ..Default::default() };
+        let large_bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {
+            points: large_points.clone().into(),
+            ..Default::default()
+        };
         assert_eq!(large_bool_check.number_variables(), large_points.len());
     }
 
@@ -560,9 +552,9 @@ mod tests {
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.clone().into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -616,24 +608,18 @@ mod tests {
         // Finish the protocol and obtain the output.
         let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
-        // Untwist each Frobenius evaluation
-        frob_evals.iter_mut().for_each(hashcaster_poly::evaluation::Evaluations::untwist);
-
-        // Flatten the Frobenius evaluations into a single vector.
-        let mut frob_evals: Vec<BinaryField128b> =
-            frob_evals.iter().flat_map(|eval| eval.clone().into_inner()).collect();
+        // Chunk the Frobenius evaluations and untwist each chunk.
+        frob_evals
+            .as_mut_slice()
+            .chunks_mut(128)
+            .for_each(|chunk| Evaluations::from(chunk.to_vec()).untwist());
 
         // Add a zero element to the end of the evaluations for padding.
         // TODO: hack to be removed in the future
         frob_evals.push(BinaryField128b::zero());
 
         // Compute algebraic AND
-        let and_algebraic = AndPackage::<2, 1>.algebraic([
-            StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
-            StrideWrapper { arr: &frob_evals, start: 128, offset: 1, mode: StrideMode::Wrapper0 },
-            StrideWrapper { arr: &frob_evals, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
-            StrideWrapper { arr: &frob_evals, start: 128, offset: 1, mode: StrideMode::Wrapper1 },
-        ]);
+        let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
 
         // Transform vector of Field elements to Points
         let points: Points = points.iter().map(|p| Point::from(*p)).collect::<Vec<_>>().into();
@@ -687,9 +673,9 @@ mod tests {
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -805,25 +791,12 @@ mod tests {
         // Verify the correctness of the round polynomial cache.
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
 
-        let algebraic_data = (0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>();
-
         // Test an imaginary algorithm execution.
-        let alg_res = boolcheck.compute_algebraic([
-            StrideWrapper { arr: &algebraic_data, start: 0, offset: 1, mode: StrideMode::Wrapper0 },
-            StrideWrapper {
-                arr: &algebraic_data,
-                start: 128,
-                offset: 1,
-                mode: StrideMode::Wrapper0,
-            },
-            StrideWrapper { arr: &algebraic_data, start: 0, offset: 1, mode: StrideMode::Wrapper1 },
-            StrideWrapper {
-                arr: &algebraic_data,
-                start: 128,
-                offset: 1,
-                mode: StrideMode::Wrapper1,
-            },
-        ]);
+        let alg_res = boolcheck.compute_algebraic(
+            &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>(),
+            0,
+            1,
+        );
 
         // Verify the result of the imaginary algorithm execution.
         assert_eq!(
@@ -894,9 +867,9 @@ mod tests {
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -960,9 +933,9 @@ mod tests {
 
         // Create a new `BoolCheckBuilder` instance.
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -1013,9 +986,9 @@ mod tests {
 
         // Create a new `BoolCheckBuilder` instance.
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -1069,9 +1042,9 @@ mod tests {
 
         // Create a new `BoolCheckBuilder` instance.
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [incorrect_claim],
             [p, q],
@@ -1122,9 +1095,9 @@ mod tests {
 
         // Create a new `BoolCheckBuilder` instance.
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],
@@ -1161,7 +1134,7 @@ mod tests {
     #[test]
     fn test_current_round_initial_state() {
         // Create a default BoolCheck instance with no challenges added.
-        let bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Assert that the initial round is 0 because no challenges have been added yet.
         assert_eq!(bool_check.current_round(), 0);
@@ -1170,7 +1143,7 @@ mod tests {
     #[test]
     fn test_current_round_after_single_challenge() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let mut bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Add one challenge to the challenges vector.
         bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
@@ -1182,7 +1155,7 @@ mod tests {
     #[test]
     fn test_current_round_after_multiple_challenges() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let mut bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1198,7 +1171,7 @@ mod tests {
     #[test]
     fn test_current_round_after_removing_challenges() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let mut bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1217,7 +1190,7 @@ mod tests {
     #[test]
     fn test_current_round_with_no_challenges_after_clear() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let mut bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1235,7 +1208,7 @@ mod tests {
     #[test]
     fn test_number_variables_initial_state() {
         // Create a BoolCheck instance with no points defined (default state).
-        let bool_check: BoolCheck<0, 0> = BoolCheck::default();
+        let bool_check: BoolCheck<0, 0, AndPackage<0, 0>> = BoolCheck::default();
 
         // Assert that the number of variables is 0 as no points are defined.
         assert_eq!(bool_check.number_variables(), 0);
@@ -1244,7 +1217,7 @@ mod tests {
     #[test]
     fn test_number_variables_with_single_point() {
         // Create a BoolCheck instance with a single point.
-        let bool_check = BoolCheck::<0, 0> {
+        let bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {
             points: Points::from(vec![BinaryField128b::from(1)]),
             ..Default::default()
         };
@@ -1258,8 +1231,10 @@ mod tests {
         // Create a BoolCheck instance with multiple points.
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
-        let bool_check =
-            BoolCheck::<0, 0> { points: Points::from(points.clone()), ..Default::default() };
+        let bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {
+            points: Points::from(points.clone()),
+            ..Default::default()
+        };
 
         // Assert that the number of variables matches the number of points (3).
         assert_eq!(bool_check.number_variables(), points.len());
@@ -1268,7 +1243,8 @@ mod tests {
     #[test]
     fn test_number_variables_with_empty_points() {
         // Create a BoolCheck instance with an empty points vector.
-        let bool_check = BoolCheck::<0, 0> { points: Points::default(), ..Default::default() };
+        let bool_check =
+            BoolCheck::<0, 0, AndPackage<0, 0>> { points: Points::default(), ..Default::default() };
 
         // Assert that the number of variables is 0 when no points are defined.
         assert_eq!(bool_check.number_variables(), 0);
@@ -1280,8 +1256,10 @@ mod tests {
         let points: Vec<BinaryField128b> = (0..1000).map(BinaryField128b::from).collect();
 
         // Create a BoolCheck instance with these points.
-        let bool_check =
-            BoolCheck::<0, 0> { points: Points::from(points.clone()), ..Default::default() };
+        let bool_check = BoolCheck::<0, 0, AndPackage<0, 0>> {
+            points: Points::from(points.clone()),
+            ..Default::default()
+        };
 
         // Assert that the number of variables matches the number of points (1000).
         assert_eq!(bool_check.number_variables(), points.len());
@@ -1318,9 +1296,9 @@ mod tests {
 
         // Create a new `BoolCheckBuilder` instance.
         let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
             phase_switch,
             points.into(),
-            BooleanPackage::And,
             &Point(gamma),
             [initial_claim],
             [p, q],

@@ -11,6 +11,10 @@ workspace = true
 hashcaster-primitives = { workspace = true }
 hashcaster-poly = { workspace = true }
 hashcaster-lincheck = { workspace = true }
+hashcaster-boolcheck = { workspace = true }
 
 num-traits = { workspace = true }
 rayon = { workspace = true }
+
+[dev-dependencies]
+itertools = { workspace = true }

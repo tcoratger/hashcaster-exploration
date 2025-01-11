@@ -1,6 +1,6 @@
 use crate::{
-    algebraic::AlgebraicOps, and::AndPackage, bool_trait::CompressedFoldedOps,
-    package::BooleanPackage, ternary_mapping::TernaryMapping, BoolCheck,
+    algebraic::AlgebraicOps, bool_trait::CompressedFoldedOps, ternary_mapping::TernaryMapping,
+    BoolCheck,
 };
 use hashcaster_poly::{
     multinear_lagrangian::MultilinearLagrangianPolynomial,
@@ -13,7 +13,7 @@ use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
-use std::{array, ops::Index};
+use std::array;
 
 /// A builder for creating instances of `BoolCheck`.
 ///
@@ -36,7 +36,7 @@ use std::{array, ops::Index};
 /// - Precompute intermediate parameters such as folding challenges and mappings.
 /// - Construct the extended tables and claims required for the `BoolCheck` protocol.
 #[derive(Clone, Debug)]
-pub struct BoolCheckBuilder<const N: usize, const M: usize> {
+pub struct BoolCheckBuilder<const N: usize, const M: usize, A: AlgebraicOps<N, M>> {
     /// The phase switch parameter (`c`).
     ///
     /// This parameter controls the number of initial rounds in the protocol.
@@ -47,12 +47,6 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize> {
     /// A collection of field elements where the Boolean operations are evaluated.
     /// These points represent the input space for the `BoolCheck` protocol.
     pub points: Points,
-
-    /// The Boolean operation package.
-    ///
-    /// Defines the Boolean operation (e.g., AND) to be performed on the polynomials.
-    /// This is specified using the `BooleanPackage` enum.
-    pub boolean_package: BooleanPackage,
 
     /// The folding challenge `gamma`.
     ///
@@ -79,23 +73,31 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize> {
     /// Each polynomial must have a length equal to `2^dim`, where `dim` is the
     /// dimensionality of the input space.
     pub polys: [MultilinearLagrangianPolynomial; N],
+
+    /// Abstract algebraic operations.
+    pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize> Default for BoolCheckBuilder<N, M> {
+impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
+    for BoolCheckBuilder<N, M, A>
+{
     fn default() -> Self {
         Self {
             c: 0,
             points: Default::default(),
-            boolean_package: Default::default(),
             gamma: Default::default(),
             gammas: array::from_fn(|_| Default::default()),
             claims: array::from_fn(|_| Default::default()),
             polys: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         }
     }
 }
 
-impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
+impl<const N: usize, const M: usize, A> BoolCheckBuilder<N, M, A>
+where
+    A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
+{
     /// Creates a new instance of `BoolCheckBuilder`.
     ///
     /// # Parameters
@@ -103,8 +105,6 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
     ///   protocol.
     /// - `points`: A collection of field elements (`Points`) where the Boolean operations are
     ///   evaluated.
-    /// - `boolean_package`: Specifies the type of Boolean operation (e.g., AND) to perform, defined
-    ///   by the `BooleanPackage` enum.
     /// - `gamma`: A reference to a random field element (`Point`) used to compute folding
     ///   challenges.
     /// - `claims`: An array of initial claims (`[BinaryField128b; M]`) for the Boolean operations.
@@ -121,9 +121,9 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
     /// # Notes
     /// - The `gammas` field is computed from the provided `gamma` using a folding strategy.
     pub fn new(
+        algebraic_operations: A,
         c: usize,
         points: Points,
-        boolean_package: BooleanPackage,
         gamma: &Point,
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
@@ -136,11 +136,11 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         Self {
             c,
             points,
-            boolean_package,
             gamma: gamma.clone(),
             gammas: BinaryField128b::compute_gammas_folding::<M>(**gamma),
             claims,
             polys,
+            algebraic_operations,
         }
     }
 
@@ -401,7 +401,7 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
         result
     }
 
-    pub fn build(&self) -> BoolCheck<N, M> {
+    pub fn build(&self) -> BoolCheck<N, M, A> {
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         for poly in &self.polys {
@@ -427,19 +427,19 @@ impl<const N: usize, const M: usize> BoolCheckBuilder<N, M> {
             ),
             polys: self.polys.clone(),
             points: self.points.clone(),
-            boolean_package: self.boolean_package.clone(),
             gammas: self.gammas,
+            algebraic_operations: self.algebraic_operations.clone(),
             ..Default::default()
         }
     }
 }
 
-impl<const N: usize, const M: usize> CompressedFoldedOps<N> for BoolCheckBuilder<N, M> {
+impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> CompressedFoldedOps<N>
+    for BoolCheckBuilder<N, M, A>
+{
     fn linear_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute the linear part of the boolean formula.
-        let lin = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<N, M>.linear(arg),
-        };
+        let lin = self.algebraic_operations.linear(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
@@ -456,9 +456,7 @@ impl<const N: usize, const M: usize> CompressedFoldedOps<N> for BoolCheckBuilder
 
     fn quadratic_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute the quadratic part of the boolean formula.
-        let quad = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<N, M>.quadratic(arg),
-        };
+        let quad = self.algebraic_operations.quadratic(arg);
 
         // Initialize the accumulator to zero.
         let mut acc = BinaryField128b::zero();
@@ -475,12 +473,12 @@ impl<const N: usize, const M: usize> CompressedFoldedOps<N> for BoolCheckBuilder
 
     fn algebraic_compressed(
         &self,
-        data: [impl Index<usize, Output = BinaryField128b>; 4],
+        data: &[BinaryField128b],
+        idx_a: usize,
+        offset: usize,
     ) -> [BinaryField128b; 3] {
         // Compute the algebraic result.
-        let alg = match self.boolean_package {
-            BooleanPackage::And => AndPackage::<N, M>.algebraic(data),
-        };
+        let alg = self.algebraic_operations.algebraic(data, idx_a, offset);
 
         // Initialize the accumulators for each of the 3 output values to zero.
         let mut acc = [BinaryField128b::zero(); 3];
@@ -502,12 +500,15 @@ impl<const N: usize, const M: usize> CompressedFoldedOps<N> for BoolCheckBuilder
 
 #[cfg(test)]
 mod tests {
+    use crate::and::AndPackage;
+
     use super::*;
 
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 1, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
+            BoolCheckBuilder { c: 1, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -522,7 +523,8 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
+            BoolCheckBuilder { c: 2, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -541,7 +543,8 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 4, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
+            BoolCheckBuilder { c: 4, ..Default::default() };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -574,7 +577,8 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckBuilder with c = 0 (single ternary digit).
-        let bool_check: BoolCheckBuilder<0, 0> = BoolCheckBuilder { c: 0, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
+            BoolCheckBuilder { c: 0, ..Default::default() };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -610,7 +614,7 @@ mod tests {
         // Create a BoolCheckBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckBuilder<3, 0> =
+        let bool_check: BoolCheckBuilder<3, 1, AndPackage<3, 1>> =
             BoolCheckBuilder { c: 2, polys: tabs, ..Default::default() };
 
         // Compute the ternary mapping for the current value of `c`

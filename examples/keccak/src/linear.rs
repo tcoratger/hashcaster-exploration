@@ -1,9 +1,8 @@
-use std::array;
-
 use crate::{matrix::composition::CombinedMatrix, rho_pi::RhoPi, theta::Theta};
 use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
 use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use num_traits::Zero;
+use std::array;
 
 /// A linear operator combining the RhoPi and Theta transformations for the Keccak permutation.
 ///

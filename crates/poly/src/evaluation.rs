@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 
 /// Evaluations of a polynomial at some points.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Evaluations(Vec<BinaryField128b>);
+pub struct Evaluations(pub Vec<BinaryField128b>);
 
 impl Evaluations {
     /// Creates a new `Evaluations` instance.

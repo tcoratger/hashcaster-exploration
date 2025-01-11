@@ -1,3 +1,4 @@
+pub mod chi;
 pub mod linear;
 pub mod matrix;
 pub mod rho_pi;

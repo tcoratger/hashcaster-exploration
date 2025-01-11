@@ -1,5 +1,4 @@
 use hashcaster_primitives::binary_field::BinaryField128b;
-use std::ops::Index;
 
 /// The `CompressedFoldedOps` trait defines an interface for executing compressed linear,
 /// quadratic, and algebraic operations over input variables and data.
@@ -19,6 +18,8 @@ pub trait CompressedFoldedOps<const I: usize>: Send + Sync {
     /// Applies an algebraic transformation to a subset of data and computes the compressed results.
     fn algebraic_compressed(
         &self,
-        data: [impl Index<usize, Output = BinaryField128b>; 4],
+        data: &[BinaryField128b],
+        idx_a: usize,
+        offset: usize,
     ) -> [BinaryField128b; 3];
 }

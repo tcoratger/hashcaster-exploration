@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use hashcaster_boolcheck::builder::BoolCheckBuilder;
+use hashcaster_boolcheck::{and::AndPackage, builder::BoolCheckBuilder};
 use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
 use hashcaster_primitives::binary_field::BinaryField128b;
 use std::array;
@@ -23,7 +23,7 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
     });
 
     // Create a BoolCheckBuilder instance with test data
-    let bool_check = BoolCheckBuilder::<N, M> {
+    let bool_check = BoolCheckBuilder::<N, M, AndPackage<N, M>> {
         c: 2, // Recursion depth
         polys: tables,
         ..Default::default()
