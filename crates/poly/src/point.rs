@@ -1,5 +1,6 @@
-use std::ops::{Deref, DerefMut};
-
+use crate::multinear_lagrangian::{
+    MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
+};
 use hashcaster_primitives::binary_field::BinaryField128b;
 use itertools::Itertools;
 use num_traits::{One, Zero};
@@ -10,10 +11,7 @@ use rayon::{
     },
     slice::ParallelSliceMut,
 };
-
-use crate::multinear_lagrangian::{
-    MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
-};
+use std::ops::{Deref, DerefMut};
 
 /// A point represented as a field element in a binary field.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
