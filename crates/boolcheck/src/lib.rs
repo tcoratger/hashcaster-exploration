@@ -311,26 +311,46 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         ret
     }
 
+    /// Computes the algebraic operations for the given data slice using the provided
+    /// algebraic operations trait and applies folding challenges.
+    ///
+    /// # Parameters
+    /// - `data`: A slice of `BinaryField128b` elements representing the data to be used in the
+    ///   computation.
+    /// - `idx_a`: The index of the algebraic operation.
+    /// - `offset`: The offset for the folding operation.
+    ///
+    /// # Returns
+    /// A 3-element array of `BinaryField128b` containing the computed algebraic values after
+    /// applying folding challenges to the input data.
+    ///
+    /// # Description
+    /// This function applies algebraic operations on the provided data slice. The resulting values
+    /// are then folded by applying a set of predefined folding challenges (`gammas`) to produce
+    /// a compressed result, which is returned as a 3-element array.
     pub fn compute_algebraic(
         &self,
         data: &[BinaryField128b],
         idx_a: usize,
         offset: usize,
     ) -> [BinaryField128b; 3] {
-        // Compute the algebraic operations for the given data slice.
+        // Perform the algebraic operation using the trait's method and store the result
         let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
 
-        // Initialize the accumulators for each of the 3 output values to zero.
+        // Initialize an accumulator array to hold the final result (3 elements for the 3 outputs)
         let mut acc = [BinaryField128b::ZERO; 3];
 
-        // Iterate over the output size `M` and compute the folded sums for each output value.
+        // Loop through the number of folding challenges (M) and apply each challenge to the data
         for i in 0..M {
+            // For each folding challenge:
+            // - apply it to the corresponding algebraic result
+            // - accumulate the result
             acc[0] += tmp[0][i] * self.gammas[i];
             acc[1] += tmp[1][i] * self.gammas[i];
             acc[2] += tmp[2][i] * self.gammas[i];
         }
 
-        // Return the array of compressed results.
+        // Return the final folded results as a 3-element array
         acc
     }
 
