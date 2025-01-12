@@ -107,6 +107,31 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         self.points.len()
     }
 
+    /// Computes the polynomial for the current round of the sumcheck protocol.
+    ///
+    /// # Description
+    /// In the sumcheck protocol, polynomials are computed iteratively in rounds. Each round
+    /// produces a univariate polynomial that satisfies certain constraints defined by the
+    /// protocol. This function computes the polynomial for the current round, caches it for
+    /// future use, and validates the computed claim against the expected value.
+    ///
+    /// The protocol has two distinct phases:
+    /// 1. **Phase 1**: Up to `c` rounds, computations are performed using the extended table over a
+    ///    restricted subset of the hypercube.
+    /// 2. **Phase 2**: After `c` rounds, the protocol transitions to computations using restricted
+    ///    polynomial coordinates.
+    ///
+    /// # Returns
+    /// A `CompressedPoly` representing the computed polynomial for the current round.
+    ///
+    /// # Panics
+    /// - If the number of rounds exceeds the number of variables in the polynomial.
+    /// - If the computed claim does not match the expected value.
+    ///
+    /// # Notes
+    /// - If the round polynomial for the current round has already been computed, it is retrieved
+    ///   from the cache.
+    /// - The function uses parallel iterators to optimize polynomial computations.
     pub fn compute_round_polynomial(&mut self) -> CompressedPoly {
         // Compute the current round of the protocol.
         let round = self.current_round();
