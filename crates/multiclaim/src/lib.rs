@@ -249,7 +249,7 @@ mod tests {
 
         // Map the points to the inverse Frobenius orbit
         let points_inv_orbit: Vec<Points> =
-            (0..128).map(|i| points.iter().map(|x| Point(x.frobenius(-i))).collect()).collect();
+            (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
 
         // Evaluate the polynomial at the points on the inverse Frobenius orbit
         let evaluations_inv_orbit: Evaluations =

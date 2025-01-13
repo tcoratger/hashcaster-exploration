@@ -471,12 +471,18 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
                 let frob_idx = idx % 128;
                 poly_coords[(poly_idx * 128 + frob_idx) * base_index]
             })
-            .collect::<Evaluations>();
+            .collect();
 
         // Apply the twist operation to each chunk of 128 evaluations.
-        frob_evals
-            .chunks_exact_mut(128)
-            .for_each(|chunk| Evaluations::from(chunk.to_vec()).twist());
+        // TODO: To be modified, this is not clean.
+        frob_evals.chunks_exact_mut(128).for_each(|chunk| {
+            let mut tmp = Evaluations::from(chunk.to_vec());
+            tmp.twist();
+
+            for (i, val) in tmp.iter().enumerate() {
+                chunk[i] = *val;
+            }
+        });
 
         // Return the `BoolCheckOutput`
         BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
@@ -497,6 +503,7 @@ mod tests {
     use super::*;
     use and::AndPackage;
     use builder::BoolCheckBuilder;
+    use hashcaster_multiclaim::builder::MulticlaimBuilder;
     use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
 
     #[test]
@@ -613,7 +620,7 @@ mod tests {
         let mut current_claim = initial_claim;
 
         // Empty vector to store random values sent by the verifier at each round.
-        let mut random_values = Vec::new();
+        let mut challenges = Vec::new();
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
@@ -622,7 +629,7 @@ mod tests {
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
             let r = BinaryField128b::random();
-            random_values.push(r);
+            challenges.push(r);
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -651,10 +658,14 @@ mod tests {
         let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
         // Chunk the Frobenius evaluations and untwist each chunk.
-        frob_evals
-            .as_mut_slice()
-            .chunks_mut(128)
-            .for_each(|chunk| Evaluations::from(chunk.to_vec()).untwist());
+        frob_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
+            let mut tmp = Evaluations::from(chunk.to_vec());
+            tmp.untwist();
+
+            for (i, val) in tmp.iter().enumerate() {
+                chunk[i] = *val;
+            }
+        });
 
         // Add a zero element to the end of the evaluations for padding.
         // TODO: hack to be removed in the future
@@ -667,16 +678,227 @@ mod tests {
         let points: Points = points.iter().map(|p| Point::from(*p)).collect();
 
         // Transform random values to Points
-        let random_values: Points = random_values.iter().map(|p| Point::from(*p)).collect();
+        let challenges: Points = challenges.iter().map(|p| Point::from(*p)).collect();
 
         // Get the expected claim
-        let expected_claim = and_algebraic[0][0] * points.eq_eval(&random_values).0;
+        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
 
         // Validate the expected claim against the current claim
         assert_eq!(current_claim, expected_claim);
 
         // Print the execution time of the test.
         println!("Execution time: {:?} ms", start.elapsed().as_millis());
+    }
+
+    #[test]
+    fn test_new_andcheck_with_multiclaim() {
+        // Set the number of variables for the test.
+        let num_vars = 20;
+
+        // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
+        // This represents a set of random variables that will be used in the test.
+        let points: Vec<_> = (0..num_vars).map(|_| BinaryField128b::random()).collect();
+
+        // Generate a multilinear polynomial `p` with 2^num_vars random elements in
+        // `BinaryField128b`. This represents one operand (a polynomial) in the AND
+        // operation.
+        let p: MultilinearLagrangianPolynomial =
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+
+        // Generate another multilinear polynomial `q` with 2^num_vars random elements in
+        // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
+        // operation.
+        let q: MultilinearLagrangianPolynomial =
+            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+
+        // Start a timer to measure the execution time of the test.
+        let start = std::time::Instant::now();
+
+        // Compute the element-wise AND operation between `p` and `q`.
+        // The result is stored in `p_and_q`.
+        let p_and_q = p.clone() & q.clone();
+
+        // The prover compute the initial claim for the AND operation at the points in `points`.
+        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+
+        // Set a phase switch parameter, which controls the folding phases.
+        let phase_switch = 5;
+
+        // Generate a random folding challenge `gamma` in `BinaryField128b`.
+        let gamma = BinaryField128b::random();
+
+        // Create a new `BoolCheckBuilder` instance with:
+        // - the phase switch parameter (c),
+        // - the points at which the AND operation is evaluated,
+        // - the Boolean package (AND operation for this test).
+        let boolcheck_builder = BoolCheckBuilder::new(
+            AndPackage,
+            phase_switch,
+            points.clone().into(),
+            &Point(gamma),
+            [initial_claim],
+            [p.clone(), q.clone()],
+        );
+
+        // Build the Boolean check with the following parameters:
+        // - the multilinear polynomials `p` and `q` used in the AND operation,
+        // - the initial claim for the AND operation,
+        // - the folding challenge `gamma`.
+        let mut boolcheck = boolcheck_builder.build();
+
+        // Initialize the current claim as the initial claim.
+        // The current claim will be updated during each round of the protocol.
+        let mut current_claim = initial_claim;
+
+        // Setup an empty vector to store the challanges in the main loop
+        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars as usize));
+
+        // The loop iterates over the number of variables to perform the rounds of the protocol.
+        for _ in 0..num_vars {
+            // Compute the round polynomial for the current round.
+            let compressed_round_polynomial = boolcheck.compute_round_polynomial();
+
+            // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
+            let r = Point(BinaryField128b::random());
+            challenges.push(r.clone());
+
+            // Decompress the round polynomial to obtain the coefficients of the univariate round
+            // polynomial.
+            let round_polynomial = compressed_round_polynomial.coeffs(current_claim);
+
+            // Update the current claim using the round polynomial and the random value.
+            // The round polynomial is a univariate polynomial in `r`:
+            // ```
+            // P(x) = c_0 + c_1 * x + c_2 * x ^ 2 + c_3 * x ^ 3
+            // ```
+            //
+            // Here we compute the updated claim as:
+            // ```
+            // current_claim = c_0 + r * c_1 + r ^ 2 * c_2 + r ^ 3 * c_3
+            // ```
+            current_claim = round_polynomial[0] +
+                *r * round_polynomial[1] +
+                *r * *r * round_polynomial[2] +
+                *r * *r * *r * round_polynomial[3];
+
+            // Bind the random value `r` to the Boolean check for the next round.
+            boolcheck.bind(&r);
+        }
+
+        // Finish the protocol and obtain the output.
+        let BoolCheckOutput { frob_evals, .. } = boolcheck.finish();
+
+        // Clone the Frobenius evaluations to untwist them (we will need the original evaluations
+        // untouched for the multiclaim part of the test).
+        let mut untwisted_evals = frob_evals.clone();
+
+        assert_eq!(frob_evals.len(), 256, "Invalid number of Frobenius evaluations.");
+
+        // Chunk the Frobenius evaluations and untwist each chunk.
+        untwisted_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
+            let mut tmp = Evaluations::from(chunk.to_vec());
+            tmp.untwist();
+
+            for (i, val) in tmp.iter().enumerate() {
+                chunk[i] = *val;
+            }
+        });
+
+        // Add a zero element to the end of the evaluations for padding.
+        // TODO: hack to be removed in the future
+        untwisted_evals.push(BinaryField128b::ZERO);
+
+        // Compute algebraic AND
+        let and_algebraic = AndPackage::<2, 1>.algebraic(&untwisted_evals, 0, 1);
+
+        // Transform vector of Field elements to Points
+        let points: Points = points.iter().map(|p| *p).collect();
+
+        // Get the expected claim
+        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
+
+        // Validate the expected claim against the current claim
+        assert_eq!(current_claim, expected_claim);
+
+        // Print the execution time of the boolcheck part of the test.
+        println!("Execution time of Boolcheck: {:?} ms", start.elapsed().as_millis());
+
+        // New start for the multiclaim part of the test.
+        let start = std::time::Instant::now();
+
+        // Setup the new points to be the challenges of the boolcheck.
+        let points = challenges.clone();
+
+        // Map the points to the inverse Frobenius orbit
+        let points_inv_orbit: Vec<Points> =
+            (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
+
+        // Generate a random gamma for folding
+        let gamma = Point(BinaryField128b::random());
+
+        // Generate `gamma^128` for final evaluation
+        let mut gamma128 = gamma.0;
+        for _ in 0..7 {
+            gamma128 *= gamma128;
+        }
+
+        // println!("frob_evals {:?}", frob_evals);
+
+        // Setup a multiclaim builder
+        let multiclaim_builder =
+            MulticlaimBuilder::new([p.clone(), q.clone()], points, frob_evals.clone());
+
+        // Builder the multiclaim prover via folding
+        let mut multiclaim_prover = multiclaim_builder.build(&gamma);
+
+        // Compute the claim
+        let mut claim = UnivariatePolynomial::new(frob_evals.0).evaluate_at(&gamma);
+
+        // Setup an empty vector to store the challanges in the main loop
+        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars as usize));
+
+        // Empty vector to store the challenges
+        for _ in 0..num_vars {
+            // Compute the round polynomial
+            let round_polynomial = multiclaim_prover.compute_round_polynomial().coeffs(claim);
+
+            // Check that the round polynomial is of degree 2
+            assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
+
+            // Random challenge
+            let challenge = Point(BinaryField128b::random());
+
+            // Update the claim with the round polynomial and the challenge
+            claim = round_polynomial[0] +
+                round_polynomial[1] * *challenge +
+                round_polynomial[2] * *challenge * *challenge;
+
+            // Push the challenge to the vector
+            challenges.push(challenge.clone());
+
+            // Bind the prover to the challenge
+            multiclaim_prover.bind(&challenge);
+        }
+
+        // Finish the protocol
+        let multiclaim_output = multiclaim_prover.finish();
+
+        // Compute the equality evaluations at the challenges
+        let eq_evaluations: UnivariatePolynomial =
+            points_inv_orbit.iter().map(|pts| pts.eq_eval(&challenges).0).collect();
+
+        // Compute the equality evaluation at gamma
+        let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
+
+        // Validate the claim
+        assert_eq!(multiclaim_output.evaluate_at(&Point(gamma128)) * eq_evaluation, claim);
+
+        // More validations about P and Q evaluations at the challenges
+        assert_eq!(p.evaluate_at(&challenges), multiclaim_output[0]);
+        assert_eq!(q.evaluate_at(&challenges), multiclaim_output[1]);
+
+        // Print the execution time of the multiclaim part of the test.
+        println!("Execution time of Multiclaim: {:?} ms", start.elapsed().as_millis());
     }
 
     #[test]
