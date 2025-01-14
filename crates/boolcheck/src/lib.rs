@@ -1073,22 +1073,20 @@ mod tests {
         let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
 
         // Generate a vector `p` with 2^2 = 4 elements.
-        let p: MultilinearLagrangianPolynomial = vec![
+        let p = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(11),
             BinaryField128b::new(22),
             BinaryField128b::new(33),
             BinaryField128b::new(44),
-        ]
-        .into();
+        ]);
 
         // Generate another vector `q` with 2^2 = 4 elements.
-        let q: MultilinearLagrangianPolynomial = vec![
+        let q = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(111),
             BinaryField128b::new(222),
             BinaryField128b::new(333),
             BinaryField128b::new(444),
-        ]
-        .into();
+        ]);
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -1136,22 +1134,20 @@ mod tests {
         let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
 
         // Generate a vector `p` with 2^2 = 4 elements.
-        let p: MultilinearLagrangianPolynomial = vec![
+        let p = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(11),
             BinaryField128b::new(22),
             BinaryField128b::new(33),
             BinaryField128b::new(44),
-        ]
-        .into();
+        ]);
 
         // Generate another vector `q` with 2^2 = 4 elements.
-        let q: MultilinearLagrangianPolynomial = vec![
+        let q = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(111),
             BinaryField128b::new(222),
             BinaryField128b::new(333),
             BinaryField128b::new(444),
-        ]
-        .into();
+        ]);
 
         // Compute the element-wise AND operation between `p` and `q`.
         // The result is stored in `p_and_q`.
@@ -1232,25 +1228,23 @@ mod tests {
     #[should_panic(expected = "Claim does not match expected value.")]
     fn test_compute_round_polynomial_invalid_claim() {
         // Generate a vector `points` of 2 field elements in `BinaryField128b`.
-        let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
+        let points = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
 
         // Generate a vector `p` with 2^2 = 4 elements.
-        let p: MultilinearLagrangianPolynomial = vec![
+        let p = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(11),
             BinaryField128b::new(22),
             BinaryField128b::new(33),
             BinaryField128b::new(44),
-        ]
-        .into();
+        ]);
 
         // Generate another vector `q` with 2^2 = 4 elements.
-        let q: MultilinearLagrangianPolynomial = vec![
+        let q = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(111),
             BinaryField128b::new(222),
             BinaryField128b::new(333),
             BinaryField128b::new(444),
-        ]
-        .into();
+        ]);
 
         // Compute an incorrect initial claim for testing purposes.
         let incorrect_claim = BinaryField128b::new(999);
@@ -1284,22 +1278,20 @@ mod tests {
         let points: Vec<_> = vec![BinaryField128b::new(1), BinaryField128b::new(2)];
 
         // Generate a vector `p` with 2^2 = 4 elements.
-        let p: MultilinearLagrangianPolynomial = vec![
+        let p = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(11),
             BinaryField128b::new(22),
             BinaryField128b::new(33),
             BinaryField128b::new(44),
-        ]
-        .into();
+        ]);
 
         // Generate another vector `q` with 2^2 = 4 elements.
-        let q: MultilinearLagrangianPolynomial = vec![
+        let q = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::new(111),
             BinaryField128b::new(222),
             BinaryField128b::new(333),
             BinaryField128b::new(444),
-        ]
-        .into();
+        ]);
 
         // Compute the element-wise AND operation between `p` and `q`.
         let p_and_q = p.clone() & q.clone();
@@ -1483,20 +1475,19 @@ mod tests {
     fn test_bind_single() {
         // Create a realistic setup with points and polynomials.
         let points = vec![BinaryField128b::from(1), BinaryField128b::from(2)];
-        let p: MultilinearLagrangianPolynomial = vec![
+        let p = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::from(11),
             BinaryField128b::from(22),
             BinaryField128b::from(33),
             BinaryField128b::from(44),
-        ]
-        .into();
-        let q: MultilinearLagrangianPolynomial = vec![
+        ]);
+
+        let q = MultilinearLagrangianPolynomial::new(vec![
             BinaryField128b::from(111),
             BinaryField128b::from(222),
             BinaryField128b::from(333),
             BinaryField128b::from(444),
-        ]
-        .into();
+        ]);
 
         // Compute the AND operation between the polynomials and the initial claim.
         let p_and_q = p.clone() & q.clone();
