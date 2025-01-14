@@ -29,6 +29,12 @@ impl Point {
     }
 }
 
+impl From<u128> for Point {
+    fn from(val: u128) -> Self {
+        Self(BinaryField128b::new(val))
+    }
+}
+
 impl From<BinaryField128b> for Point {
     fn from(field_element: BinaryField128b) -> Self {
         Self(field_element)

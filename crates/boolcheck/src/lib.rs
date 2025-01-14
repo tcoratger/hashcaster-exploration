@@ -920,7 +920,7 @@ mod tests {
         let phase_switch = 2;
 
         // Generate a folding challenge `gamma`
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -1108,7 +1108,7 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -1171,7 +1171,7 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let mut boolcheck_builder =
@@ -1216,7 +1216,7 @@ mod tests {
         let phase_switch = 2;
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let mut boolcheck_builder =
@@ -1227,7 +1227,7 @@ mod tests {
 
         // Simulate adding challenges equal to the number of variables.
         for i in 0..bool_check.number_variables() {
-            bool_check.challenges.push(Point(BinaryField128b::new(i as u128)));
+            bool_check.challenges.push(Point::from(i as u128));
         }
 
         // Attempt to compute a round polynomial beyond the round limit.
@@ -1266,7 +1266,7 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let mut boolcheck_builder = BoolCheckBuilder::new(
@@ -1318,7 +1318,7 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let mut boolcheck_builder =
@@ -1334,7 +1334,7 @@ mod tests {
         let coeffs = round_poly.coeffs(initial_claim);
 
         // Generate a random challenge value.
-        let challenge = Point(BinaryField128b::new(3));
+        let challenge = Point::from(3);
 
         // Compute the round polynomial.
         bool_check.bind(&challenge);
@@ -1513,7 +1513,7 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point(BinaryField128b::new(1234));
+        let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let mut boolcheck_builder =
