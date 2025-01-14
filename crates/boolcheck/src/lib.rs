@@ -604,7 +604,7 @@ mod tests {
         let mut current_claim = initial_claim;
 
         // Empty vector to store random values sent by the verifier at each round.
-        let mut challenges = Vec::new();
+        let mut challenges = Points::default();
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
@@ -612,8 +612,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = BinaryField128b::random();
-            challenges.push(r);
+            let r = Point(BinaryField128b::random());
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -629,13 +628,13 @@ mod tests {
             // ```
             // current_claim = c_0 + r * c_1 + r ^ 2 * c_2 + r ^ 3 * c_3
             // ```
-            current_claim = round_polynomial[0] +
-                r * round_polynomial[1] +
-                r * r * round_polynomial[2] +
-                r * r * r * round_polynomial[3];
+            current_claim = round_polynomial.evaluate_at(&r);
 
             // Bind the random value `r` to the Boolean check for the next round.
-            boolcheck.bind(&Point(r));
+            boolcheck.bind(&r);
+
+            // Store the random value in the challenges vector.
+            challenges.push(r);
         }
 
         // Finish the protocol and obtain the output.
@@ -650,9 +649,6 @@ mod tests {
 
         // Compute algebraic AND
         let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
-
-        // Transform random values to Points
-        let challenges: Points = challenges.iter().map(|p| Point::from(*p)).collect();
 
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
@@ -748,10 +744,7 @@ mod tests {
             // ```
             // current_claim = c_0 + r * c_1 + r ^ 2 * c_2 + r ^ 3 * c_3
             // ```
-            current_claim = round_polynomial[0] +
-                *r * round_polynomial[1] +
-                *r * *r * round_polynomial[2] +
-                *r * *r * *r * round_polynomial[3];
+            current_claim = round_polynomial.evaluate_at(&r);
 
             // Bind the random value `r` to the Boolean check for the next round.
             boolcheck.bind(&r);
@@ -831,9 +824,7 @@ mod tests {
             let challenge = Point::random();
 
             // Update the claim with the round polynomial and the challenge
-            claim = round_polynomial[0] +
-                round_polynomial[1] * *challenge +
-                round_polynomial[2] * *challenge * *challenge;
+            claim = round_polynomial.evaluate_at(&challenge);
 
             // Push the challenge to the vector
             challenges.push(challenge.clone());
@@ -968,19 +959,16 @@ mod tests {
         );
 
         // Generate an imaginary random challenge (fixed for testing purposes).
-        let r = BinaryField128b::new(5678);
+        let r = Point::from(5678);
 
         // Update the current claim using the round polynomial and the random value.
-        let current_claim = round_polynomial[0] +
-            r * round_polynomial[1] +
-            r * r * round_polynomial[2] +
-            r * r * r * round_polynomial[3];
+        let current_claim = round_polynomial.evaluate_at(&r);
 
         // Verify the correctness of the updated claim.
         assert_eq!(current_claim, BinaryField128b::new(284181495769767592368287233794578256034));
 
         // Bind the random value `r` to the Boolean check for the next round.
-        boolcheck.bind(&Point(r));
+        boolcheck.bind(&r);
 
         // Validate the updated extended table after the first imaginary round.
         assert_eq!(

@@ -84,7 +84,7 @@ impl Evaluations {
         assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
 
         // Process each chunk of 128 elements separately.
-        self.chunks_exact_mut(128).for_each(|chunk| {
+        self.par_chunks_exact_mut(128).for_each(|chunk| {
             // Create a vector to store the twisted evaluations for this chunk.
             let mut twisted_evals = vec![];
 
