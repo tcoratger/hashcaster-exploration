@@ -238,7 +238,7 @@ mod tests {
         let theta_ac = ThetaAC;
 
         // Generate a random input for `apply`.
-        let input: Vec<_> = (0..1600).map(|_| BinaryField128b::random()).collect();
+        let input = BinaryField128b::random_vec(1600);
 
         // Prepare output storage for the result of `apply`.
         let mut output_apply = vec![BinaryField128b::from(0); 320];
@@ -247,7 +247,7 @@ mod tests {
         theta_ac.apply(&input, &mut output_apply);
 
         // Generate another random input for `apply_transposed`.
-        let transposed_input: Vec<_> = (0..320).map(|_| BinaryField128b::random()).collect();
+        let transposed_input = BinaryField128b::random_vec(320);
 
         // Prepare output storage for the result of `apply_transposed`.
         let mut output_transposed = vec![BinaryField128b::from(0); 1600];

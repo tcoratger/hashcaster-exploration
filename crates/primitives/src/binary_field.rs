@@ -101,6 +101,12 @@ impl BinaryField128b {
         Self::new(rand::thread_rng().gen())
     }
 
+    /// Generates a random vector of [`BinaryField128b`] elements.
+    pub fn random_vec(size: usize) -> Vec<Self> {
+        let mut rng = rand::thread_rng();
+        (0..size).map(|_| Self::new(rng.gen())).collect()
+    }
+
     /// **Performs the Frobenius map computation in GF(2^128).**
     ///
     /// ### Description

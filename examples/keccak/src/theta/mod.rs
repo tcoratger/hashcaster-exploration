@@ -89,7 +89,7 @@ mod tests {
 
         // **Generate random input for `apply`**
         // - This represents the input vector for the forward transformation.
-        let input_apply: Vec<_> = (0..1600).map(|_| BinaryField128b::random()).collect();
+        let input_apply = BinaryField128b::random_vec(1600);
 
         // **Prepare output storage for `apply`**
         // - This will store the result of the forward transformation.
@@ -101,7 +101,7 @@ mod tests {
 
         // **Generate random input for `apply_transposed`**
         // - This represents the input vector for the transposed transformation.
-        let input_transposed: Vec<_> = (0..1600).map(|_| BinaryField128b::random()).collect();
+        let input_transposed = BinaryField128b::random_vec(1600);
 
         // **Prepare output storage for `apply_transposed`**
         // - This will store the result of the transposed transformation.

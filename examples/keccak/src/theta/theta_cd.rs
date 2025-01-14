@@ -221,7 +221,7 @@ mod tests {
 
         // **Generate random input for `apply`**
         // - This represents the column parity vector `C[x]` with 320 random elements.
-        let input_apply: Vec<_> = (0..320).map(|_| BinaryField128b::random()).collect();
+        let input_apply = BinaryField128b::random_vec(320);
 
         // **Prepare output storage for the result of `apply`**
         // - This will store the computed `D[x]` values (320 elements).
@@ -233,7 +233,7 @@ mod tests {
 
         // **Generate random input for `apply_transposed`**
         // - This represents the `D[x]` vector for testing the transposed operation.
-        let input_transposed: Vec<_> = (0..320).map(|_| BinaryField128b::random()).collect();
+        let input_transposed = BinaryField128b::random_vec(320);
 
         // **Prepare output storage for the result of `apply_transposed`**
         // - This will store the distributed column parity values `C[x]`.

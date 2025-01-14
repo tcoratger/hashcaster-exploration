@@ -127,7 +127,7 @@ mod tests {
 
         // **Generate random input for `apply`**
         // - This represents the input to the identity operation.
-        let input_apply: Vec<_> = (0..5).map(|_| BinaryField128b::random()).collect();
+        let input_apply = BinaryField128b::random_vec(5);
 
         // **Prepare output storage for the result of `apply`**
         // - This will store the result of applying the identity operation.
@@ -139,7 +139,7 @@ mod tests {
 
         // **Generate random input for `apply_transposed`**
         // - For the identity matrix, `apply_transposed` should behave identically to `apply`.
-        let input_transposed: Vec<_> = (0..5).map(|_| BinaryField128b::random()).collect();
+        let input_transposed = BinaryField128b::random_vec(5);
 
         // **Prepare output storage for the result of `apply_transposed`**
         // - This will store the result of applying the transposed operation.

@@ -11,6 +11,11 @@ impl Evaluations {
         Self(evaluations)
     }
 
+    /// Creates a new `Evaluations` instance with random evaluations.
+    pub fn random(n: usize) -> Self {
+        Self((0..n).map(|_| BinaryField128b::random()).collect())
+    }
+
     /// Consumes the `Evaluations` instance and returns the inner vector of evaluations.
     pub fn into_inner(self) -> Vec<BinaryField128b> {
         self.0
@@ -254,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_pi_random_orbit() {
-        let orbit: Evaluations = (0..128).map(|_| BinaryField128b::random()).collect();
+        let orbit = Evaluations::random(128);
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
@@ -268,7 +273,7 @@ mod tests {
     #[test]
     fn twist_untwist() {
         // Generate a random set of 128 evaluations.
-        let lhs: Evaluations = (0..128).map(|_| BinaryField128b::random()).collect();
+        let lhs = Evaluations::random(128);
 
         // Clone `lhs` to create an independent copy for transformation.
         let mut rhs = lhs.clone();

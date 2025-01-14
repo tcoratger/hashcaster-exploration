@@ -145,7 +145,7 @@ mod tests {
 
         // **Generate random input for `apply`**
         // - This represents the input to the combined operation.
-        let input_apply: Vec<_> = (0..4).map(|_| BinaryField128b::random()).collect();
+        let input_apply = BinaryField128b::random_vec(4);
 
         // **Prepare output storage for the result of `apply`**
         // - This will store the result of `A(x) + B(x)`.
@@ -157,7 +157,7 @@ mod tests {
 
         // **Generate random input for `apply_transposed`**
         // - This represents the input to the transposed operation.
-        let input_transposed: Vec<_> = (0..4).map(|_| BinaryField128b::random()).collect();
+        let input_transposed = BinaryField128b::random_vec(4);
 
         // **Prepare output storage for the result of `apply_transposed`**
         // - This will store the result of the transposed operation.
