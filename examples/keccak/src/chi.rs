@@ -243,14 +243,11 @@ mod tests {
         const SWITCH: usize = 5;
 
         // Setup some random points
-        let points = Points((0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect());
+        let points: Points = (0..NUM_VARS).map(|_| BinaryField128b::random()).collect();
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
-        let polys: [_; 5] = array::from_fn(|_| {
-            MultilinearLagrangianPolynomial::new(
-                (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
-            )
-        });
+        let polys: [MultilinearLagrangianPolynomial; 5] =
+            array::from_fn(|_| (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect());
 
         // Compute chi witness
         let witness = chi_round_witness(&polys);
@@ -319,7 +316,14 @@ mod tests {
         assert_eq!(frob_evals.len(), 128 * 5, "Frobenius evaluations length mismatch");
 
         // Untwist the Frobenius evaluations
-        frob_evals.chunks_mut(128).for_each(|chunk| Evaluations::from(chunk.to_vec()).untwist());
+        frob_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
+            let mut tmp = Evaluations::from(chunk.to_vec());
+            tmp.untwist();
+
+            for (i, val) in tmp.iter().enumerate() {
+                chunk[i] = *val;
+            }
+        });
 
         // Compute the expected coordinate evaluations
         let expected_coord_evals: Vec<_> = polys

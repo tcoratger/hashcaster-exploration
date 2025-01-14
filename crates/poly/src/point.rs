@@ -30,6 +30,12 @@ impl Deref for Point {
     }
 }
 
+impl DerefMut for Point {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// A collection of points represented as field elements in a binary field.
 ///
 /// # Description

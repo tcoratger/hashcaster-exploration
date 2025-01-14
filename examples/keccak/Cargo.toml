@@ -12,9 +12,11 @@ hashcaster-primitives = { workspace = true }
 hashcaster-poly = { workspace = true }
 hashcaster-lincheck = { workspace = true }
 hashcaster-boolcheck = { workspace = true }
+hashcaster-multiclaim = { workspace = true }
 
 num-traits = { workspace = true }
 rayon = { workspace = true }
+itertools = { workspace = true }
 
 [dev-dependencies]
 itertools = { workspace = true }

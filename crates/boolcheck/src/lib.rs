@@ -691,6 +691,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_sign_loss)]
     fn test_new_andcheck_with_multiclaim() {
         // Set the number of variables for the test.
         let num_vars = 20;
@@ -812,7 +813,7 @@ mod tests {
         let and_algebraic = AndPackage::<2, 1>.algebraic(&untwisted_evals, 0, 1);
 
         // Transform vector of Field elements to Points
-        let points: Points = points.iter().map(|p| *p).collect();
+        let points: Points = points.iter().copied().collect();
 
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
