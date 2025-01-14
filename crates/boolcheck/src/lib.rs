@@ -586,7 +586,7 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -717,7 +717,7 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -750,7 +750,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point(BinaryField128b::random());
+            let r = Point::random();
             challenges.push(r.clone());
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
@@ -825,7 +825,7 @@ mod tests {
             (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
 
         // Generate a random gamma for folding
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Generate `gamma^128` for final evaluation
         let mut gamma128 = gamma.0;
@@ -857,7 +857,7 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial[0] +

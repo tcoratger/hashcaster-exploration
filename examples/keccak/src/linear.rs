@@ -395,7 +395,7 @@ mod tests {
         );
 
         // Setup a random gamma for folding
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Build the prover
         let mut prover = prover_builder.build(&gamma);
@@ -412,7 +412,7 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Update the claim
             claim = round_poly[0] +

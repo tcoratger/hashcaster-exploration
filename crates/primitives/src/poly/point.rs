@@ -18,6 +18,17 @@ use std::ops::{Deref, DerefMut};
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Point(pub BinaryField128b);
 
+impl Point {
+    /// Generates a random [`Point`] element.
+    ///
+    /// # Returns
+    /// - A random `Point` instance, with the internal `u128` value generated uniformly across the
+    ///   entire range of 128 bits.
+    pub fn random() -> Self {
+        Self(BinaryField128b::random())
+    }
+}
+
 impl From<BinaryField128b> for Point {
     fn from(field_element: BinaryField128b) -> Self {
         Self(field_element)

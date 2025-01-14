@@ -102,7 +102,7 @@ impl Keccak {
         let start = Instant::now();
 
         // Generate a random gamma value for folding.
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Initialize the BoolCheck prover builder.
         let mut boolcheck_builder = BoolCheckBuilder::new(
@@ -135,7 +135,7 @@ impl Keccak {
             let round_poly = boolcheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");
@@ -206,7 +206,7 @@ impl Keccak {
         let start = Instant::now();
 
         // Generate a random gamma for folding.
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Compute gamma^128 for evaluation.
         let mut gamma128 = gamma.0;
@@ -247,7 +247,7 @@ impl Keccak {
             let round_poly = multiclaim_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");
@@ -292,7 +292,7 @@ impl Keccak {
         let points = self.challenges.clone();
 
         // Generate a random gamma for folding.
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         let evaluations: [_; 5] =
             self.multiclaim_output.clone().unwrap().coeffs.try_into().unwrap();
@@ -328,7 +328,7 @@ impl Keccak {
             let round_poly = lincheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");

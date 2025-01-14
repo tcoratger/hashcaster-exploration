@@ -236,7 +236,7 @@ mod tests {
         );
 
         // Create points for evaluation
-        let points: Points = (0..NUM_VARS).map(|_| Point(BinaryField128b::random())).collect();
+        let points: Points = (0..NUM_VARS).map(|_| Point::random()).collect();
 
         // Map the points to the inverse Frobenius orbit
         let points_inv_orbit: Vec<Points> =
@@ -251,7 +251,7 @@ mod tests {
             MulticlaimBuilder::new([poly.clone()], points, evaluations_inv_orbit.clone());
 
         // Generate a random gamma for folding
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         // Builder the prover via folding
         let mut prover = prover_builder.build(&gamma);
@@ -277,7 +277,7 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial[0] +

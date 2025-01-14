@@ -263,7 +263,7 @@ mod tests {
         let chi = ChiPackage;
 
         // Generate a random gamma for folding
-        let gamma = Point(BinaryField128b::random());
+        let gamma = Point::random();
 
         let start = std::time::Instant::now();
 
@@ -292,7 +292,7 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point(BinaryField128b::random());
+            let challenge = Point::random();
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");

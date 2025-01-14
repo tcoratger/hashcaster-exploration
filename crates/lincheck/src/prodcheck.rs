@@ -760,7 +760,7 @@ mod tests {
             let compressed_round_polynomial = prodcheck.round_polynomial();
 
             // Generate a random challenge `r` for the current round.
-            let r = Point(BinaryField128b::random());
+            let r = Point::random();
 
             // Decompress the round polynomial to obtain its coefficients.
             // The round polynomial is represented as a univariate polynomial in `r`.
