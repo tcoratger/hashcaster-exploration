@@ -1,6 +1,8 @@
 use crate::{matrix::composition::CombinedMatrix, rho_pi::RhoPi, theta::Theta};
-use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
-use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
+use hashcaster_primitives::{
+    binary_field::BinaryField128b, linear_trait::LinearOperations,
+    poly::multinear_lagrangian::MultilinearLagrangianPolynomial,
+};
 use std::array;
 
 /// A linear operator combining the RhoPi and Theta transformations for the Keccak permutation.
@@ -246,9 +248,12 @@ pub fn keccak_linround_witness(
 mod tests {
     use super::*;
     use hashcaster_lincheck::{builder::LinCheckBuilder, prodcheck::ProdCheckOutput};
-    use hashcaster_poly::{
-        point::{Point, Points},
-        univariate::UnivariatePolynomial,
+    use hashcaster_primitives::{
+        poly::{
+            point::{Point, Points},
+            univariate::UnivariatePolynomial,
+        },
+        sumcheck::Sumcheck,
     };
     use num_traits::MulAdd;
 

@@ -1,9 +1,9 @@
-use crate::{evaluation::Evaluations, point::Points};
-use bytemuck::cast_slice;
-use hashcaster_primitives::{
+use crate::{
     binary_field::BinaryField128b,
+    poly::{evaluation::Evaluations, point::Points},
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
+use bytemuck::cast_slice;
 use num_traits::Zero;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,

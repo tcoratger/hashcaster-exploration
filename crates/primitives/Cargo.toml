@@ -19,3 +19,4 @@ ruint = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 unroll = { workspace = true }
+itertools = { workspace = true }

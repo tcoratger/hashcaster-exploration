@@ -8,7 +8,6 @@ rust-version = "1.84"
 members = [
     "crates/boolcheck",
     "crates/primitives",
-    "crates/poly",
     "crates/lincheck",
     "crates/multiclaim",
     "examples/keccak",
@@ -47,7 +46,6 @@ module_name_repetitions = "allow"
 [workspace.dependencies]
 hashcaster-primitives = { path = "crates/primitives" }
 hashcaster-boolcheck = { path = "crates/boolcheck" }
-hashcaster-poly = { path = "crates/poly" }
 hashcaster-lincheck = { path = "crates/lincheck" }
 hashcaster-multiclaim = { path = "crates/multiclaim" }
 

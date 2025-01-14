@@ -1,12 +1,15 @@
 use algebraic::AlgebraicOps;
-use hashcaster_poly::{
-    compressed::CompressedPoly,
-    evaluation::Evaluations,
-    multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
-    point::{Point, Points},
-    univariate::UnivariatePolynomial,
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    poly::{
+        compressed::CompressedPoly,
+        evaluation::Evaluations,
+        multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    },
+    sumcheck::Sumcheck,
 };
-use hashcaster_primitives::binary_field::BinaryField128b;
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
@@ -67,8 +70,9 @@ pub struct BoolCheck<const N: usize, const M: usize, A: AlgebraicOps<N, M>> {
     pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
-    for BoolCheck<N, M, A>
+impl<const N: usize, const M: usize, A> Default for BoolCheck<N, M, A>
+where
+    A: AlgebraicOps<N, M> + Default,
 {
     fn default() -> Self {
         Self {
@@ -88,51 +92,13 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
     }
 }
 
-impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCheck<N, M, A> {
-    /// Returns the current round of the protocol.
-    ///
-    /// The current round is represented by the number of challenges that have been submitted to the
-    /// prover.
-    pub fn current_round(&self) -> usize {
-        self.challenges.len()
-    }
+impl<const N: usize, const M: usize, A> Sumcheck for BoolCheck<N, M, A>
+where
+    A: AlgebraicOps<N, M> + Send + Sync,
+{
+    type Output = BoolCheckOutput;
 
-    /// Returns the number of evaluation points for the polynomials in the protocol.
-    ///
-    /// For examples, the multilinear polynomial `p` can be written as:
-    /// `p(x) = p_0 + p_1*x_1 + p_2*x_2 + ... + p_n*x_n`
-    ///
-    /// The number of variables in the polynomial is `n`.
-    pub fn number_variables(&self) -> usize {
-        self.points.len()
-    }
-
-    /// Computes the polynomial for the current round of the sumcheck protocol.
-    ///
-    /// # Description
-    /// In the sumcheck protocol, polynomials are computed iteratively in rounds. Each round
-    /// produces a univariate polynomial that satisfies certain constraints defined by the
-    /// protocol. This function computes the polynomial for the current round, caches it for
-    /// future use, and validates the computed claim against the expected value.
-    ///
-    /// The protocol has two distinct phases:
-    /// 1. **Phase 1**: Up to `c` rounds, computations are performed using the extended table over a
-    ///    restricted subset of the hypercube.
-    /// 2. **Phase 2**: After `c` rounds, the protocol transitions to computations using restricted
-    ///    polynomial coordinates.
-    ///
-    /// # Returns
-    /// A `CompressedPoly` representing the computed polynomial for the current round.
-    ///
-    /// # Panics
-    /// - If the number of rounds exceeds the number of variables in the polynomial.
-    /// - If the computed claim does not match the expected value.
-    ///
-    /// # Notes
-    /// - If the round polynomial for the current round has already been computed, it is retrieved
-    ///   from the cache.
-    /// - The function uses parallel iterators to optimize polynomial computations.
-    pub fn compute_round_polynomial(&mut self) -> CompressedPoly {
+    fn compute_round_polynomial(&mut self) -> CompressedPoly {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -336,50 +302,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         ret
     }
 
-    /// Computes the algebraic operations for the given data slice using the provided
-    /// algebraic operations trait and applies folding challenges.
-    ///
-    /// # Parameters
-    /// - `data`: A slice of `BinaryField128b` elements representing the data to be used in the
-    ///   computation.
-    /// - `idx_a`: The index of the algebraic operation.
-    /// - `offset`: The offset for the folding operation.
-    ///
-    /// # Returns
-    /// A 3-element array of `BinaryField128b` containing the computed algebraic values after
-    /// applying folding challenges to the input data.
-    ///
-    /// # Description
-    /// This function applies algebraic operations on the provided data slice. The resulting values
-    /// are then folded by applying a set of predefined folding challenges (`gammas`) to produce
-    /// a compressed result, which is returned as a 3-element array.
-    pub fn compute_algebraic(
-        &self,
-        data: &[BinaryField128b],
-        idx_a: usize,
-        offset: usize,
-    ) -> [BinaryField128b; 3] {
-        // Perform the algebraic operation using the trait's method and store the result
-        let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
-
-        // Initialize an accumulator array to hold the final result (3 elements for the 3 outputs)
-        let mut acc = [BinaryField128b::ZERO; 3];
-
-        // Loop through the number of folding challenges (M) and apply each challenge to the data
-        for i in 0..M {
-            // For each folding challenge:
-            // - apply it to the corresponding algebraic result
-            // - accumulate the result
-            acc[0] += tmp[0][i] * self.gammas[i];
-            acc[1] += tmp[1][i] * self.gammas[i];
-            acc[2] += tmp[2][i] * self.gammas[i];
-        }
-
-        // Return the final folded results as a 3-element array
-        acc
-    }
-
-    pub fn bind(&mut self, r: &Point) {
+    fn bind(&mut self, r: &Point) {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -451,7 +374,7 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         }
     }
 
-    pub fn finish(&self) -> BoolCheckOutput {
+    fn finish(&self) -> Self::Output {
         // Compute the number of variables in the polynomial.
         let number_variables = self.number_variables();
         // The number of rounds should match the number of variables for the protocol to end.
@@ -485,7 +408,73 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> BoolCh
         });
 
         // Return the `BoolCheckOutput`
-        BoolCheckOutput { frob_evals, round_polys: round_polys.clone() }
+        Self::Output { frob_evals, round_polys: round_polys.clone() }
+    }
+}
+
+impl<const N: usize, const M: usize, A> BoolCheck<N, M, A>
+where
+    A: AlgebraicOps<N, M> + Send + Sync,
+{
+    /// Returns the current round of the protocol.
+    ///
+    /// The current round is represented by the number of challenges that have been submitted to the
+    /// prover.
+    pub fn current_round(&self) -> usize {
+        self.challenges.len()
+    }
+
+    /// Returns the number of evaluation points for the polynomials in the protocol.
+    ///
+    /// For examples, the multilinear polynomial `p` can be written as:
+    /// `p(x) = p_0 + p_1*x_1 + p_2*x_2 + ... + p_n*x_n`
+    ///
+    /// The number of variables in the polynomial is `n`.
+    pub fn number_variables(&self) -> usize {
+        self.points.len()
+    }
+
+    /// Computes the algebraic operations for the given data slice using the provided
+    /// algebraic operations trait and applies folding challenges.
+    ///
+    /// # Parameters
+    /// - `data`: A slice of `BinaryField128b` elements representing the data to be used in the
+    ///   computation.
+    /// - `idx_a`: The index of the algebraic operation.
+    /// - `offset`: The offset for the folding operation.
+    ///
+    /// # Returns
+    /// A 3-element array of `BinaryField128b` containing the computed algebraic values after
+    /// applying folding challenges to the input data.
+    ///
+    /// # Description
+    /// This function applies algebraic operations on the provided data slice. The resulting values
+    /// are then folded by applying a set of predefined folding challenges (`gammas`) to produce
+    /// a compressed result, which is returned as a 3-element array.
+    pub fn compute_algebraic(
+        &self,
+        data: &[BinaryField128b],
+        idx_a: usize,
+        offset: usize,
+    ) -> [BinaryField128b; 3] {
+        // Perform the algebraic operation using the trait's method and store the result
+        let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
+
+        // Initialize an accumulator array to hold the final result (3 elements for the 3 outputs)
+        let mut acc = [BinaryField128b::ZERO; 3];
+
+        // Loop through the number of folding challenges (M) and apply each challenge to the data
+        for i in 0..M {
+            // For each folding challenge:
+            // - apply it to the corresponding algebraic result
+            // - accumulate the result
+            acc[0] += tmp[0][i] * self.gammas[i];
+            acc[1] += tmp[1][i] * self.gammas[i];
+            acc[2] += tmp[2][i] * self.gammas[i];
+        }
+
+        // Return the final folded results as a 3-element array
+        acc
     }
 }
 
@@ -504,7 +493,9 @@ mod tests {
     use and::AndPackage;
     use builder::BoolCheckBuilder;
     use hashcaster_multiclaim::builder::MulticlaimBuilder;
-    use hashcaster_poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point};
+    use hashcaster_primitives::poly::{
+        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point,
+    };
 
     #[test]
     fn test_current_rounds() {

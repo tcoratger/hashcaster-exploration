@@ -1,7 +1,9 @@
-use crate::multinear_lagrangian::{
-    MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
+use crate::{
+    binary_field::BinaryField128b,
+    poly::multinear_lagrangian::{
+        MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
+    },
 };
-use hashcaster_primitives::binary_field::BinaryField128b;
 use itertools::Itertools;
 use rayon::{
     iter::{
@@ -322,7 +324,7 @@ impl FromIterator<BinaryField128b> for Points {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_primitives::binary_field::BinaryField128b;
+    use crate::binary_field::BinaryField128b;
 
     #[test]
     fn test_eq_eval() {

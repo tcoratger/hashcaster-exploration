@@ -2,12 +2,14 @@ use crate::{
     algebraic::AlgebraicOps, bool_trait::CompressedFoldedOps, ternary_mapping::TernaryMapping,
     BoolCheck,
 };
-use hashcaster_poly::{
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
-    univariate::UnivariatePolynomial,
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    poly::{
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    },
 };
-use hashcaster_primitives::binary_field::BinaryField128b;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,

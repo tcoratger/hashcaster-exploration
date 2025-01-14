@@ -1,10 +1,13 @@
 use crate::prodcheck::ProdCheck;
-use hashcaster_poly::{
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
-    univariate::UnivariatePolynomial,
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    linear_trait::LinearOperations,
+    poly::{
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    },
 };
-use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use std::array;
 
 /// A builder for constructing and managing the state of the LinCheck protocol.

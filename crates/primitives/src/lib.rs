@@ -7,7 +7,9 @@ pub mod linear_trait;
 pub mod matrix;
 pub mod matrix_efficient;
 pub mod matrix_lin;
+pub mod poly;
 pub mod small_uint;
+pub mod sumcheck;
 pub mod utils;
 
 #[cfg(test)]

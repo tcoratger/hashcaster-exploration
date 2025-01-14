@@ -2,14 +2,17 @@
 #![feature(generic_const_exprs)]
 
 use hashcaster_lincheck::prodcheck::ProdCheck;
-use hashcaster_poly::{
-    compressed::CompressedPoly,
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
-    univariate::UnivariatePolynomial,
-};
 use hashcaster_primitives::{
-    array_ref, binary_field::BinaryField128b, matrix_efficient::EfficientMatrix,
+    array_ref,
+    binary_field::BinaryField128b,
+    matrix_efficient::EfficientMatrix,
+    poly::{
+        compressed::CompressedPoly,
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    },
+    sumcheck::Sumcheck,
 };
 use num_traits::MulAdd;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
@@ -40,6 +43,38 @@ impl<const N: usize> Default for MultiClaim<N> {
             gamma: Default::default(),
             object: Default::default(),
         }
+    }
+}
+
+impl<const N: usize> Sumcheck for MultiClaim<N> {
+    type Output = UnivariatePolynomial;
+
+    fn compute_round_polynomial(&mut self) -> CompressedPoly {
+        self.object.compute_round_polynomial()
+    }
+
+    fn bind(&mut self, challenge: &Point) {
+        self.object.bind(challenge);
+    }
+
+    fn finish(&self) -> Self::Output {
+        // Compute the folded openings.
+        // - The first opening is initialized to zero,
+        // - Subsequent openings are evaluated for each polynomial at the challenges derived during
+        //   the sumcheck.
+        let mut ret = UnivariatePolynomial::new(
+            std::iter::once(BinaryField128b::ZERO)
+                .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
+                .collect(),
+        );
+
+        // Adjust the first opening:
+        // - Use a univariate evaluation to account for gamma powers.
+        // - Update the first opening with the adjusted value.
+        ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
+
+        // Return the resulting openings.
+        ret
     }
 }
 
@@ -94,60 +129,13 @@ impl<const N: usize> MultiClaim<N> {
             gamma: gamma_pows.get(128).map_or_else(Default::default, |g| (*g).into()),
         }
     }
-
-    /// Computes the compressed polynomial for the current round of the proof.
-    ///
-    /// # Returns
-    /// The compressed polynomial after applying folding operations.
-    pub fn compute_round_polynomial(&mut self) -> CompressedPoly {
-        self.object.compute_round_polynomial()
-    }
-
-    /// Binds a challenge point to the `MultiClaim`.
-    ///
-    /// This updates the state of the underlying product check with the provided challenge point.
-    ///
-    /// # Parameters
-    /// - `challenge`: The challenge point used for folding operations.
-    pub fn bind(&mut self, challenge: &Point) {
-        self.object.bind(challenge);
-    }
-
-    /// Finalizes the `MultiClaim` by computing the univariate polynomial of folded openings.
-    ///
-    /// # Returns
-    /// A univariate polynomial representing the folded openings, adjusted for gamma powers.
-    ///
-    /// # Process
-    /// - Initializes the first opening to zero.
-    /// - Evaluates subsequent openings using the challenges derived during the sumcheck process.
-    /// - Adjusts the first opening with the univariate evaluation at the gamma value.
-    pub fn finish(&self) -> UnivariatePolynomial {
-        // Compute the folded openings.
-        // - The first opening is initialized to zero,
-        // - Subsequent openings are evaluated for each polynomial at the challenges derived during
-        //   the sumcheck.
-        let mut ret = UnivariatePolynomial::new(
-            std::iter::once(BinaryField128b::ZERO)
-                .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
-                .collect(),
-        );
-
-        // Adjust the first opening:
-        // - Use a univariate evaluation to account for gamma powers.
-        // - Update the first opening with the adjusted value.
-        ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
-
-        // Return the resulting openings.
-        ret
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use builder::MulticlaimBuilder;
-    use hashcaster_poly::{evaluation::Evaluations, point::Point};
+    use hashcaster_primitives::poly::{evaluation::Evaluations, point::Point};
     use num_traits::MulAdd;
 
     #[test]

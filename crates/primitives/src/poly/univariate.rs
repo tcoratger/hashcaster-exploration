@@ -1,5 +1,4 @@
-use crate::point::Point;
-use hashcaster_primitives::binary_field::BinaryField128b;
+use crate::{binary_field::BinaryField128b, poly::point::Point};
 use num_traits::MulAddAssign;
 use std::ops::{Deref, DerefMut, Mul, MulAssign};
 

@@ -3,13 +3,17 @@ use chi::chi_round_witness;
 use hashcaster_boolcheck::{algebraic::AlgebraicOps, builder::BoolCheckBuilder, BoolCheckOutput};
 use hashcaster_lincheck::{builder::LinCheckBuilder, prodcheck::ProdCheckOutput};
 use hashcaster_multiclaim::builder::MulticlaimBuilder;
-use hashcaster_poly::{
-    evaluation::Evaluations,
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
-    univariate::UnivariatePolynomial,
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    linear_trait::LinearOperations,
+    poly::{
+        evaluation::Evaluations,
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+        univariate::UnivariatePolynomial,
+    },
+    sumcheck::Sumcheck,
 };
-use hashcaster_primitives::{binary_field::BinaryField128b, linear_trait::LinearOperations};
 use itertools::Itertools;
 use linear::{keccak_linround_witness, KeccakLinear};
 use num_traits::MulAdd;
@@ -72,13 +76,6 @@ impl Keccak {
 
         // Evaluate the claims using the Chi witness and points.
         let evaluation_claims: [_; 5] = array::from_fn(|i| witness_chi[i].evaluate_at(&points));
-
-        // Assert that witness generation produced the expected number of evaluations.
-        assert_eq!(
-            evaluation_claims.len(),
-            5,
-            "Evaluation claims should contain exactly 5 entries."
-        );
 
         let duration = start.elapsed();
         println!(">>>> Witness generation took {} ms", duration.as_millis());

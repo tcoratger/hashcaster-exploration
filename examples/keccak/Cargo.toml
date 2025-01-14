@@ -9,7 +9,6 @@ workspace = true
 
 [dependencies]
 hashcaster-primitives = { workspace = true }
-hashcaster-poly = { workspace = true }
 hashcaster-lincheck = { workspace = true }
 hashcaster-boolcheck = { workspace = true }
 hashcaster-multiclaim = { workspace = true }

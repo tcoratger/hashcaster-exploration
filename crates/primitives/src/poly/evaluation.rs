@@ -1,6 +1,4 @@
-use hashcaster_primitives::{
-    binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE,
-};
+use crate::{binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE};
 use std::ops::{Deref, DerefMut};
 
 /// Evaluations of a polynomial at some points.

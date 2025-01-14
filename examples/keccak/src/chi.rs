@@ -1,6 +1,7 @@
 use hashcaster_boolcheck::algebraic::AlgebraicOps;
-use hashcaster_poly::multinear_lagrangian::MultilinearLagrangianPolynomial;
-use hashcaster_primitives::binary_field::BinaryField128b;
+use hashcaster_primitives::{
+    binary_field::BinaryField128b, poly::multinear_lagrangian::MultilinearLagrangianPolynomial,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
@@ -171,11 +172,14 @@ pub fn chi_round_witness(
 mod tests {
     use super::*;
     use hashcaster_boolcheck::{builder::BoolCheckBuilder, BoolCheckOutput};
-    use hashcaster_poly::{
-        evaluation::Evaluations,
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
-        univariate::UnivariatePolynomial,
+    use hashcaster_primitives::{
+        poly::{
+            evaluation::Evaluations,
+            multinear_lagrangian::MultilinearLagrangianPolynomial,
+            point::{Point, Points},
+            univariate::UnivariatePolynomial,
+        },
+        sumcheck::Sumcheck,
     };
     use itertools::Itertools;
     use std::array;

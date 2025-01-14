@@ -1,10 +1,12 @@
 use crate::MultiClaim;
-use hashcaster_poly::{
-    evaluation::Evaluations,
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    poly::{
+        evaluation::Evaluations,
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+    },
 };
-use hashcaster_primitives::binary_field::BinaryField128b;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array;
 
@@ -112,8 +114,10 @@ impl<const N: usize> MulticlaimBuilder<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_poly::point::{Point, Points};
-    use hashcaster_primitives::binary_field::BinaryField128b;
+    use hashcaster_primitives::{
+        binary_field::BinaryField128b,
+        poly::point::{Point, Points},
+    };
 
     #[test]
     fn test_multiclaim_builder_default() {

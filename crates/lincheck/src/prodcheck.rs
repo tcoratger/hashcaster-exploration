@@ -1,10 +1,13 @@
-use hashcaster_poly::{
-    compressed::CompressedPoly,
-    evaluation::Evaluations,
-    multinear_lagrangian::MultilinearLagrangianPolynomial,
-    point::{Point, Points},
+use hashcaster_primitives::{
+    binary_field::BinaryField128b,
+    poly::{
+        compressed::CompressedPoly,
+        evaluation::Evaluations,
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{Point, Points},
+    },
+    sumcheck::Sumcheck,
 };
-use hashcaster_primitives::binary_field::BinaryField128b;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array::from_fn;
 
@@ -37,80 +40,10 @@ impl<const N: usize> Default for ProdCheck<N> {
     }
 }
 
-impl<const N: usize> ProdCheck<N> {
-    pub fn new(
-        p_polys: [MultilinearLagrangianPolynomial; N],
-        q_polys: [MultilinearLagrangianPolynomial; N],
-        claim: BinaryField128b,
-        check_init_claim: bool,
-    ) -> Self {
-        // Compute the number of variables from the length of the first polynomial.
-        let num_vars = p_polys[0].len().ilog2() as usize;
+impl<const N: usize> Sumcheck for ProdCheck<N> {
+    type Output = ProdCheckOutput;
 
-        // Validate that each polynomial in `P` and `Q` has the expected size.
-        assert!(
-            p_polys
-                .iter()
-                .zip(q_polys.iter())
-                .all(|(p, q)| p.len() == 1 << num_vars && q.len() == 1 << num_vars),
-            "All polynomials must have size 2^num_vars"
-        );
-
-        // Optionally verify the correctness of the initial claim.
-        if check_init_claim {
-            // Compute the expected claim by multiplying each pair of polynomials.
-            let expected_claim =
-                p_polys.iter().zip(&q_polys).fold(BinaryField128b::ZERO, |acc, (p, q)| {
-                    acc + p
-                        .iter()
-                        .zip(q)
-                        .map(|(&p_val, &q_val)| p_val * q_val)
-                        .sum::<BinaryField128b>()
-                });
-
-            // Ensure the provided claim matches the computed claim.
-            assert_eq!(claim, expected_claim, "Initial claim does not match computed value");
-        }
-
-        // Return the new `Prodcheck` instance.
-        Self { p_polys, q_polys, claim, num_vars, ..Default::default() }
-    }
-
-    /// Computes the round polynomial for the current state of the prover in the sumcheck protocol.
-    ///
-    /// ### Purpose
-    /// The round polynomial represents the contribution of the current variable in the sumcheck
-    /// protocol. It compresses multilinear polynomial evaluations into a smaller univariate
-    /// polynomial, which is required for verification in the sumcheck protocol.
-    ///
-    /// ### Mathematical Context
-    /// Given two sets of polynomials, `P` and `Q`, the goal is to compute the contribution of the
-    /// current variable `X_i` to the overall product sum. For each index `i`, the contribution
-    /// consists of three terms:
-    ///
-    /// 1. **`pq_zero`**: Product of evaluations when `X_i = 0` for all polynomials.
-    /// 2. **`pq_one`**: Product of evaluations when `X_i = 1` for all polynomials.
-    /// 3. **`pq_inf`**: Product of sums of evaluations across both halves.
-    ///
-    /// These terms are combined into a univariate polynomial:
-    ///
-    /// ```text
-    /// g_i(X_i) = pq_zero + (pq_inf - pq_zero - pq_one) * X_i
-    /// ```
-    ///
-    /// This method iteratively reduces the polynomial size and caches intermediate results to
-    /// optimize future computations.
-    ///
-    /// ### Steps
-    /// 1. Validate the protocol state to ensure it is incomplete.
-    /// 2. Partition the evaluations into two halves based on the current variable.
-    /// 3. Compute the contributions (`pq_zero`, `pq_one`, `pq_inf`) for each index in parallel.
-    /// 4. Compress the computed polynomial into a univariate form.
-    /// 5. Cache the result to optimize future rounds.
-    ///
-    /// ### Returns
-    /// - A compressed polynomial representing the contribution of the current variable.
-    pub fn compute_round_polynomial(&mut self) -> CompressedPoly {
+    fn compute_round_polynomial(&mut self) -> CompressedPoly {
         // Fetch the length of the first polynomial to determine the range of the current variable.
         let p0_len = self.p_polys[0].len();
 
@@ -186,26 +119,7 @@ impl<const N: usize> ProdCheck<N> {
         compressed_poly
     }
 
-    /// Updates the state of the `ProdCheck` instance by binding a new challenge.
-    ///
-    /// ### Purpose
-    /// In the sumcheck protocol, the `bind` function progresses the protocol to the next step
-    /// by incorporating a new challenge, updating the claim, and halving the size of the
-    /// polynomials (`P` and `Q`). This allows for iterative reduction of the problem size.
-    ///
-    /// ### Key Steps
-    /// 1. Validates that the protocol is incomplete (polynomials are not fully reduced).
-    /// 2. Computes the new claim by evaluating the decompressed round polynomial at the challenge.
-    /// 3. Updates the list of challenges with the new challenge.
-    /// 4. Reduces the size of the `P` and `Q` polynomials by halving them based on the challenge.
-    /// 5. Clears the cached round message, as it becomes invalid after this operation.
-    ///
-    /// ### Parameters
-    /// - `r`: The new challenge (`BinaryField128b`) to bind to the protocol.
-    ///
-    /// ### Panics
-    /// - Panics if the protocol is already complete (polynomials have size 1).
-    pub fn bind(&mut self, r: &Point) {
+    fn bind(&mut self, r: &Point) {
         // Validate that the protocol is not complete.
         // Get the length of the first polynomial.
         let p0_len = self.p_polys[0].len();
@@ -260,20 +174,7 @@ impl<const N: usize> ProdCheck<N> {
         self.cached_round_msg = None;
     }
 
-    /// Finalizes the protocol and returns the results.
-    ///
-    /// # Purpose
-    /// The `finish` function is invoked when the sumcheck protocol has completed all rounds.
-    /// It produces the final evaluations of the `p_polys` and `q_polys`, which are guaranteed
-    /// to be single values at this stage.
-    ///
-    /// # Returns
-    /// A `ProdCheckOutput` containing the final evaluations of `p_polys` and `q_polys`.
-    ///
-    /// # Panics
-    /// - Panics if any polynomial in `p_polys` or `q_polys` is not fully reduced (i.e., does not
-    ///   have a length of 1).
-    pub fn finish(&self) -> ProdCheckOutput {
+    fn finish(&self) -> Self::Output {
         ProdCheckOutput {
             p_evaluations: self
                 .p_polys
@@ -296,6 +197,46 @@ impl<const N: usize> ProdCheck<N> {
                 })
                 .collect(),
         }
+    }
+}
+
+impl<const N: usize> ProdCheck<N> {
+    pub fn new(
+        p_polys: [MultilinearLagrangianPolynomial; N],
+        q_polys: [MultilinearLagrangianPolynomial; N],
+        claim: BinaryField128b,
+        check_init_claim: bool,
+    ) -> Self {
+        // Compute the number of variables from the length of the first polynomial.
+        let num_vars = p_polys[0].len().ilog2() as usize;
+
+        // Validate that each polynomial in `P` and `Q` has the expected size.
+        assert!(
+            p_polys
+                .iter()
+                .zip(q_polys.iter())
+                .all(|(p, q)| p.len() == 1 << num_vars && q.len() == 1 << num_vars),
+            "All polynomials must have size 2^num_vars"
+        );
+
+        // Optionally verify the correctness of the initial claim.
+        if check_init_claim {
+            // Compute the expected claim by multiplying each pair of polynomials.
+            let expected_claim =
+                p_polys.iter().zip(&q_polys).fold(BinaryField128b::ZERO, |acc, (p, q)| {
+                    acc + p
+                        .iter()
+                        .zip(q)
+                        .map(|(&p_val, &q_val)| p_val * q_val)
+                        .sum::<BinaryField128b>()
+                });
+
+            // Ensure the provided claim matches the computed claim.
+            assert_eq!(claim, expected_claim, "Initial claim does not match computed value");
+        }
+
+        // Return the new `Prodcheck` instance.
+        Self { p_polys, q_polys, claim, num_vars, ..Default::default() }
     }
 }
 
@@ -329,7 +270,7 @@ pub struct ProdCheckOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_poly::point::Point;
+    use hashcaster_primitives::poly::point::Point;
     use std::array;
 
     #[test]

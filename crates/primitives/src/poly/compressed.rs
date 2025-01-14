@@ -1,5 +1,4 @@
-use crate::univariate::UnivariatePolynomial;
-use hashcaster_primitives::binary_field::BinaryField128b;
+use crate::{binary_field::BinaryField128b, poly::univariate::UnivariatePolynomial};
 use std::ops::Deref;
 
 /// A compressed representation of a univariate polynomial in a binary field.
@@ -121,7 +120,7 @@ impl Deref for CompressedPoly {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_primitives::binary_field::BinaryField128b;
+    use crate::binary_field::BinaryField128b;
 
     #[test]
     fn test_compress() {
