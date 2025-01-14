@@ -231,9 +231,7 @@ mod tests {
         const NUM_VARS: usize = 20;
 
         // Create a multilinear polynomial with `2^NUM_VARS` coefficients
-        let poly = MultilinearLagrangianPolynomial::new(
-            (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
-        );
+        let poly = MultilinearLagrangianPolynomial::random(1 << NUM_VARS);
 
         // Create points for evaluation
         let points = Points::random(NUM_VARS);

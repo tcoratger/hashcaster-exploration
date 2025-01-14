@@ -48,6 +48,11 @@ impl MultilinearLagrangianPolynomial {
         self.coeffs.clone()
     }
 
+    /// Generates a random multilinear Lagrangian polynomial with the given number of coefficients.
+    pub fn random(n: usize) -> Self {
+        (0..n).map(|_| BinaryField128b::random()).collect()
+    }
+
     /// Creates a new [`MultilinearLagrangianPolynomial`] with the given coefficients.
     ///
     /// # Arguments

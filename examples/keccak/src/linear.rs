@@ -377,7 +377,7 @@ mod tests {
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
         let polys: [MultilinearLagrangianPolynomial; 5] =
-            array::from_fn(|_| (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect());
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
 
         // Apply the Keccak linear round witness computation
         let m_p = keccak_linround_witness(array::from_fn(|i| polys[i].as_slice()));

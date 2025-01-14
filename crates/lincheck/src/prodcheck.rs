@@ -731,19 +731,11 @@ mod tests {
 
         // Generate random polynomials for `p_polys` and `q_polys`.
         // Each polynomial has `2^NUM_VARS` evaluations.
-        let p_polys: [_; N] = array::from_fn(|_| {
-            MultilinearLagrangianPolynomial::new(
-                // Create a vector of random field elements of length `2^NUM_VARS`.
-                (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
-            )
-        });
+        let p_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
 
-        let q_polys: [_; N] = array::from_fn(|_| {
-            MultilinearLagrangianPolynomial::new(
-                // Create another vector of random field elements for `q_polys`.
-                (0..1 << NUM_VARS).map(|_| BinaryField128b::random()).collect(),
-            )
-        });
+        let q_polys: [_; N] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
 
         // Compute the initial claim: the sum of the element-wise products of `P` and `Q`.
         let mut current_claim =

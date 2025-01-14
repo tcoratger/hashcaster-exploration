@@ -566,14 +566,12 @@ mod tests {
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
-        let p: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+        let p = MultilinearLagrangianPolynomial::random(1 << num_vars);
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
-        let q: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+        let q = MultilinearLagrangianPolynomial::random(1 << num_vars);
 
         // Start a timer to measure the execution time of the test.
         let start = std::time::Instant::now();
@@ -694,14 +692,12 @@ mod tests {
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
-        let p: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+        let p = MultilinearLagrangianPolynomial::random(1 << num_vars);
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
-        let q: MultilinearLagrangianPolynomial =
-            (0..1 << num_vars).map(|_| BinaryField128b::random()).collect();
+        let q = MultilinearLagrangianPolynomial::random(1 << num_vars);
 
         // Start a timer to measure the execution time of the test.
         let start = std::time::Instant::now();

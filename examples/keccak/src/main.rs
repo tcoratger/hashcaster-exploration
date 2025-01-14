@@ -60,7 +60,7 @@ impl Keccak {
 
         // Generate 5 multilinear lagrangian polynomials with random coefficients.
         let polys: [MultilinearLagrangianPolynomial; 5] =
-            array::from_fn(|_| (0..1 << num_vars).map(|_| BinaryField128b::random()).collect());
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars));
 
         // Initialize the Chi package.
         let chi = ChiPackage;

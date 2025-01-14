@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_eq_poly_sequence_cross_check() {
         // Generate a random vector of 20 points in the finite field.
-        let points: Points = (0..20).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(20);
 
         // Compute the equality polynomial sequence for the points.
         let eq_sequence = points.to_eq_poly_sequence();
