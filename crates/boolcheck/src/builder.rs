@@ -433,37 +433,21 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
     for BoolCheckBuilder<N, M, A>
 {
     fn linear_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
-        // Compute the linear part of the boolean formula.
-        let lin = self.algebraic_operations.linear(arg);
-
-        // Initialize the accumulator to zero.
-        let mut acc = BinaryField128b::ZERO;
-
-        // Iterate over the output size `M` and compute the folded sum using `gammas`.
-        for (i, &t) in lin.iter().enumerate() {
-            // Multiply the result by the corresponding gamma and accumulate.
-            acc += t * self.gammas[i];
-        }
-
-        // Return the final compressed result.
-        acc
+        // Compute and fold the linear part of the boolean formula using gammas.
+        self.algebraic_operations
+            .linear(arg)
+            .iter()
+            .zip(self.gammas.iter())
+            .fold(BinaryField128b::ZERO, |acc, (&t, &gamma)| acc + t * gamma)
     }
 
     fn quadratic_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
-        // Compute the quadratic part of the boolean formula.
-        let quad = self.algebraic_operations.quadratic(arg);
-
-        // Initialize the accumulator to zero.
-        let mut acc = BinaryField128b::ZERO;
-
-        // Iterate over the output size `M` and compute the folded sum using `gammas`.
-        for (i, &t) in quad.iter().enumerate() {
-            // Multiply the result by the corresponding gamma and accumulate.
-            acc += t * self.gammas[i];
-        }
-
-        // Return the final compressed result.
-        acc
+        // Compute and fold the quadratic part of the boolean formula using gammas.
+        self.algebraic_operations
+            .quadratic(arg)
+            .iter()
+            .zip(self.gammas.iter())
+            .fold(BinaryField128b::ZERO, |acc, (&t, &gamma)| acc + t * gamma)
     }
 
     fn algebraic_compressed(
@@ -475,21 +459,10 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
         // Compute the algebraic result.
         let alg = self.algebraic_operations.algebraic(data, idx_a, offset);
 
-        // Initialize the accumulators for each of the 3 output values to zero.
-        let mut acc = [BinaryField128b::ZERO; 3];
-
-        // Iterate over the output size `M` and compute the folded sums for each output value.
-        for i in 0..M {
-            // Compress the first output using gammas.
-            acc[0] += alg[0][i] * self.gammas[i];
-            // Compress the second output using gammas.
-            acc[1] += alg[1][i] * self.gammas[i];
-            // Compress the third output using gammas.
-            acc[2] += alg[2][i] * self.gammas[i];
-        }
-
-        // Return the array of results.
-        acc
+        // Fold each output value using the gammas.
+        array::from_fn(|j| {
+            (0..M).fold(BinaryField128b::ZERO, |acc, i| acc + alg[j][i] * self.gammas[i])
+        })
     }
 }
 
