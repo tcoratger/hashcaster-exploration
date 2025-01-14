@@ -349,8 +349,6 @@ impl Keccak {
         // Equality polynomial corresponding to the random challenges
         let eq_challenges = self.challenges.to_eq_poly();
 
-        // ----------------
-
         // Generate a series of scaled equality polynomials by iteratively multiplying by gamma.
         let adj_eq_vec: Vec<_> = (0..5)
             // Start with an initial multiplier of ONE and update it for each iteration.

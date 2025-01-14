@@ -92,14 +92,12 @@ where
             .collect();
 
         // Combine all openings into a single composite opening.
-        let openings: Vec<_> = (0..128)
-            .map(|i| {
-                // Fold contributions from all openings for the current Frobenius point.
-                (0..N).fold(BinaryField128b::ZERO, |o, j| {
-                    o + self.openings[i + j * 128] * gamma_pows[128 * j]
-                })
+        let openings: [_; 128] = array::from_fn(|i| {
+            // Fold contributions from all openings for the current Frobenius point.
+            (0..N).fold(BinaryField128b::ZERO, |o, j| {
+                o + self.openings[i + j * 128] * gamma_pows[128 * j]
             })
-            .collect();
+        });
 
         // Construct and return the `MultiClaim`.
         MultiClaim::new(poly.into(), &self.points, &openings, &gamma_pows, self.polys.clone())
