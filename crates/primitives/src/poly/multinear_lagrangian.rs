@@ -542,7 +542,7 @@ mod tests {
         for _ in 0..iterations {
             // Step 1: Generate random points for the test.
             let num_points = rng.gen_range(2..6); // Random number of points between 2 and 5.
-            let points: Points = (0..num_points).map(|_| BinaryField128b::random()).collect();
+            let points = Points::random(num_points);
 
             // Step 2: Compute the equality polynomial using `new_eq_poly`.
             let result = points.to_eq_poly();
@@ -585,7 +585,7 @@ mod tests {
         let polynomial = MultilinearLagrangianPolynomial::new(vec![coeff0, coeff1, coeff2, coeff3]);
 
         // Define the evaluation points.
-        let points = Points::from(vec![BinaryField128b::random(), BinaryField128b::random()]);
+        let points = Points::random(2);
 
         // Compute the evaluation.
         let result = polynomial.evaluate_at(&points);

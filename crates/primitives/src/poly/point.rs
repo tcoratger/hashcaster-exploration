@@ -80,6 +80,11 @@ impl DerefMut for Point {
 pub struct Points(pub Vec<Point>);
 
 impl Points {
+    /// Generates a random collection of `n` points.
+    pub fn random(n: usize) -> Self {
+        (0..n).map(|_| BinaryField128b::random()).collect()
+    }
+
     /// Constructs the equality polynomial based on the provided points.
     ///
     /// # Arguments

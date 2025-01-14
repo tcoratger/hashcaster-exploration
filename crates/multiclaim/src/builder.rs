@@ -140,7 +140,7 @@ mod tests {
         ];
 
         // Define valid points.
-        let points = Points::from(vec![Point::from(BinaryField128b::from(1))]);
+        let points = Points::from(vec![Point::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
         let openings: Evaluations = vec![BinaryField128b::from(0); 2 * 128].into();
@@ -162,7 +162,7 @@ mod tests {
         ];
 
         // Define valid points.
-        let points = Points::from(vec![Point::from(BinaryField128b::from(1))]);
+        let points = Points::from(vec![Point::from(1)]);
 
         // Define an invalid number of openings (not N * 128).
         let openings = vec![BinaryField128b::from(0); 100];
@@ -181,7 +181,7 @@ mod tests {
         ];
 
         // Define valid points (1 point, so polynomials should have length 2).
-        let points = Points::from(vec![Point::from(BinaryField128b::from(1))]);
+        let points = Points::from(vec![Point::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
         let openings = vec![BinaryField128b::from(0); 2 * 128];
@@ -222,7 +222,7 @@ mod tests {
 
         // Define points (1 point, so polynomials should have length 2)
         // First point in the point set
-        let p1 = Point::from(BinaryField128b::from(1));
+        let p1 = Point::from(1);
         // Wrap the point into the Points structure
         let points = Points::from(vec![p1]);
 

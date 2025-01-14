@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+
 use algebraic::AlgebraicOps;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
@@ -558,7 +561,7 @@ mod tests {
 
         // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
         // This represents a set of random variables that will be used in the test.
-        let points: Vec<_> = (0..num_vars).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(num_vars);
 
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
@@ -580,7 +583,7 @@ mod tests {
         let p_and_q = p.clone() & q.clone();
 
         // The prover compute the initial claim for the AND operation at the points in `points`.
-        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+        let initial_claim = p_and_q.evaluate_at(&points);
 
         // Set a phase switch parameter, which controls the folding phases.
         let phase_switch = 5;
@@ -595,7 +598,7 @@ mod tests {
         let mut boolcheck_builder = BoolCheckBuilder::new(
             AndPackage,
             phase_switch,
-            points.clone().into(),
+            points.clone(),
             [initial_claim],
             [p, q],
         );
@@ -665,9 +668,6 @@ mod tests {
         // Compute algebraic AND
         let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
 
-        // Transform vector of Field elements to Points
-        let points: Points = points.iter().map(|p| Point::from(*p)).collect();
-
         // Transform random values to Points
         let challenges: Points = challenges.iter().map(|p| Point::from(*p)).collect();
 
@@ -689,7 +689,7 @@ mod tests {
 
         // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
         // This represents a set of random variables that will be used in the test.
-        let points: Vec<_> = (0..num_vars).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(num_vars);
 
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
@@ -711,7 +711,7 @@ mod tests {
         let p_and_q = p.clone() & q.clone();
 
         // The prover compute the initial claim for the AND operation at the points in `points`.
-        let initial_claim = p_and_q.evaluate_at(&points.clone().into());
+        let initial_claim = p_and_q.evaluate_at(&points);
 
         // Set a phase switch parameter, which controls the folding phases.
         let phase_switch = 5;
@@ -726,7 +726,7 @@ mod tests {
         let mut boolcheck_builder = BoolCheckBuilder::new(
             AndPackage,
             phase_switch,
-            points.clone().into(),
+            points.clone(),
             [initial_claim],
             [p.clone(), q.clone()],
         );
@@ -742,7 +742,7 @@ mod tests {
         let mut current_claim = initial_claim;
 
         // Setup an empty vector to store the challanges in the main loop
-        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars as usize));
+        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars));
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
@@ -802,9 +802,6 @@ mod tests {
         // Compute algebraic AND
         let and_algebraic = AndPackage::<2, 1>.algebraic(&untwisted_evals, 0, 1);
 
-        // Transform vector of Field elements to Points
-        let points: Points = points.iter().copied().collect();
-
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
 
@@ -846,7 +843,7 @@ mod tests {
         let mut claim = UnivariatePolynomial::new(frob_evals.0).evaluate_at(&gamma);
 
         // Setup an empty vector to store the challanges in the main loop
-        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars as usize));
+        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars));
 
         // Empty vector to store the challenges
         for _ in 0..num_vars {

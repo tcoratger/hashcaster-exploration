@@ -373,7 +373,7 @@ mod tests {
         let keccak_linear = KeccakLinear::new();
 
         // Setup NUM_VARS random points
-        let points: Points = (0..NUM_VARS).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(NUM_VARS);
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
         let polys: [MultilinearLagrangianPolynomial; 5] =

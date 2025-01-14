@@ -56,7 +56,7 @@ impl Keccak {
     /// Initialize the protocol with configuration and random data.
     pub fn new(num_vars: usize, c: usize, num_active_vars: usize) -> Self {
         // Generate random points for the protocol.
-        let points: Points = (0..num_vars).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(num_vars);
 
         // Generate 5 multilinear lagrangian polynomials with random coefficients.
         let polys: [MultilinearLagrangianPolynomial; 5] =

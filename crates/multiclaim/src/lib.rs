@@ -236,7 +236,7 @@ mod tests {
         );
 
         // Create points for evaluation
-        let points: Points = (0..NUM_VARS).map(|_| Point::random()).collect();
+        let points = Points::random(NUM_VARS);
 
         // Map the points to the inverse Frobenius orbit
         let points_inv_orbit: Vec<Points> =
@@ -280,9 +280,7 @@ mod tests {
             let challenge = Point::random();
 
             // Update the claim with the round polynomial and the challenge
-            claim = round_polynomial[0] +
-                round_polynomial[1] * *challenge +
-                round_polynomial[2] * *challenge * *challenge;
+            claim = round_polynomial.evaluate_at(&challenge);
 
             // Push the challenge to the vector
             challenges.push(challenge.clone());

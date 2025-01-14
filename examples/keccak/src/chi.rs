@@ -247,7 +247,7 @@ mod tests {
         const SWITCH: usize = 5;
 
         // Setup some random points
-        let points: Points = (0..NUM_VARS).map(|_| BinaryField128b::random()).collect();
+        let points = Points::random(NUM_VARS);
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
         let polys: [MultilinearLagrangianPolynomial; 5] =
