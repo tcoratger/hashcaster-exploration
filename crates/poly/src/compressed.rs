@@ -2,14 +2,56 @@ use crate::univariate::UnivariatePolynomial;
 use hashcaster_primitives::binary_field::BinaryField128b;
 use std::ops::Deref;
 
+/// A compressed representation of a univariate polynomial in a binary field.
+///
+/// # Description
+/// The `CompressedPoly` struct represents a polynomial with compressed coefficients,
+/// skipping certain terms for optimization. It allows efficient storage and reconstruction
+/// of the original polynomial given the sum of its coefficients evaluated at `x = 1`.
+///
+/// # Fields
+/// - `0`: A `Vec<BinaryField128b>` containing the compressed coefficients. The first coefficient is
+///   stored explicitly, followed by selected other coefficients. Some coefficients (e.g., `c1`) are
+///   omitted to reduce storage.
+///
+/// # Example
+/// Given the polynomial:
+/// ```text
+/// P(x) = 3 + 4x + 5x^2 + 6x^3
+/// ```
+/// - Compressed coefficients: `[3, 5, 6]`
+/// - Missing coefficient: `c1 = 4`
+///
+/// The struct supports compressing a polynomial, reconstructing it, and retrieving
+/// the original coefficients.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CompressedPoly(Vec<BinaryField128b>);
 
 impl CompressedPoly {
+    /// Creates a new compressed polynomial from a vector of coefficients.
+    ///
+    /// # Parameters
+    /// - `coeffs`: A `Vec<BinaryField128b>` containing the coefficients of the polynomial.
+    ///
+    /// # Returns
+    /// A `CompressedPoly` instance with the provided coefficients.
     pub const fn new(coeffs: Vec<BinaryField128b>) -> Self {
         Self(coeffs)
     }
 
+    /// Compresses a polynomial by omitting certain coefficients.
+    ///
+    /// # Parameters
+    /// - `poly`: A slice of `BinaryField128b` representing the polynomial coefficients.
+    ///
+    /// # Returns
+    /// A tuple containing:
+    /// - `CompressedPoly`: The compressed polynomial.
+    /// - `BinaryField128b`: The sum of the coefficients, used for reconstruction.
+    ///
+    /// # Example
+    /// Input: `[3, 4, 5, 6]` (coefficients of `P(x) = 3 + 4x + 5x^2 + 6x^3`)
+    /// Output: `(CompressedPoly([3, 5, 6]), 15)` (sum = 4 + 5 + 6 = 15)
     pub fn compress(poly: &[BinaryField128b]) -> (Self, BinaryField128b) {
         let sum = poly.iter().skip(1).fold(BinaryField128b::ZERO, |a, b| a + b);
         (Self(std::iter::once(&poly[0]).chain(&poly[2..]).copied().collect()), sum)
