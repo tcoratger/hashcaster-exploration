@@ -409,7 +409,7 @@ mod tests {
         // Main loop
         for _ in 0..NUM_ACTIVE_VARS {
             // Compute the round polynomial
-            let round_poly = prover.compute_round_polynomial().coeffs(claim);
+            let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
             let challenge = Point(BinaryField128b::random());

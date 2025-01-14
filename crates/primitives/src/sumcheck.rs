@@ -5,7 +5,7 @@ pub trait Sumcheck {
     type Output;
 
     /// Computes the polynomial for the current round of the sumcheck protocol.
-    fn compute_round_polynomial(&mut self) -> CompressedPoly;
+    fn round_polynomial(&mut self) -> CompressedPoly;
 
     /// Updates the state of the sumcheck instance by binding a new challenge.
     fn bind(&mut self, challenge: &Point);

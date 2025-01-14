@@ -43,7 +43,7 @@ impl<const N: usize> Default for ProdCheck<N> {
 impl<const N: usize> Sumcheck for ProdCheck<N> {
     type Output = ProdCheckOutput;
 
-    fn compute_round_polynomial(&mut self) -> CompressedPoly {
+    fn round_polynomial(&mut self) -> CompressedPoly {
         // Fetch the length of the first polynomial to determine the range of the current variable.
         let p0_len = self.p_polys[0].len();
 
@@ -131,7 +131,7 @@ impl<const N: usize> Sumcheck for ProdCheck<N> {
         // Compute the new claim using the decompressed round polynomial and the challenge.
         //
         // Fetch the coefficients of the round polynomial and evaluate it at the challenge `r`.
-        let round_poly = self.compute_round_polynomial().coeffs(self.claim);
+        let round_poly = self.round_polynomial().coeffs(self.claim);
         self.claim = round_poly.evaluate_at(r);
 
         // Add the new challenge to the list of challenges.
@@ -475,7 +475,7 @@ mod tests {
         assert!(prodcheck.cached_round_msg.is_none());
 
         // Compute the round polynomial.
-        let compressed_poly = prodcheck.compute_round_polynomial();
+        let compressed_poly = prodcheck.round_polynomial();
 
         // Manually compute the expected compressed polynomial.
         // - `pq_zero` is the sum of products of lower halves for all polynomials.
@@ -523,7 +523,7 @@ mod tests {
         let mut prodcheck = ProdCheck::new(p_polys, q_polys, incorrect_claim, false);
 
         // This should panic due to mismatched claim.
-        prodcheck.compute_round_polynomial();
+        prodcheck.round_polynomial();
     }
 
     #[test]
@@ -544,7 +544,7 @@ mod tests {
         let mut prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);
 
         // This should panic because the protocol is complete.
-        prodcheck.compute_round_polynomial();
+        prodcheck.round_polynomial();
     }
 
     #[test]
@@ -757,7 +757,7 @@ mod tests {
         // Simulate the rounds of the sumcheck protocol.
         for _ in 0..NUM_VARS {
             // Compute the round polynomial for the current state of the protocol.
-            let compressed_round_polynomial = prodcheck.compute_round_polynomial();
+            let compressed_round_polynomial = prodcheck.round_polynomial();
 
             // Generate a random challenge `r` for the current round.
             let r = Point(BinaryField128b::random());

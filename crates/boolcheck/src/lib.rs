@@ -98,7 +98,7 @@ where
 {
     type Output = BoolCheckOutput;
 
-    fn compute_round_polynomial(&mut self) -> CompressedPoly {
+    fn round_polynomial(&mut self) -> CompressedPoly {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -316,7 +316,7 @@ where
         // - The round polynomial is a univariate polynomial in `r`.
         // - We first compute the compressed form of the polynomial.
         // - We then decompress the polynomial to obtain the coefficients.
-        let round_poly = self.compute_round_polynomial().coeffs(self.claim);
+        let round_poly = self.round_polynomial().coeffs(self.claim);
         // Update the current claim:
         // - We evaluate the round polynomial at the random value `r` provided by the verifier.
         self.claim = round_poly.evaluate_at(r);
@@ -616,7 +616,7 @@ mod tests {
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
             // Compute the round polynomial for the current round.
-            let compressed_round_polynomial = boolcheck.compute_round_polynomial();
+            let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
             let r = BinaryField128b::random();
@@ -748,7 +748,7 @@ mod tests {
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
             // Compute the round polynomial for the current round.
-            let compressed_round_polynomial = boolcheck.compute_round_polynomial();
+            let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
             let r = Point(BinaryField128b::random());
@@ -852,7 +852,7 @@ mod tests {
         // Empty vector to store the challenges
         for _ in 0..num_vars {
             // Compute the round polynomial
-            let round_polynomial = multiclaim_prover.compute_round_polynomial().coeffs(claim);
+            let round_polynomial = multiclaim_prover.round_polynomial().coeffs(claim);
 
             // Check that the round polynomial is of degree 2
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
@@ -977,7 +977,7 @@ mod tests {
         );
 
         // Compute the round polynomial for an imaginary round.
-        let compressed_round_polynomial = boolcheck.compute_round_polynomial();
+        let compressed_round_polynomial = boolcheck.round_polynomial();
 
         // Verify the compressed round polynomial.
         assert_eq!(
@@ -1141,7 +1141,7 @@ mod tests {
         bool_check.round_polys.push(cached_poly.clone());
 
         // Compute the round polynomial for the cached round.
-        let round_poly = bool_check.compute_round_polynomial();
+        let round_poly = bool_check.round_polynomial();
 
         // Ensure the cached polynomial is returned.
         assert_eq!(round_poly, cached_poly);
@@ -1200,7 +1200,7 @@ mod tests {
         let mut bool_check = boolcheck_builder.build();
 
         // Compute the round polynomial for the initial round.
-        let round_poly = bool_check.compute_round_polynomial();
+        let round_poly = bool_check.round_polynomial();
 
         // Ensure the computed polynomial is not empty.
         assert!(!round_poly.coeffs(initial_claim).is_empty());
@@ -1257,7 +1257,7 @@ mod tests {
 
         // Attempt to compute a round polynomial beyond the round limit.
         // This should panic.
-        bool_check.compute_round_polynomial();
+        bool_check.round_polynomial();
     }
 
     #[test]
@@ -1308,7 +1308,7 @@ mod tests {
 
         // Attempt to compute a round polynomial with the incorrect claim.
         // This should panic as the claim does not match the computed value.
-        bool_check.compute_round_polynomial();
+        bool_check.round_polynomial();
     }
 
     #[test]
@@ -1360,7 +1360,7 @@ mod tests {
         let mut bool_check = boolcheck_builder.build();
 
         // Compute the round polynomial.
-        let round_poly = bool_check.compute_round_polynomial();
+        let round_poly = bool_check.round_polynomial();
 
         // Decompress the round polynomial and retrieve its coefficients.
         let coeffs = round_poly.coeffs(initial_claim);

@@ -49,8 +49,8 @@ impl<const N: usize> Default for MultiClaim<N> {
 impl<const N: usize> Sumcheck for MultiClaim<N> {
     type Output = UnivariatePolynomial;
 
-    fn compute_round_polynomial(&mut self) -> CompressedPoly {
-        self.object.compute_round_polynomial()
+    fn round_polynomial(&mut self) -> CompressedPoly {
+        self.object.round_polynomial()
     }
 
     fn bind(&mut self, challenge: &Point) {
@@ -268,7 +268,7 @@ mod tests {
         // Principal loop of the prover
         for _ in 0..NUM_VARS {
             // Compute the round polynomial
-            let round_polynomial = prover.compute_round_polynomial().coeffs(claim);
+            let round_polynomial = prover.round_polynomial().coeffs(claim);
 
             // Check that the round polynomial is of degree 2
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");

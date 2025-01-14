@@ -133,7 +133,7 @@ impl Keccak {
         // Perform the BoolCheck rounds.
         for _ in 0..self.num_vars {
             // Compute the round polynomial.
-            let round_poly = boolcheck_prover.compute_round_polynomial().coeffs(claim);
+            let round_poly = boolcheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
             let challenge = Point(BinaryField128b::random());
@@ -245,7 +245,7 @@ impl Keccak {
         // Perform the Multiclaim rounds.
         for _ in 0..self.num_vars {
             // Compute the round polynomial.
-            let round_poly = multiclaim_prover.compute_round_polynomial().coeffs(claim);
+            let round_poly = multiclaim_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
             let challenge = Point(BinaryField128b::random());
@@ -326,7 +326,7 @@ impl Keccak {
         // Perform the LinCheck rounds.
         for _ in 0..self.num_active_vars {
             // Compute the round polynomial.
-            let round_poly = lincheck_prover.compute_round_polynomial().coeffs(claim);
+            let round_poly = lincheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
             let challenge = Point(BinaryField128b::random());
