@@ -400,15 +400,7 @@ where
             .collect();
 
         // Apply the twist operation to each chunk of 128 evaluations.
-        // TODO: To be modified, this is not clean.
-        frob_evals.chunks_exact_mut(128).for_each(|chunk| {
-            let mut tmp = Evaluations::from(chunk.to_vec());
-            tmp.twist();
-
-            for (i, val) in tmp.iter().enumerate() {
-                chunk[i] = *val;
-            }
-        });
+        frob_evals.twist();
 
         // Return the `BoolCheckOutput`
         Self::Output { frob_evals, round_polys: round_polys.clone() }
@@ -649,15 +641,8 @@ mod tests {
         // Finish the protocol and obtain the output.
         let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
-        // Chunk the Frobenius evaluations and untwist each chunk.
-        frob_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
-            let mut tmp = Evaluations::from(chunk.to_vec());
-            tmp.untwist();
-
-            for (i, val) in tmp.iter().enumerate() {
-                chunk[i] = *val;
-            }
-        });
+        // Untwist the Frobenius evaluations to obtain the expected claim.
+        frob_evals.untwist();
 
         // Add a zero element to the end of the evaluations for padding.
         // TODO: hack to be removed in the future
@@ -781,15 +766,8 @@ mod tests {
 
         assert_eq!(frob_evals.len(), 256, "Invalid number of Frobenius evaluations.");
 
-        // Chunk the Frobenius evaluations and untwist each chunk.
-        untwisted_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
-            let mut tmp = Evaluations::from(chunk.to_vec());
-            tmp.untwist();
-
-            for (i, val) in tmp.iter().enumerate() {
-                chunk[i] = *val;
-            }
-        });
+        // Untwist the Frobenius evaluations to obtain the expected claim.
+        untwisted_evals.untwist();
 
         // Add a zero element to the end of the evaluations for padding.
         // TODO: hack to be removed in the future

@@ -1,4 +1,5 @@
 use crate::{binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE};
+use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use std::ops::{Deref, DerefMut};
 
 /// Evaluations of a polynomial at some points.
@@ -79,35 +80,33 @@ impl Evaluations {
     ///    orbit.
     /// 4. Replace the original evaluations with the twisted evaluations.
     pub fn twist(&mut self) {
-        // Create a vector to store the twisted evaluations.
-        // This will hold the new evaluations of P in the inverse Frobenius orbit.
-        let mut twisted_evals = vec![];
+        // Ensure the evaluations can be chunked into 128-element groups.
+        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
 
-        // Perform the twist operation for 128 basis elements.
-        // Each iteration computes one twisted evaluation of P.
-        for _ in 0..128 {
-            // Square each element in the input evaluations (`evals`).
-            // This is the Frobenius mapping applied to all elements in `evals`.
-            // Perform x = x^2 for all x in evals.
-            self.iter_mut().map(|x| *x *= *x).count();
+        // Process each chunk of 128 elements separately.
+        self.chunks_exact_mut(128).for_each(|chunk| {
+            // Create a vector to store the twisted evaluations for this chunk.
+            let mut twisted_evals = vec![];
 
-            // Compute the evaluation of P for the current twist.
-            // - Multiply each element of `evals` by the corresponding basis element
-            // - Sum them up to get the evaluation of P in this twisted context.
-            twisted_evals.push(
-                (0..128)
-                    .map(|i| BinaryField128b::basis(i) * self[i])
-                    .fold(BinaryField128b::ZERO, |a, b| a + b),
-            );
-        }
+            // Perform the twist operation for 128 basis elements.
+            for _ in 0..128 {
+                // Apply the Frobenius map (squaring) to all elements in the chunk.
+                chunk.iter_mut().for_each(|x| *x *= *x);
 
-        // Reverse the twisted evaluations.
-        // This ensures that the evaluations align with the inverse Frobenius orbit.
-        twisted_evals.reverse();
+                // Compute the twisted evaluation for this basis index.
+                twisted_evals.push(
+                    (0..128)
+                        .map(|i| BinaryField128b::basis(i) * chunk[i])
+                        .fold(BinaryField128b::ZERO, |acc, val| acc + val),
+                );
+            }
 
-        // Replace the original evaluations with the twisted evaluations.
-        // The `evals` slice now contains the twisted evaluations.
-        self.clone_from_slice(&twisted_evals);
+            // Reverse the twisted evaluations to align with the inverse Frobenius orbit.
+            twisted_evals.reverse();
+
+            // Replace the original chunk with the twisted evaluations.
+            chunk.copy_from_slice(&twisted_evals);
+        });
     }
 
     /// Reverts the "twist" transformation by applying the inverse.
@@ -123,22 +122,31 @@ impl Evaluations {
     /// 1. Apply the Frobenius map \( x \mapsto x^{2^i} \) to align the elements.
     /// 2. Use the `pi` function to reconstruct the evaluations from the twisted form.
     pub fn untwist(&mut self) {
-        // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
-        #[allow(clippy::cast_possible_wrap)]
-        for i in 0..128 {
-            self[i] = self[i].frobenius(i as i32);
-        }
+        // Ensure the evaluations can be chunked into 128-element groups.
+        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
 
-        // Use a fixed-size array to store the untwisted evaluations.
-        let mut untwisted = [BinaryField128b::ZERO; 128];
+        // Process each chunk of 128 elements separately.
+        self.par_chunks_exact_mut(128).for_each(|chunk| {
+            // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
+            // Each element in the chunk is updated to its Frobenius-transformed value.
+            chunk.iter_mut().enumerate().for_each(|(i, val)| {
+                *val = val.frobenius(i as i32);
+            });
 
-        // Compute the untwisted evaluations using the `pi` function.
-        for (i, ut) in untwisted.iter_mut().enumerate() {
-            *ut = self.pi(i);
-        }
+            // Compute the untwisted evaluations using the `pi` function.
+            // Create a temporary array to store the untwisted values for this chunk.
+            let mut untwisted_chunk = [BinaryField128b::ZERO; 128];
 
-        // Replace the current evaluations with the untwisted evaluations.
-        self.copy_from_slice(&untwisted);
+            // Calculate each untwisted value based on the `pi` function.
+            untwisted_chunk.iter_mut().enumerate().for_each(|(i, ut)| {
+                *ut = (0..128)
+                    .map(|j| BinaryField128b::new(COBASIS_FROBENIUS_TRANSPOSE[i][j]) * chunk[j])
+                    .fold(BinaryField128b::ZERO, |acc, x| acc + x);
+            });
+
+            // Replace the current chunk with the untwisted values.
+            chunk.copy_from_slice(&untwisted_chunk);
+        });
     }
 }
 

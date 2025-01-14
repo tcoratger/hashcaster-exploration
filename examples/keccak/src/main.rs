@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+
 use crate::chi::ChiPackage;
 use chi::chi_round_witness;
 use hashcaster_boolcheck::{algebraic::AlgebraicOps, builder::BoolCheckBuilder, BoolCheckOutput};
@@ -7,7 +10,6 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
-        evaluation::Evaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
         univariate::UnivariatePolynomial,
@@ -170,14 +172,7 @@ impl Keccak {
         let mut coord_evals = output.frob_evals.clone();
 
         // Untwist the Frobenius evaluations
-        coord_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
-            let mut tmp = Evaluations::from(chunk.to_vec());
-            tmp.untwist();
-
-            for (i, val) in tmp.iter().enumerate() {
-                chunk[i] = *val;
-            }
-        });
+        coord_evals.untwist();
 
         // Trick for padding
         coord_evals.push(BinaryField128b::ZERO);
