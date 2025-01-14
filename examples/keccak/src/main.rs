@@ -12,7 +12,7 @@ use hashcaster_primitives::{
         point::{Point, Points},
         univariate::UnivariatePolynomial,
     },
-    sumcheck::Sumcheck,
+    sumcheck::{Sumcheck, SumcheckBuilder},
 };
 use itertools::Itertools;
 use linear::{keccak_linround_witness, KeccakLinear};
@@ -105,17 +105,16 @@ impl Keccak {
         let gamma = Point(BinaryField128b::random());
 
         // Initialize the BoolCheck prover builder.
-        let boolcheck_builder = BoolCheckBuilder::new(
+        let mut boolcheck_builder = BoolCheckBuilder::new(
             self.chi.clone(),
             self.c,
             self.points.clone(),
-            &gamma,
             self.evaluation_claims,
             self.witness_linear.clone(),
         );
 
         // Build the BoolCheck prover.
-        let mut boolcheck_prover = boolcheck_builder.build();
+        let mut boolcheck_prover = boolcheck_builder.build(&gamma);
 
         // Initialize the claim.
         let mut claim =
@@ -225,7 +224,7 @@ impl Keccak {
         points_inv_orbit.reverse();
 
         // Initialize the Multiclaim prover builder.
-        let multiclaim_builder = MulticlaimBuilder::new(
+        let mut multiclaim_builder = MulticlaimBuilder::new(
             self.witness_linear.clone(),
             self.challenges.clone(),
             self.boolcheck_output.clone().unwrap().frob_evals,
@@ -299,7 +298,7 @@ impl Keccak {
             self.multiclaim_output.clone().unwrap().coeffs.try_into().unwrap();
 
         // Initialize the LinCheck prover builder.
-        let lincheck_builder = LinCheckBuilder::new(
+        let mut lincheck_builder = LinCheckBuilder::new(
             self.polys.clone(),
             self.challenges.clone(),
             KeccakLinear::new(),

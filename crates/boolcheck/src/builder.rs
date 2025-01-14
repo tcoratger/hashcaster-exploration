@@ -9,6 +9,7 @@ use hashcaster_primitives::{
         point::{Point, Points},
         univariate::UnivariatePolynomial,
     },
+    sumcheck::SumcheckBuilder,
 };
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
@@ -49,13 +50,6 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize, A: AlgebraicOps<N, M
     /// These points represent the input space for the `BoolCheck` protocol.
     pub points: Points,
 
-    /// The folding challenge `gamma`.
-    ///
-    /// A random field element used to compute folding challenges.
-    /// Folding challenges are applied to compress the polynomials and evaluate
-    /// the Boolean relations.
-    pub gamma: Point,
-
     /// Precomputed folding challenges (`gammas`).
     ///
     /// An array of field elements derived from `gamma`. These values are used
@@ -86,7 +80,6 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
         Self {
             c: 0,
             points: Default::default(),
-            gamma: Default::default(),
             gammas: array::from_fn(|_| Default::default()),
             claims: array::from_fn(|_| Default::default()),
             polys: array::from_fn(|_| Default::default()),
@@ -125,7 +118,6 @@ where
         algebraic_operations: A,
         c: usize,
         points: Points,
-        gamma: &Point,
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
@@ -134,15 +126,7 @@ where
         //
         // This ensures the phase switch does not exceed the dimensionality of the input space.
         assert!(c < points.len());
-        Self {
-            c,
-            points,
-            gamma: gamma.clone(),
-            gammas: BinaryField128b::compute_gammas_folding::<M>(**gamma),
-            claims,
-            polys,
-            algebraic_operations,
-        }
+        Self { c, points, claims, polys, algebraic_operations, ..Default::default() }
     }
 
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
@@ -401,8 +385,18 @@ where
 
         result
     }
+}
 
-    pub fn build(&self) -> BoolCheck<N, M, A> {
+impl<const N: usize, const M: usize, A> SumcheckBuilder for BoolCheckBuilder<N, M, A>
+where
+    A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
+{
+    type Sumcheck = BoolCheck<N, M, A>;
+
+    fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
+        // Compute the folding challenges using the provided gamma.
+        self.gammas = BinaryField128b::compute_gammas_folding::<M>(**gamma);
+
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         for poly in &self.polys {
@@ -420,7 +414,7 @@ where
             c: self.c,
             bit_mapping,
             eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
-            claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(&self.gamma),
+            claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
             extended_table: self.extend_n_tables(
                 &trit_mapping,
                 |args| self.linear_compressed(args),

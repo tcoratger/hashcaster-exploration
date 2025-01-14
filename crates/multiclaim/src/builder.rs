@@ -6,6 +6,7 @@ use hashcaster_primitives::{
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
     },
+    sumcheck::SumcheckBuilder,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array;
@@ -65,21 +66,15 @@ impl<const N: usize> MulticlaimBuilder<N> {
 
         Self { polys, points, openings }
     }
+}
 
-    /// Builds a `MultiClaim` by folding the input polynomials and openings using a gamma parameter.
-    ///
-    /// # Parameters
-    /// - `gamma`: A reference to a `Point` used for the folding operation.
-    ///
-    /// # Returns
-    /// A `MultiClaim` representing the combined result of the inputs.
-    ///
-    /// # Requirements
-    /// - The generic constant `[(); 128 * N]` must be well-formed.
-    pub fn build(&self, gamma: &Point) -> MultiClaim<N>
-    where
-        [(); 128 * N]:,
-    {
+impl<const N: usize> SumcheckBuilder for MulticlaimBuilder<N>
+where
+    [(); 128 * N]:,
+{
+    type Sumcheck = MultiClaim<N>;
+
+    fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the powers of gamma for the folding process.
         let gamma_pows: [_; 128 * N] = BinaryField128b::compute_gammas_folding(**gamma);
 
@@ -239,7 +234,7 @@ mod tests {
         }
 
         // Create a new MulticlaimBuilder instance
-        let builder = MulticlaimBuilder::new(polys, points, openings.clone().into());
+        let mut builder = MulticlaimBuilder::new(polys, points, openings.clone().into());
 
         // Define gamma (random point for testing)
         let gamma = Point::from(BinaryField128b::from(2));

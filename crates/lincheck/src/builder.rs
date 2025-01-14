@@ -7,6 +7,7 @@ use hashcaster_primitives::{
         point::{Point, Points},
         univariate::UnivariatePolynomial,
     },
+    sumcheck::SumcheckBuilder,
 };
 use std::array;
 
@@ -82,21 +83,14 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
         // Return the initialized builder.
         Self { matrix, polys, points, num_vars, num_active_vars, initial_claims }
     }
+}
 
-    /// Constructs the folding challenge protocol for LinCheck.
-    ///
-    /// ## Description
-    /// This function sets up the LinCheck protocol by:
-    /// - Restricting the input polynomials based on "dormant" variables.
-    /// - Combining the equality polynomial for "active" variables with gamma powers.
-    /// - Applying a matrix transposition to compute folded results.
-    ///
-    /// ## Parameters
-    /// - `gamma`: Folding challenge scalar.
-    ///
-    /// ## Returns
-    /// A `ProdCheck` object containing the folded polynomials and evaluations.
-    pub fn build(self, gamma: &Point) -> ProdCheck<N> {
+impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
+    for LinCheckBuilder<N, M, L>
+{
+    type Sumcheck = ProdCheck<N>;
+
+    fn build(&mut self, gamma: &Point) -> ProdCheck<N> {
         // Compute chunk size based on active variables.
         // Each polynomial is divided into chunks of size `2^num_active_vars`.
         let chunk_size = 1 << self.num_active_vars;
@@ -121,7 +115,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
         //
         // For each polynomial `P(x)`:
         // `P'(x) = Σ(eq_dormant[j] * P_chunk[j])` for chunks `j`.
-        self.polys.into_iter().enumerate().for_each(|(i, poly)| {
+        self.polys.clone().into_iter().enumerate().for_each(|(i, poly)| {
             poly.chunks(chunk_size).enumerate().for_each(|(j, chunk)| {
                 p_polys[i].iter_mut().zip(chunk).for_each(|(p, &c)| *p += eq_dormant[j] * c);
             });
@@ -431,10 +425,11 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Construct LinCheckBuilder
-        let lincheck = LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+        let mut lincheck_builder =
+            LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover
-        let lincheck_prover = lincheck.build(&Point(BinaryField128b::from(1234)));
+        let lincheck_prover = lincheck_builder.build(&Point(BinaryField128b::from(1234)));
 
         // Expected ProdCheck prover
         let expected_prover = ProdCheck {

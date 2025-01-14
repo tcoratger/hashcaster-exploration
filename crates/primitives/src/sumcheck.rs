@@ -1,5 +1,15 @@
 use crate::poly::{compressed::CompressedPoly, point::Point};
 
+/// A trait that abstracts the sumcheck protocol builder.
+pub trait SumcheckBuilder {
+    /// The sumcheck protocol type.
+    type Sumcheck: Sumcheck;
+
+    /// Builds a new sumcheck instance.
+    fn build(&mut self, gamma: &Point) -> Self::Sumcheck;
+}
+
+/// A trait that abstracts the sumcheck protocol methods.
 pub trait Sumcheck {
     /// The output type of the sumcheck protocol.
     type Output;

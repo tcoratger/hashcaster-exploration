@@ -179,7 +179,7 @@ mod tests {
             point::{Point, Points},
             univariate::UnivariatePolynomial,
         },
-        sumcheck::Sumcheck,
+        sumcheck::{Sumcheck, SumcheckBuilder},
     };
     use itertools::Itertools;
     use std::array;
@@ -268,15 +268,14 @@ mod tests {
         let start = std::time::Instant::now();
 
         // Setup the prover builder
-        let prover_builder = BoolCheckBuilder::new(
+        let mut prover_builder = BoolCheckBuilder::new(
             chi.clone(),
             SWITCH,
             points.clone(),
-            &gamma,
             evaluation_claims,
             polys.clone(),
         );
-        let mut prover = prover_builder.build();
+        let mut prover = prover_builder.build(&gamma);
 
         // Initialize the claim
         let mut claim = UnivariatePolynomial::new(evaluation_claims.to_vec()).evaluate_at(&gamma);

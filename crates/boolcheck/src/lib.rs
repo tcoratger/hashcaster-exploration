@@ -493,8 +493,9 @@ mod tests {
     use and::AndPackage;
     use builder::BoolCheckBuilder;
     use hashcaster_multiclaim::builder::MulticlaimBuilder;
-    use hashcaster_primitives::poly::{
-        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point,
+    use hashcaster_primitives::{
+        poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point},
+        sumcheck::SumcheckBuilder,
     };
 
     #[test]
@@ -585,17 +586,16 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = BinaryField128b::random();
+        let gamma = Point(BinaryField128b::random());
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let boolcheck_builder = BoolCheckBuilder::new(
+        let mut boolcheck_builder = BoolCheckBuilder::new(
             AndPackage,
             phase_switch,
             points.clone().into(),
-            &Point(gamma),
             [initial_claim],
             [p, q],
         );
@@ -604,7 +604,7 @@ mod tests {
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut boolcheck = boolcheck_builder.build();
+        let mut boolcheck = boolcheck_builder.build(&gamma);
 
         // Initialize the current claim as the initial claim.
         // The current claim will be updated during each round of the protocol.
@@ -717,17 +717,16 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = BinaryField128b::random();
+        let gamma = Point(BinaryField128b::random());
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let boolcheck_builder = BoolCheckBuilder::new(
+        let mut boolcheck_builder = BoolCheckBuilder::new(
             AndPackage,
             phase_switch,
             points.clone().into(),
-            &Point(gamma),
             [initial_claim],
             [p.clone(), q.clone()],
         );
@@ -736,7 +735,7 @@ mod tests {
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut boolcheck = boolcheck_builder.build();
+        let mut boolcheck = boolcheck_builder.build(&gamma);
 
         // Initialize the current claim as the initial claim.
         // The current claim will be updated during each round of the protocol.
@@ -837,7 +836,7 @@ mod tests {
         // println!("frob_evals {:?}", frob_evals);
 
         // Setup a multiclaim builder
-        let multiclaim_builder =
+        let mut multiclaim_builder =
             MulticlaimBuilder::new([p.clone(), q.clone()], points, frob_evals.clone());
 
         // Builder the multiclaim prover via folding
@@ -921,26 +920,20 @@ mod tests {
         let phase_switch = 2;
 
         // Generate a folding challenge `gamma`
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check with the following parameters:
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut boolcheck = boolcheck_builder.build();
+        let mut boolcheck = boolcheck_builder.build(&gamma);
 
         // Validate the initial extended table.
         assert_eq!(
@@ -1115,26 +1108,20 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check with the following parameters:
         // - the multilinear polynomials `p` and `q` used in the AND operation,
         // - the initial claim for the AND operation,
         // - the folding challenge `gamma`.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Add a precomputed round polynomial to the cache.
         let cached_poly = CompressedPoly::new(vec![BinaryField128b::from(1)]);
@@ -1184,20 +1171,14 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance.
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Compute the round polynomial for the initial round.
         let round_poly = bool_check.round_polynomial();
@@ -1235,20 +1216,14 @@ mod tests {
         let phase_switch = 2;
 
         // Generate a folding challenge `gamma`.
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance.
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Simulate adding challenges equal to the number of variables.
         for i in 0..bool_check.number_variables() {
@@ -1291,20 +1266,19 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance.
-        let boolcheck_builder = BoolCheckBuilder::new(
+        let mut boolcheck_builder = BoolCheckBuilder::new(
             AndPackage,
             phase_switch,
             points.into(),
-            &Point(gamma),
             [incorrect_claim],
             [p, q],
         );
 
         // Build the Boolean check.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Attempt to compute a round polynomial with the incorrect claim.
         // This should panic as the claim does not match the computed value.
@@ -1344,20 +1318,14 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance.
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Compute the round polynomial.
         let round_poly = bool_check.round_polynomial();
@@ -1545,20 +1513,14 @@ mod tests {
         let phase_switch = 1;
 
         // Generate a folding challenge `gamma`.
-        let gamma = BinaryField128b::new(1234);
+        let gamma = Point(BinaryField128b::new(1234));
 
         // Create a new `BoolCheckBuilder` instance.
-        let boolcheck_builder = BoolCheckBuilder::new(
-            AndPackage,
-            phase_switch,
-            points.into(),
-            &Point(gamma),
-            [initial_claim],
-            [p, q],
-        );
+        let mut boolcheck_builder =
+            BoolCheckBuilder::new(AndPackage, phase_switch, points.into(), [initial_claim], [p, q]);
 
         // Build the Boolean check.
-        let mut bool_check = boolcheck_builder.build();
+        let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Bind a random challenge `r` to the BoolCheck instance.
         let r = Point::from(BinaryField128b::from(42));

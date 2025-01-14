@@ -135,7 +135,10 @@ impl<const N: usize> MultiClaim<N> {
 mod tests {
     use super::*;
     use builder::MulticlaimBuilder;
-    use hashcaster_primitives::poly::{evaluation::Evaluations, point::Point};
+    use hashcaster_primitives::{
+        poly::{evaluation::Evaluations, point::Point},
+        sumcheck::SumcheckBuilder,
+    };
     use num_traits::MulAdd;
 
     #[test]
@@ -244,7 +247,7 @@ mod tests {
             (0..128).map(|i| poly.evaluate_at(&points_inv_orbit[i])).collect();
 
         // Setup a multiclaim builder
-        let prover_builder =
+        let mut prover_builder =
             MulticlaimBuilder::new([poly.clone()], points, evaluations_inv_orbit.clone());
 
         // Generate a random gamma for folding

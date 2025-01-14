@@ -253,7 +253,7 @@ mod tests {
             point::{Point, Points},
             univariate::UnivariatePolynomial,
         },
-        sumcheck::Sumcheck,
+        sumcheck::{Sumcheck, SumcheckBuilder},
     };
     use num_traits::MulAdd;
 
@@ -386,7 +386,7 @@ mod tests {
         let initial_claims: [_; 5] = array::from_fn(|i| m_p[i].evaluate_at(&points));
 
         // Setup the lincheck prover
-        let prover = LinCheckBuilder::new(
+        let mut prover_builder = LinCheckBuilder::new(
             polys.clone(),
             points.clone(),
             keccak_linear,
@@ -398,7 +398,7 @@ mod tests {
         let gamma = Point(BinaryField128b::random());
 
         // Build the prover
-        let mut prover = prover.build(&gamma);
+        let mut prover = prover_builder.build(&gamma);
 
         // Claim to be updated during the main loop
         let mut claim = UnivariatePolynomial::from(initial_claims.to_vec()).evaluate_at(&gamma);
