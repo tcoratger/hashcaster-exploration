@@ -366,7 +366,7 @@ where
         // 3. We can transition to phase 2 by applying the `restrict` functionality.
         if self.current_round() == self.c + 1 {
             // At the end of the first phase, we do not need the extended table anymore.
-            self.extended_table = Vec::new();
+            self.extended_table.clear();
 
             // Restrict the polynomial coordinates based on the accumulated challenges.
             self.poly_coords = MultilinearLagrangianPolynomials::from(self.polys.to_vec())
