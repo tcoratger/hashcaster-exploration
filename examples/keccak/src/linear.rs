@@ -121,9 +121,7 @@ impl LinearOperations for KeccakLinear {
         let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the combined RhoPi and Theta transformations to each sub-state.
-        for j in 0..3 {
-            self.0.apply(&state[j], &mut output_state[j]);
-        }
+        state.iter().zip(output_state.iter_mut()).for_each(|(s, o)| self.0.apply(s, o));
 
         // Map the transformed intermediate output back to the flattened output vector.
         for i in 0..5 {
@@ -159,9 +157,7 @@ impl LinearOperations for KeccakLinear {
         let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the inverse transformations to each sub-state.
-        for j in 0..3 {
-            self.0.apply_transposed(&state[j], &mut output_state[j]);
-        }
+        state.iter().zip(output_state.iter_mut()).for_each(|(s, o)| self.0.apply_transposed(s, o));
 
         // Map the transformed intermediate output back to the flattened output vector.
         for i in 0..5 {
@@ -229,7 +225,9 @@ pub fn keccak_linround_witness(
         let mut output_state = [[BinaryField128b::ZERO; 1600]; 3];
 
         // Apply the Keccak linear operator to each part of the state.
-        (0..3).for_each(|j| m.apply(&input_state[j], &mut output_state[j]));
+        input_state.iter().zip(output_state.iter_mut()).for_each(|(input, output)| {
+            m.apply(input, output);
+        });
 
         // Map the transformed output state back to the flattened output vectors.
         output.iter_mut().enumerate().for_each(|(i, block)| {
