@@ -1,6 +1,5 @@
-use std::ops::Index;
-
 use hashcaster_primitives::binary_field::BinaryField128b;
+use std::ops::Index;
 
 /// A trait defining a generic algebraic evaluation behavior.
 ///

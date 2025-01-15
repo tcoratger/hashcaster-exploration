@@ -399,9 +399,10 @@ where
 
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
-        for poly in &self.polys {
-            assert_eq!(poly.len(), expected_poly_len, "Polynomial length mismatch");
-        }
+        assert!(
+            self.polys.iter().all(|poly| poly.len() == expected_poly_len),
+            "Polynomial length mismatch"
+        );
 
         // Generate bit and trit mappings
         let (bit_mapping, trit_mapping) = self.trit_mapping();
@@ -468,9 +469,8 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> Compre
 
 #[cfg(test)]
 mod tests {
-    use crate::and::AndPackage;
-
     use super::*;
+    use crate::and::AndPackage;
 
     #[test]
     fn test_trit_mapping_small_c() {

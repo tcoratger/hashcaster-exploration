@@ -328,10 +328,10 @@ where
         // Add the random value sent by the verifier to the list of gammas.
         self.challenges.push(r.clone());
 
-        // Compute `r^2` for future usage in the protocol.
-        let r2 = **r * **r;
-
         if round <= self.c {
+            // Compute `r^2` for future usage in the protocol.
+            let r2 = **r * **r;
+
             // We compute, by chunk of 3, the new values for the extended table:
             // ```
             // P(0, r) = P(0, r) + (P(0, r) + P(1, r) + P(∞, r)) * r + P(∞, r) * r^2
