@@ -612,7 +612,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point(BinaryField128b::random());
+            let r = Point::random();
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -728,7 +728,6 @@ mod tests {
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
             let r = Point::random();
-            challenges.push(r.clone());
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -748,6 +747,9 @@ mod tests {
 
             // Bind the random value `r` to the Boolean check for the next round.
             boolcheck.bind(&r);
+
+            // Store the random value in the challenges vector.
+            challenges.push(r);
         }
 
         // Finish the protocol and obtain the output.
