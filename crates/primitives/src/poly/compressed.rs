@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_sum_all_zero_coefficients() {
-        let poly = [BinaryField128b::new(0), BinaryField128b::new(0), BinaryField128b::new(0)];
+        let poly = [BinaryField128b::ZERO, BinaryField128b::ZERO, BinaryField128b::ZERO];
 
         let (_, sum) = CompressedPoly::compress(&poly);
 
@@ -235,10 +235,10 @@ mod tests {
         // Define a univariate polynomial:
         // P(x) = 0 + 0x + 0x^2 + 0x^3
         let poly = vec![
-            BinaryField128b::new(0),
-            BinaryField128b::new(0),
-            BinaryField128b::new(0),
-            BinaryField128b::new(0),
+            BinaryField128b::ZERO,
+            BinaryField128b::ZERO,
+            BinaryField128b::ZERO,
+            BinaryField128b::ZERO,
         ];
 
         // Compress the polynomial

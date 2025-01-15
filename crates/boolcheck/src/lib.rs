@@ -901,7 +901,7 @@ mod tests {
         assert_eq!(
             boolcheck.extended_table,
             vec![
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
                 BinaryField128b::new(1),
                 BinaryField128b::new(1),
                 BinaryField128b::new(2),
@@ -909,7 +909,7 @@ mod tests {
                 BinaryField128b::new(1),
                 BinaryField128b::new(2),
                 BinaryField128b::new(2),
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
                 BinaryField128b::new(4),
                 BinaryField128b::new(5),
                 BinaryField128b::new(1),
@@ -918,16 +918,16 @@ mod tests {
                 BinaryField128b::new(1),
                 BinaryField128b::new(2),
                 BinaryField128b::new(2),
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
                 BinaryField128b::new(4),
                 BinaryField128b::new(4),
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
                 BinaryField128b::new(4),
                 BinaryField128b::new(4),
-                BinaryField128b::new(0),
-                BinaryField128b::new(0),
-                BinaryField128b::new(0),
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
+                BinaryField128b::ZERO,
+                BinaryField128b::ZERO,
+                BinaryField128b::ZERO,
             ]
         );
 
@@ -982,7 +982,7 @@ mod tests {
                 BinaryField128b::new(2),
                 BinaryField128b::new(4),
                 BinaryField128b::new(4),
-                BinaryField128b::new(0),
+                BinaryField128b::ZERO,
             ]
         );
 
@@ -1019,7 +1019,7 @@ mod tests {
             boolcheck.polys.to_vec(),
             vec![
                 MultilinearLagrangianPolynomial::from(vec![
-                    BinaryField128b::new(0),
+                    BinaryField128b::ZERO,
                     BinaryField128b::new(1),
                     BinaryField128b::new(2),
                     BinaryField128b::new(3),

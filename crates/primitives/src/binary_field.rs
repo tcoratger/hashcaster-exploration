@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(a + b, BinaryField128b::new(0b1111));
 
         // Test addition with zero.
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         // 1010 XOR 0000 = 1010
         // Adding zero should return the same value.
         assert_eq!(a + zero, a);
@@ -444,7 +444,7 @@ mod tests {
         assert_eq!(a + &b, BinaryField128b::new(0b1111));
 
         // Test addition with zero.
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         // 1010 XOR 0000 = 1010
         // Adding zero (by reference) should return the same value.
         assert_eq!(a + &zero, a);
@@ -472,7 +472,7 @@ mod tests {
         // Negation is a no-op in this field.
 
         // Case 1: Negating zero
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         // Negation of zero should remain zero.
         assert_eq!(-zero, zero);
 
@@ -501,7 +501,7 @@ mod tests {
         assert_eq!(a - b, BinaryField128b::new(0b1111));
 
         // Test subtraction with zero.
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         // 1010 XOR 0000 = 1010
         // Subtracting zero should return the same value.
         assert_eq!(a - zero, a);
@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(a - &b, BinaryField128b::new(0b1111));
 
         // Test subtraction with zero.
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         // 1010 XOR 0000 = 1010
         // Subtracting zero (by reference) should return the same value.
         assert_eq!(a - &zero, a);
@@ -577,7 +577,7 @@ mod tests {
     #[allow(clippy::unreadable_literal)]
     fn test_mul_zero() {
         // Case: Multiplying zero with any number should return zero.
-        let zero = BinaryField128b::new(0);
+        let zero = BinaryField128b::ZERO;
         let value = BinaryField128b::new(0x123456789ABCDEF0);
 
         // Multiplying zero with zero
@@ -727,7 +727,7 @@ mod tests {
 
         // Define a few test values
         let values = [
-            BinaryField128b::new(0),                  // Zero value
+            BinaryField128b::ZERO,                  // Zero value
             BinaryField128b::new(0x123456789ABCDEF0), // Arbitrary non-zero value
             BinaryField128b::new(u128::MAX),          // Maximum possible value
             BinaryField128b::new(0xFEDCBA9876543210), // Another arbitrary value
@@ -949,11 +949,11 @@ mod tests {
 
         // Multiplying by zero should leave the accumulator unchanged
         result.mul_add_assign(zero, zero);
-        assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero failed");
+        assert_eq!(result, BinaryField128b::ZERO, "MulAddAssign with zero failed");
 
         // Adding zero should leave the result unchanged
         result.mul_add_assign(BinaryField128b::ONE, zero);
-        assert_eq!(result, BinaryField128b::new(0), "MulAddAssign with zero addition failed");
+        assert_eq!(result, BinaryField128b::ZERO, "MulAddAssign with zero addition failed");
     }
 
     #[test]
