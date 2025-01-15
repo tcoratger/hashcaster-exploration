@@ -46,7 +46,7 @@ pub struct BoolCheck<const N: usize, const M: usize, A: AlgebraicOps<N, M>> {
     pub extended_table: Vec<BinaryField128b>,
 
     /// An optional field storing evaluations on a restricted subset of the hypercube.
-    poly_coords: Option<Evaluations>,
+    poly_coords: Evaluations,
 
     /// The phase switch parameter, indicating the number of rounds in phase one.
     pub c: usize,
@@ -82,7 +82,7 @@ where
             points: Points::default(),
             polys: array::from_fn(|_| Default::default()),
             extended_table: Vec::new(),
-            poly_coords: None,
+            poly_coords: Evaluations::default(),
             c: 0,
             challenges: Points::default(),
             bit_mapping: Vec::new(),
@@ -233,9 +233,6 @@ where
                 "Invalid equality polynomial size"
             );
 
-            // Poly coordinates are required for the computation of `P ∧ Q` in the restricted phase.
-            let poly_coords = self.poly_coords.as_ref().unwrap();
-
             // Here we want to compute (in the restricted phase):
             //
             // ```
@@ -244,8 +241,12 @@ where
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.compute_algebraic(poly_coords, i, 1 << (number_variables - self.c - 1))
-                        .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic(
+                        &self.poly_coords,
+                        i,
+                        1 << (number_variables - self.c - 1),
+                    )
+                    .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(|| [BinaryField128b::ZERO; 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f])
         };
@@ -347,15 +348,13 @@ where
             let half = 1 << (number_variables - round - 1);
 
             // Compute the new values for the poly coordinates:
-            self.poly_coords
-                .as_mut()
-                .unwrap()
-                .par_chunks_mut(1 << (number_variables - self.c - 1))
-                .for_each(|chunk| {
+            self.poly_coords.par_chunks_mut(1 << (number_variables - self.c - 1)).for_each(
+                |chunk| {
                     for j in 0..half {
                         chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * **r;
                     }
-                });
+                },
+            );
         }
 
         // Transition to phase 2 if the current round equals `c + 1`.
@@ -370,10 +369,8 @@ where
             self.extended_table = Vec::new();
 
             // Restrict the polynomial coordinates based on the accumulated challenges.
-            self.poly_coords = Some(
-                MultilinearLagrangianPolynomials::from(self.polys.to_vec())
-                    .restrict(&self.challenges, number_variables),
-            );
+            self.poly_coords = MultilinearLagrangianPolynomials::from(self.polys.to_vec())
+                .restrict(&self.challenges, number_variables);
         }
     }
 
@@ -385,9 +382,6 @@ where
 
         // Decompose the `BoolCheck` instance to extract the required fields.
         let Self { poly_coords, round_polys, c, .. } = self;
-
-        // Unwrap the polynomial coordinates, ensuring they are initialized.
-        let poly_coords = poly_coords.clone().unwrap();
 
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - c - 1);
