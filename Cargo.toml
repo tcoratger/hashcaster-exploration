@@ -10,6 +10,7 @@ members = [
     "crates/primitives",
     "crates/lincheck",
     "crates/multiclaim",
+    "crates/pcs",
     "examples/keccak",
 ]
 
@@ -48,6 +49,20 @@ hashcaster-primitives = { path = "crates/primitives" }
 hashcaster-boolcheck = { path = "crates/boolcheck" }
 hashcaster-lincheck = { path = "crates/lincheck" }
 hashcaster-multiclaim = { path = "crates/multiclaim" }
+hashcaster-pcs = { path = "crates/pcs" }
+
+binius_core = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_field = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_hal = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_hash = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_macros = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_math = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_ntt = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+binius_utils = { git = "https://github.com/IrreducibleOSS/binius", rev = "fe4cc76" }
+
+p3-challenger = { git = "https://github.com/Plonky3/Plonky3", rev = "04358dd" }
+p3-keccak = { git = "https://github.com/Plonky3/Plonky3", rev = "04358dd" }
+p3-symmetric = { git = "https://github.com/Plonky3/Plonky3", rev = "04358dd" }
 
 derive_more = "1.0"
 bytemuck = "1.0"
