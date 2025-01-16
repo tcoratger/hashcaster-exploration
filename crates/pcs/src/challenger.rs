@@ -33,7 +33,7 @@ where
     H: CryptographicHasher<u8, [u8; 32]>,
 {
     fn observe(&mut self, value: BinaryField128b) {
-        self.0.observe_slice(&value.into_inner().to_be_bytes())
+        self.0.observe_slice(&value.into_inner().to_be_bytes());
     }
 }
 
@@ -159,7 +159,7 @@ mod tests {
         // Expected hash based on TestHasher logic (sum of all observed values)
         let expected_hash = {
             let combined =
-                vec![1_u128.to_be_bytes(), 2_u128.to_be_bytes(), 3_u128.to_be_bytes()].concat();
+                [1_u128.to_be_bytes(), 2_u128.to_be_bytes(), 3_u128.to_be_bytes()].concat();
             let sum = combined.iter().copied().sum::<u8>();
             [sum; 16]
         };
