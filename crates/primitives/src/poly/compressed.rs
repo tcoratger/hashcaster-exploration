@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{binary_field::BinaryField128b, poly::univariate::UnivariatePolynomial};
 use std::ops::Deref;
 
@@ -23,8 +25,8 @@ use std::ops::Deref;
 ///
 /// The struct supports compressing a polynomial, reconstructing it, and retrieving
 /// the original coefficients.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CompressedPoly(Vec<BinaryField128b>);
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompressedPoly(pub Vec<BinaryField128b>);
 
 impl CompressedPoly {
     /// Creates a new compressed polynomial from a vector of coefficients.

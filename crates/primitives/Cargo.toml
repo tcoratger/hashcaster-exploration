@@ -20,3 +20,4 @@ rand = { workspace = true }
 rayon = { workspace = true }
 unroll = { workspace = true }
 itertools = { workspace = true }
+serde = { workspace = true }

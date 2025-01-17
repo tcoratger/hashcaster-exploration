@@ -73,6 +73,8 @@ rand = "0.8"
 itertools = "0.13"
 unroll = "0.1"
 criterion = "0.5"
+groestl_crypto = { package = "groestl", version = "0.10.1" }
+serde = "1.0"
 
 [profile.release]
 debug = true

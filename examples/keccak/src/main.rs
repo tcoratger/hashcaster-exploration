@@ -10,6 +10,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
+        evaluation::Evaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
         univariate::UnivariatePolynomial,
@@ -24,6 +25,7 @@ use std::{array, time::Instant};
 pub mod chi;
 pub mod linear;
 pub mod matrix;
+pub mod pcs;
 pub mod rho_pi;
 pub mod theta;
 
@@ -47,7 +49,7 @@ pub struct Keccak {
     /// Optional output from the BoolCheck protocol.
     boolcheck_output: Option<BoolCheckOutput>,
     /// Optional output from the Multiclaim protocol.
-    multiclaim_output: Option<UnivariatePolynomial>,
+    multiclaim_output: Option<Evaluations>,
     /// Linear witness for the protocol.
     witness_linear: [MultilinearLagrangianPolynomial; 5],
     /// Evaluation claims for the protocol.
@@ -268,7 +270,11 @@ impl Keccak {
         let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
         // Validate the claim
-        assert_eq!(multiclaim_output.evaluate_at(&Point(gamma128)) * eq_evaluation, claim);
+        assert_eq!(
+            UnivariatePolynomial::new(multiclaim_output.clone().0).evaluate_at(&Point(gamma128)) *
+                eq_evaluation,
+            claim
+        );
 
         let end = Instant::now();
 
@@ -289,8 +295,7 @@ impl Keccak {
         // Generate a random gamma for folding.
         let gamma = Point::random();
 
-        let evaluations: [_; 5] =
-            self.multiclaim_output.clone().unwrap().coeffs.try_into().unwrap();
+        let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0.try_into().unwrap();
 
         // Initialize the LinCheck prover builder.
         let mut lincheck_builder = LinCheckBuilder::new(

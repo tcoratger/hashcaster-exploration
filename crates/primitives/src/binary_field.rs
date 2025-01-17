@@ -6,14 +6,30 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use num_traits::{MulAdd, MulAddAssign, One, Zero};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::{
     arch::aarch64::uint8x16_t,
     iter::Sum,
     ops::{Add, AddAssign, BitAnd, Deref, Mul, MulAssign, Neg, Sub},
 };
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Pod,
+    Zeroable,
+    Serialize,
+    Deserialize,
+)]
 pub struct BinaryField128b(u128);
 
 impl BinaryField128b {
@@ -727,7 +743,7 @@ mod tests {
 
         // Define a few test values
         let values = [
-            BinaryField128b::ZERO,                  // Zero value
+            BinaryField128b::ZERO,                    // Zero value
             BinaryField128b::new(0x123456789ABCDEF0), // Arbitrary non-zero value
             BinaryField128b::new(u128::MAX),          // Maximum possible value
             BinaryField128b::new(0xFEDCBA9876543210), // Another arbitrary value

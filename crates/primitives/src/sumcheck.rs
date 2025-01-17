@@ -1,4 +1,4 @@
-use crate::poly::{compressed::CompressedPoly, point::Point};
+use crate::poly::{compressed::CompressedPoly, evaluation::Evaluations, point::Point};
 
 /// A trait that abstracts the sumcheck protocol builder.
 pub trait SumcheckBuilder {
@@ -12,7 +12,7 @@ pub trait SumcheckBuilder {
 /// A trait that abstracts the sumcheck protocol methods.
 pub trait Sumcheck {
     /// The output type of the sumcheck protocol.
-    type Output;
+    type Output: EvaluationProvider;
 
     /// Computes the polynomial for the current round of the sumcheck protocol.
     fn round_polynomial(&mut self) -> CompressedPoly;
@@ -22,4 +22,9 @@ pub trait Sumcheck {
 
     /// Returns the output of the sumcheck protocol.
     fn finish(&self) -> Self::Output;
+}
+
+pub trait EvaluationProvider {
+    /// Returns the evaluations of the sumcheck protocol output.
+    fn evals(&self) -> Evaluations;
 }

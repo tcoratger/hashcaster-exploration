@@ -12,10 +12,24 @@ hashcaster-primitives = { workspace = true }
 hashcaster-lincheck = { workspace = true }
 hashcaster-boolcheck = { workspace = true }
 hashcaster-multiclaim = { workspace = true }
+hashcaster-pcs = { workspace = true }
 
 num-traits = { workspace = true }
 rayon = { workspace = true }
 itertools = { workspace = true }
 
-[dev-dependencies]
-itertools = { workspace = true }
+binius_core = { workspace = true }
+binius_field = { workspace = true }
+binius_hal = { workspace = true }
+binius_hash = { workspace = true }
+binius_macros = { workspace = true }
+binius_math = { workspace = true }
+binius_ntt = { workspace = true }
+binius_utils = { workspace = true }
+
+p3-challenger = { workspace = true }
+p3-keccak = { workspace = true }
+p3-symmetric = { workspace = true }
+
+groestl_crypto = { workspace = true }
+serde = { workspace = true }

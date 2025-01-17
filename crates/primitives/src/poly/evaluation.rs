@@ -1,13 +1,17 @@
-use crate::{binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE};
+use crate::{
+    binary_field::BinaryField128b, frobenius_cobasis::COBASIS_FROBENIUS_TRANSPOSE,
+    sumcheck::EvaluationProvider,
+};
 use num_traits::MulAdd;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
+use serde::{Deserialize, Serialize};
 use std::{
     array,
     ops::{Deref, DerefMut},
 };
 
 /// Evaluations of a polynomial at some points.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Evaluations(pub Vec<BinaryField128b>);
 
 impl Evaluations {
@@ -178,6 +182,12 @@ impl DerefMut for Evaluations {
 impl FromIterator<BinaryField128b> for Evaluations {
     fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
+    }
+}
+
+impl EvaluationProvider for Evaluations {
+    fn evals(&self) -> Evaluations {
+        self.clone()
     }
 }
 

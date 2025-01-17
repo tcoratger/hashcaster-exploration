@@ -11,7 +11,7 @@ use hashcaster_primitives::{
         point::{Point, Points},
         univariate::UnivariatePolynomial,
     },
-    sumcheck::Sumcheck,
+    sumcheck::{EvaluationProvider, Sumcheck},
 };
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
@@ -476,6 +476,12 @@ pub struct BoolCheckOutput {
     pub round_polys: Vec<CompressedPoly>,
 }
 
+impl EvaluationProvider for BoolCheckOutput {
+    fn evals(&self) -> Evaluations {
+        self.frob_evals.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -840,7 +846,11 @@ mod tests {
         let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
         // Validate the claim
-        assert_eq!(multiclaim_output.evaluate_at(&Point(gamma128)) * eq_evaluation, claim);
+        assert_eq!(
+            UnivariatePolynomial::new(multiclaim_output.clone().0).evaluate_at(&Point(gamma128)) *
+                eq_evaluation,
+            claim
+        );
 
         // More validations about P and Q evaluations at the challenges
         assert_eq!(p.evaluate_at(&challenges), multiclaim_output[0]);

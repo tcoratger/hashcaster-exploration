@@ -6,7 +6,7 @@ use hashcaster_primitives::{
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
     },
-    sumcheck::Sumcheck,
+    sumcheck::{EvaluationProvider, Sumcheck},
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::array::from_fn;
@@ -265,6 +265,12 @@ pub struct ProdCheckOutput {
     /// Each evaluation corresponds to the single value extracted from a fully reduced
     /// polynomial in the `q_polys` set.
     pub q_evaluations: Evaluations,
+}
+
+impl EvaluationProvider for ProdCheckOutput {
+    fn evals(&self) -> Evaluations {
+        self.p_evaluations.clone()
+    }
 }
 
 #[cfg(test)]

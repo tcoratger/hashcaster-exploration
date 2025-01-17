@@ -8,6 +8,7 @@ use hashcaster_primitives::{
     matrix_efficient::EfficientMatrix,
     poly::{
         compressed::CompressedPoly,
+        evaluation::Evaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
         univariate::UnivariatePolynomial,
@@ -47,7 +48,7 @@ impl<const N: usize> Default for MultiClaim<N> {
 }
 
 impl<const N: usize> Sumcheck for MultiClaim<N> {
-    type Output = UnivariatePolynomial;
+    type Output = Evaluations;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
         self.object.round_polynomial()
@@ -74,7 +75,7 @@ impl<const N: usize> Sumcheck for MultiClaim<N> {
         ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
 
         // Return the resulting openings.
-        ret
+        Evaluations(ret.coeffs)
     }
 }
 
