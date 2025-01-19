@@ -1,5 +1,5 @@
 use crate::chi::ChiPackage;
-use hashcaster_boolcheck::builder::BoolCheckBuilder;
+use hashcaster_boolcheck::{algebraic::AlgebraicOps, builder::BoolCheckBuilder};
 use hashcaster_lincheck::builder::LinCheckBuilder;
 use hashcaster_multiclaim::builder::MulticlaimBuilder;
 use hashcaster_pcs::{
@@ -245,6 +245,158 @@ impl HashcasterKeccak {
         rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
 
         rs
+    }
+
+    pub fn verify_chi(
+        &self,
+        points: &Points,
+        claims: &[BinaryField128b; 5],
+        bool_check_proof: &SumcheckProof,
+        multi_open_proof: &SumcheckProof,
+        challenger: &mut F128Challenger,
+    ) -> Points {
+        // Verify the number of round polynomials in the LinCheck proof.
+        assert_eq!(bool_check_proof.round_polys.len(), self.num_vars());
+
+        // Verify the number of round polynomials in the Multiclaim proof.
+        assert_eq!(multi_open_proof.round_polys.len(), self.num_vars());
+
+        // Verify the number of evaluations in the BoolCheck proof.
+        assert_eq!(bool_check_proof.evals.len(), 128 * 5);
+
+        // Verify the number of evaluations in the Multiclaim proof.
+        assert_eq!(multi_open_proof.evals.len(), 5);
+
+        let updated_points = {
+            // Setup the ChiPackage
+            let chi = ChiPackage {};
+
+            // Sample a gamma
+            let gamma = Point(challenger.sample());
+
+            // Evaluate the claims at gamma.
+            let mut claim = UnivariatePolynomial::new(claims.to_vec()).evaluate_at(&gamma);
+
+            // Initialize an empty vector to store the challenges.
+            let mut rs = Points(Vec::new());
+
+            // Iterate over the round polynomials in the proof.
+            for round_poly in &bool_check_proof.round_polys {
+                // Check the number of coefficients in the round polynomial.
+                assert_eq!(round_poly.len(), 3);
+
+                // Challenger observes the coefficients of the round polynomial.
+                challenger.observe_slice(&round_poly.0);
+
+                // Challenger samples a new random challenge for this round.
+                let r = Point(challenger.sample());
+
+                // Update the claim by evaluating the round polynomial at the sampled challenge.
+                claim = round_poly.coeffs(claim).evaluate_at(&r);
+
+                // Store the challenge for this round.
+                rs.push(r);
+            }
+
+            // Fetch the frobenius evaluations from the proof.
+            let frob_evals = &bool_check_proof.evals;
+
+            // Challenger observes the extracted evaluations.
+            challenger.observe_slice(frob_evals);
+
+            // Clone and store the frobenius evaluations
+            let mut coord_evals = frob_evals.clone();
+
+            // Untwist the frobenius evaluations
+            coord_evals.untwist();
+
+            // Trick for padding
+            coord_evals.push(BinaryField128b::ZERO);
+
+            // Compute the claimed evaluations and fold them
+            let claimed_evaluations =
+                UnivariatePolynomial::new(chi.algebraic(&coord_evals, 0, 1)[0].to_vec());
+            let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
+
+            // Validate the final claim
+            assert_eq!(
+                folded_claimed_evaluations * *(points.eq_eval(&rs)),
+                claim,
+                "Final claim mismatch"
+            );
+
+            rs
+        };
+
+        let final_points = {
+            // Sample a gamma
+            let gamma = Point(challenger.sample());
+
+            // 1. Tranform the Boolcheck proof evaluations into a UnivariatePolynomial.
+            // 2. Evaluate the polynomial at gamma.
+            let mut claim =
+                UnivariatePolynomial::new(bool_check_proof.evals.0.clone()).evaluate_at(&gamma);
+
+            // Initialize an empty vector to store the challenges.
+            let mut rs = Points(Vec::new());
+
+            // Iterate over the round polynomials in the proof.
+            for round_poly in &multi_open_proof.round_polys {
+                // Check the number of coefficients in the round polynomial.
+                assert_eq!(round_poly.len(), 2);
+
+                // Challenger observes the coefficients of the round polynomial.
+                challenger.observe_slice(&round_poly.0);
+
+                // Challenger samples a new random challenge for this round.
+                let r = Point(challenger.sample());
+
+                // Update the claim by evaluating the round polynomial at the sampled challenge.
+                claim = round_poly.coeffs(claim).evaluate_at(&r);
+
+                // Store the challenge for this round.
+                rs.push(r);
+            }
+
+            // Fetch the evaluations from the proof.
+            let evals = &multi_open_proof.evals;
+
+            // Challenger observes the extracted evaluations.
+            challenger.observe_slice(evals);
+
+            // Initialize the inverse orbit points
+            let mut points_inv_orbit = vec![];
+            let mut tmp = updated_points;
+            for _ in 0..128 {
+                tmp.iter_mut().for_each(|x| **x = **x * **x);
+                points_inv_orbit.push(tmp.clone());
+            }
+            points_inv_orbit.reverse();
+
+            // Compute gamma^128 for evaluation.
+            let mut gamma128 = gamma.0;
+            for _ in 0..7 {
+                gamma128 *= gamma128;
+            }
+
+            // Compute the equality evaluations at the challenges
+            let eq_evaluations: UnivariatePolynomial =
+                points_inv_orbit.iter().map(|pts| pts.eq_eval(&rs).0).collect();
+
+            // Compute the equality evaluation at gamma
+            let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
+
+            // Validate the claim
+            assert_eq!(
+                UnivariatePolynomial::new(evals.clone().0).evaluate_at(&Point(gamma128)) *
+                    eq_evaluation,
+                claim
+            );
+
+            rs
+        };
+
+        final_points
     }
 }
 
