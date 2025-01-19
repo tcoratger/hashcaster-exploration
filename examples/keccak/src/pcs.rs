@@ -17,6 +17,8 @@ use hashcaster_primitives::{
     },
     sumcheck::{EvaluationProvider, Sumcheck, SumcheckBuilder},
 };
+use itertools::Itertools;
+use num_traits::MulAdd;
 use p3_challenger::{CanObserve, CanSample};
 use serde::{Deserialize, Serialize};
 use std::array::from_fn;
@@ -140,6 +142,109 @@ impl HashcasterKeccak {
         );
 
         perform_sumcheck(LIN_CHECK_NUM_VARS, &mut lincheck_builder, challenger, claims)
+    }
+
+    pub fn verify_lin(
+        &self,
+        matrix: &impl LinearOperations,
+        points: &Points,
+        claims: [BinaryField128b; 5],
+        lin_check_proof: &SumcheckProof,
+        challenger: &mut F128Challenger,
+    ) -> Points {
+        // Verify the number of round polynomials in the LinCheck proof.
+        assert_eq!(lin_check_proof.round_polys.len(), LIN_CHECK_NUM_VARS);
+
+        // Verify the number of evaluations in the LinCheck proof.
+        assert_eq!(lin_check_proof.evals.len(), 5);
+
+        // Sample a gamma
+        let gamma = Point(challenger.sample());
+
+        // Evaluate the claims at gamma.
+        let mut claim = UnivariatePolynomial::new(claims.to_vec()).evaluate_at(&gamma);
+
+        // Initialize an empty vector to store the challenges.
+        let mut rs = Points(Vec::new());
+
+        // Iterate over the round polynomials in the proof.
+        for round_poly in &lin_check_proof.round_polys {
+            // Check the number of coefficients in the round polynomial.
+            assert_eq!(round_poly.len(), 2);
+
+            // Challenger observes the coefficients of the round polynomial.
+            challenger.observe_slice(&round_poly.0);
+
+            // Challenger samples a new random challenge for this round.
+            let r = Point(challenger.sample());
+
+            // Update the claim by evaluating the round polynomial at the sampled challenge.
+            claim = round_poly.coeffs(claim).evaluate_at(&r);
+
+            // Store the challenge for this round.
+            rs.push(r);
+        }
+
+        // Fetch the evaluations from the proof.
+        let evals = &lin_check_proof.evals;
+
+        // Challenger observes the extracted evaluations.
+        challenger.observe_slice(evals);
+
+        // Equality polynomial corresponding to the active variables
+        let eq_active_vars = Points(points[..LIN_CHECK_NUM_VARS].to_vec()).to_eq_poly();
+        // Equality polynomial corresponding to the random challenges
+        let eq_challenges = rs.to_eq_poly();
+
+        // Generate a series of scaled equality polynomials by iteratively multiplying by gamma.
+        let adj_eq_vec: Vec<_> = (0..5)
+            // Start with an initial multiplier of ONE and update it for each iteration.
+            .scan(BinaryField128b::ONE, |mult, _| {
+                // Store the current value of the multiplier.
+                let current_mult = *mult;
+                // Update the multiplier by multiplying it with gamma for the next iteration.
+                *mult *= *gamma;
+                // Map over the equality polynomials, scaling each one by the current multiplier.
+                Some(eq_active_vars.iter().map(move |x| *x * current_mult))
+            })
+            .flatten()
+            .collect();
+
+        // Create a mutable array initialized to ZERO for storing the results of the matrix
+        // application.
+        let mut target = vec![BinaryField128b::ZERO; 5 * (1 << LIN_CHECK_NUM_VARS)];
+
+        // Apply the transposed matrix to the scaled equality polynomials.
+        matrix.apply_transposed(&adj_eq_vec, &mut target);
+
+        // Compute evaluations of equality constraints by processing each polynomial segment.
+        let eq_evals: Vec<_> = (0..5)
+            // Iterate over each segment of the target corresponding to the equality constraints.
+            .map(|i| {
+                // Select the current segment of the target array.
+                target[i * (1 << LIN_CHECK_NUM_VARS)..(i + 1) * (1 << LIN_CHECK_NUM_VARS)]
+                    // Pair the segment elements with the equality challenge values.
+                    .iter()
+                    .zip(eq_challenges.iter())
+                    // Compute the sum of the products of corresponding elements.
+                    .fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc))
+            })
+            .collect();
+
+        // Compute the final expected claim by summing the products of the linear and equality
+        // evaluations.
+        let expected_claim = evals
+            .iter()
+            .zip_eq(eq_evals.iter())
+            .fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc));
+
+        // Verify the claim by checking if it matches the expected claim.
+        assert_eq!(claim, expected_claim);
+
+        // Add the points to the challenges vector.
+        rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
+
+        rs
     }
 }
 
