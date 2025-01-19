@@ -148,7 +148,7 @@ impl HashcasterKeccak {
         &self,
         matrix: &impl LinearOperations,
         points: &Points,
-        claims: [BinaryField128b; 5],
+        claims: &[BinaryField128b; 5],
         lin_check_proof: &SumcheckProof,
         challenger: &mut F128Challenger,
     ) -> Points {
@@ -158,38 +158,12 @@ impl HashcasterKeccak {
         // Verify the number of evaluations in the LinCheck proof.
         assert_eq!(lin_check_proof.evals.len(), 5);
 
-        // Sample a gamma
-        let gamma = Point(challenger.sample());
-
-        // Evaluate the claims at gamma.
-        let mut claim = UnivariatePolynomial::new(claims.to_vec()).evaluate_at(&gamma);
-
-        // Initialize an empty vector to store the challenges.
-        let mut rs = Points(Vec::new());
-
-        // Iterate over the round polynomials in the proof.
-        for round_poly in &lin_check_proof.round_polys {
-            // Check the number of coefficients in the round polynomial.
-            assert_eq!(round_poly.len(), 2);
-
-            // Challenger observes the coefficients of the round polynomial.
-            challenger.observe_slice(&round_poly.0);
-
-            // Challenger samples a new random challenge for this round.
-            let r = Point(challenger.sample());
-
-            // Update the claim by evaluating the round polynomial at the sampled challenge.
-            claim = round_poly.coeffs(claim).evaluate_at(&r);
-
-            // Store the challenge for this round.
-            rs.push(r);
-        }
-
-        // Fetch the evaluations from the proof.
-        let evals = &lin_check_proof.evals;
-
-        // Challenger observes the extracted evaluations.
-        challenger.observe_slice(evals);
+        // Perform the common verification steps
+        let (claim, mut rs, gamma) = perform_verification(
+            challenger,
+            lin_check_proof,
+            &UnivariatePolynomial::new(claims.to_vec()),
+        );
 
         // Equality polynomial corresponding to the active variables
         let eq_active_vars = Points(points[..LIN_CHECK_NUM_VARS].to_vec()).to_eq_poly();
@@ -233,7 +207,8 @@ impl HashcasterKeccak {
 
         // Compute the final expected claim by summing the products of the linear and equality
         // evaluations.
-        let expected_claim = evals
+        let expected_claim = lin_check_proof
+            .evals
             .iter()
             .zip_eq(eq_evals.iter())
             .fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc));
@@ -271,32 +246,12 @@ impl HashcasterKeccak {
             // Setup the ChiPackage
             let chi = ChiPackage {};
 
-            // Sample a gamma
-            let gamma = Point(challenger.sample());
-
-            // Evaluate the claims at gamma.
-            let mut claim = UnivariatePolynomial::new(claims.to_vec()).evaluate_at(&gamma);
-
-            // Initialize an empty vector to store the challenges.
-            let mut rs = Points(Vec::new());
-
-            // Iterate over the round polynomials in the proof.
-            for round_poly in &bool_check_proof.round_polys {
-                // Check the number of coefficients in the round polynomial.
-                assert_eq!(round_poly.len(), 3);
-
-                // Challenger observes the coefficients of the round polynomial.
-                challenger.observe_slice(&round_poly.0);
-
-                // Challenger samples a new random challenge for this round.
-                let r = Point(challenger.sample());
-
-                // Update the claim by evaluating the round polynomial at the sampled challenge.
-                claim = round_poly.coeffs(claim).evaluate_at(&r);
-
-                // Store the challenge for this round.
-                rs.push(r);
-            }
+            // Perform common verification for BoolCheck
+            let (claim, rs, gamma) = perform_verification(
+                challenger,
+                bool_check_proof,
+                &UnivariatePolynomial::new(claims.to_vec()),
+            );
 
             // Fetch the frobenius evaluations from the proof.
             let frob_evals = &bool_check_proof.evals;
@@ -329,34 +284,12 @@ impl HashcasterKeccak {
         };
 
         let final_points = {
-            // Sample a gamma
-            let gamma = Point(challenger.sample());
-
-            // 1. Tranform the Boolcheck proof evaluations into a UnivariatePolynomial.
-            // 2. Evaluate the polynomial at gamma.
-            let mut claim =
-                UnivariatePolynomial::new(bool_check_proof.evals.0.clone()).evaluate_at(&gamma);
-
-            // Initialize an empty vector to store the challenges.
-            let mut rs = Points(Vec::new());
-
-            // Iterate over the round polynomials in the proof.
-            for round_poly in &multi_open_proof.round_polys {
-                // Check the number of coefficients in the round polynomial.
-                assert_eq!(round_poly.len(), 2);
-
-                // Challenger observes the coefficients of the round polynomial.
-                challenger.observe_slice(&round_poly.0);
-
-                // Challenger samples a new random challenge for this round.
-                let r = Point(challenger.sample());
-
-                // Update the claim by evaluating the round polynomial at the sampled challenge.
-                claim = round_poly.coeffs(claim).evaluate_at(&r);
-
-                // Store the challenge for this round.
-                rs.push(r);
-            }
+            // Perform common verification for MultiOpen
+            let (claim, rs, gamma) = perform_verification(
+                challenger,
+                multi_open_proof,
+                &UnivariatePolynomial::new(bool_check_proof.evals.0.clone()),
+            );
 
             // Fetch the evaluations from the proof.
             let evals = &multi_open_proof.evals;
@@ -454,4 +387,39 @@ where
 
     // Return the proof and updated points (challenges).
     (SumcheckProof { round_polys, evals }, rs)
+}
+
+fn perform_verification(
+    challenger: &mut F128Challenger,
+    proof: &SumcheckProof,
+    initial_claim_poly: &UnivariatePolynomial,
+) -> (BinaryField128b, Points, Point) {
+    // Sample a gamma
+    let gamma = Point(challenger.sample());
+
+    // Evaluate the initial claim at gamma
+    let mut claim = initial_claim_poly.evaluate_at(&gamma);
+
+    // Initialize a vector to store the challenges
+    let mut rs = Points(Vec::new());
+
+    // Iterate over the round polynomials in the proof
+    for round_poly in &proof.round_polys {
+        // Challenger observes the round polynomial coefficients
+        challenger.observe_slice(&round_poly.0);
+
+        // Challenger samples a new challenge for this round
+        let r = Point(challenger.sample());
+
+        // Update the claim by evaluating the round polynomial at the sampled challenge
+        claim = round_poly.coeffs(claim).evaluate_at(&r);
+
+        // Store the sampled challenge
+        rs.push(r);
+    }
+
+    // Fetch and observe the proof's evaluations
+    challenger.observe_slice(&proof.evals);
+
+    (claim, rs, gamma)
 }
