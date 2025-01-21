@@ -395,7 +395,7 @@ where
 
     fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the folding challenges using the provided gamma.
-        self.gammas = BinaryField128b::compute_gammas_folding::<M>(**gamma);
+        self.gammas = BinaryField128b::compute_gammas_folding(**gamma);
 
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();

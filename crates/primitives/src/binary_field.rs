@@ -188,9 +188,9 @@ impl BinaryField128b {
     /// An array of size `M` containing the computed sequence of gamma values.
     pub fn compute_gammas_folding<const M: usize>(gamma: Self) -> [Self; M] {
         // Initialize the array with the identity element
-        let mut gammas = [Self::one(); M];
+        let mut gammas = [Self::ONE; M];
         // Start with the multiplicative identity
-        let mut current = Self::one();
+        let mut current = Self::ONE;
 
         for g in gammas.iter_mut().take(M) {
             // Set the current power in the array
@@ -373,9 +373,9 @@ impl From<u128> for BinaryField128b {
 impl From<bool> for BinaryField128b {
     fn from(val: bool) -> Self {
         if val {
-            Self::one()
+            Self::ONE
         } else {
-            Self::zero()
+            Self::ZERO
         }
     }
 }
@@ -846,7 +846,7 @@ mod tests {
     fn test_compute_gammas_folding_identity() {
         // Case: Gamma = 1
         let gamma = BinaryField128b::ONE;
-        let result = BinaryField128b::compute_gammas_folding::<5>(gamma);
+        let result = BinaryField128b::compute_gammas_folding(gamma);
 
         // Expected result is a sequence of ones
         let expected = [BinaryField128b::ONE; 5];
@@ -857,7 +857,7 @@ mod tests {
     fn test_compute_gammas_folding_simple_case() {
         // Case: Gamma = 2
         let gamma = BinaryField128b::new(2);
-        let result = BinaryField128b::compute_gammas_folding::<4>(gamma);
+        let result = BinaryField128b::compute_gammas_folding(gamma);
 
         // Expected result
         let expected = [BinaryField128b::ONE, gamma, gamma * gamma, gamma * gamma * gamma];
@@ -868,7 +868,7 @@ mod tests {
     fn test_compute_gammas_folding_large_gamma() {
         // Case: Gamma = large value
         let gamma = BinaryField128b::new(123_456_789);
-        let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
+        let result = BinaryField128b::compute_gammas_folding(gamma);
 
         // Expected result calculated manually: [1, gamma, gamma^2]
         let expected = [BinaryField128b::ONE, gamma, gamma * gamma];
@@ -879,7 +879,7 @@ mod tests {
     fn test_compute_gammas_folding_zero_gamma() {
         // Case: Gamma = 0
         let gamma = BinaryField128b::ZERO;
-        let result = BinaryField128b::compute_gammas_folding::<3>(gamma);
+        let result = BinaryField128b::compute_gammas_folding(gamma);
 
         // Expected result: [1, 0, 0]
         let expected = [BinaryField128b::ONE, BinaryField128b::ZERO, BinaryField128b::ZERO];
