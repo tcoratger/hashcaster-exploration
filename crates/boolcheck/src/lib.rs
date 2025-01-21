@@ -446,24 +446,13 @@ where
         idx_a: usize,
         offset: usize,
     ) -> [BinaryField128b; 3] {
-        // Perform the algebraic operation using the trait's method and store the result
-        let tmp = self.algebraic_operations.algebraic(data, idx_a, offset);
-
-        // Initialize an accumulator array to hold the final result (3 elements for the 3 outputs)
-        let mut acc = [BinaryField128b::ZERO; 3];
-
-        // Loop through the number of folding challenges (M) and apply each challenge to the data
-        for i in 0..M {
-            // For each folding challenge:
-            // - apply it to the corresponding algebraic result
-            // - accumulate the result
-            acc[0] += tmp[0][i] * self.gammas[i];
-            acc[1] += tmp[1][i] * self.gammas[i];
-            acc[2] += tmp[2][i] * self.gammas[i];
-        }
-
-        // Return the final folded results as a 3-element array
-        acc
+        // Perform algebraic operations and fold results using gammas.
+        self.algebraic_operations.algebraic(data, idx_a, offset).map(|result| {
+            result
+                .iter()
+                .zip(&self.gammas)
+                .fold(BinaryField128b::ZERO, |acc, (&val, &gamma)| acc + val * gamma)
+        })
     }
 }
 
