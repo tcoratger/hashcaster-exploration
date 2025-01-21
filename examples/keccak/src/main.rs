@@ -212,13 +212,7 @@ impl Keccak {
         }
 
         // Initialize the inverse orbit points
-        let mut points_inv_orbit = vec![];
-        let mut tmp = self.challenges.clone();
-        for _ in 0..128 {
-            tmp.iter_mut().for_each(|x| **x = **x * **x);
-            points_inv_orbit.push(tmp.clone());
-        }
-        points_inv_orbit.reverse();
+        let points_inv_orbit = self.challenges.to_points_inv_orbit();
 
         // Initialize the Multiclaim prover builder.
         let mut multiclaim_builder = MulticlaimBuilder::new(

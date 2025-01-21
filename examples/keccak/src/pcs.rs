@@ -298,13 +298,7 @@ impl HashcasterKeccak {
             challenger.observe_slice(evals);
 
             // Initialize the inverse orbit points
-            let mut points_inv_orbit = vec![];
-            let mut tmp = updated_points;
-            for _ in 0..128 {
-                tmp.iter_mut().for_each(|x| **x = **x * **x);
-                points_inv_orbit.push(tmp.clone());
-            }
-            points_inv_orbit.reverse();
+            let points_inv_orbit = updated_points.to_points_inv_orbit();
 
             // Compute gamma^128 for evaluation.
             let mut gamma128 = gamma.0;

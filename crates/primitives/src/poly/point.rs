@@ -297,6 +297,37 @@ impl Points {
             .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + **x + **y))
             .into()
     }
+
+    /// Computes the inverse orbit of points by iteratively squaring their values
+    /// and reversing the order of the resulting sequences.
+    ///
+    /// # Description
+    /// This function takes an initial set of `Points` and generates an "inverse orbit"
+    /// by performing 128 rounds of squaring on the points. At each round:
+    /// - Every point in the current set is squared (Frobenius map).
+    /// - The resulting state is stored as a new entry in the output vector.
+    ///
+    /// Finally, the sequence of stored states is reversed to represent the inverse orbit.
+    pub fn to_points_inv_orbit(&self) -> Vec<Self> {
+        // Initialize the container for the inverse orbit points.
+        let mut points_inv_orbit = Vec::with_capacity(128);
+
+        // Clone the initial challenges to avoid modifying the original.
+        let mut tmp = self.clone();
+
+        // Perform 128 iterations of squaring and store the results.
+        for _ in 0..128 {
+            // Square each challenge point.
+            tmp.iter_mut().for_each(|x| **x = **x * **x);
+            // Store the current state of the challenges.
+            points_inv_orbit.push(tmp.clone());
+        }
+
+        // Reverse the order to represent the inverse orbit.
+        points_inv_orbit.reverse();
+
+        points_inv_orbit
+    }
 }
 
 impl From<Vec<BinaryField128b>> for Points {
@@ -534,5 +565,64 @@ mod tests {
             let pts: Points = points[points.len() - i..].into();
             assert_eq!(*poly, pts.to_eq_poly());
         });
+    }
+
+    #[test]
+    fn test_to_points_inv_orbit_ones() {
+        // Generate a random set of 5 points.
+        let initial_points = Points(vec![Point(BinaryField128b::ONE); 5]);
+
+        // Compute the inverse orbit.
+        let points_inv_orbit = initial_points.to_points_inv_orbit();
+
+        // Validate the length of the inverse orbit.
+        assert_eq!(points_inv_orbit.len(), 128, "The orbit should contain 128 entries.");
+
+        // Validate that all entries in the orbit are ones.
+        for point_inv_orbit in points_inv_orbit.iter().take(128) {
+            for j in 0..5 {
+                assert_eq!(
+                    point_inv_orbit[j],
+                    Point(BinaryField128b::ONE),
+                    "The inverse orbit should contain all ones."
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_to_points_inv_orbit_last_element() {
+        // Define two initial points in the binary field with fixed values.
+        let mut pt1 = BinaryField128b::new(1234);
+        let mut pt2 = BinaryField128b::new(5678);
+
+        // Create the initial `Points` instance containing the two points.
+        // This represents the starting state of the inverse orbit computation.
+        let initial_points = Points(vec![Point(pt1), Point(pt2)]);
+
+        // Call the `to_points_inv_orbit` function to compute the inverse orbit.
+        let points_inv_orbit = initial_points.to_points_inv_orbit();
+
+        // Initialize a vector to store the expected results of the inverse orbit.
+        let mut expected_points = Vec::new();
+
+        // Generate the expected results for the inverse orbit by manually squaring the points.
+        for _ in 0..128 {
+            // Each point is squared using the Frobenius map (x -> x^2).
+            pt1 *= pt1;
+            pt2 *= pt2;
+
+            // Store the current state of the points in the expected results vector.
+            expected_points.push(Points(vec![Point(pt1), Point(pt2)]));
+        }
+
+        // Reverse the order of the expected points to match the behavior of the function.
+        expected_points.reverse();
+
+        // Validate that the computed inverse orbit matches the expected results.
+        assert_eq!(
+            points_inv_orbit, expected_points,
+            "The inverse orbit should be the same as the expected points."
+        );
     }
 }
