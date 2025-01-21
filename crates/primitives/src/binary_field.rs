@@ -4,7 +4,7 @@ use crate::{
     frobenius::FROBENIUS,
 };
 use bytemuck::{Pod, Zeroable};
-use num_traits::{MulAdd, MulAddAssign, One, Zero};
+use num_traits::{MulAdd, MulAddAssign, One, Pow, Zero};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -200,6 +200,42 @@ impl BinaryField128b {
         }
 
         gammas
+    }
+}
+
+impl Pow<u32> for BinaryField128b {
+    type Output = Self;
+
+    /// **Computes the power of a binary field element.**
+    ///
+    /// This function computes \( x^{2^k} \) in the binary field \( GF(2^{128}) \).
+    /// It leverages the property of binary fields where powers of two are efficiently
+    /// computed by repeated squaring.
+    ///
+    /// # Parameters
+    /// - `self`: The base element in \( GF(2^{128}) \).
+    /// - `exp`: The exponent, which must be a power of 2.
+    ///
+    /// # Returns
+    /// A new `BinaryField128b` instance representing \( self^{exp} \).
+    ///
+    /// # Panics
+    /// - Panics if the `exp` is not a power of 2.
+    fn pow(self, exp: u32) -> Self {
+        // Ensure that the exponent is a power of 2, as required by this implementation.
+        assert!(exp.is_power_of_two(), "Exponent must be a power of 2.");
+
+        // Initialize the result with the base element.
+        let mut result = self;
+
+        // Perform repeated squaring based on the number of times we need to double.
+        // The number of doublings is given by the base-2 logarithm of the exponent.
+        for _ in 0..exp.ilog2() {
+            result *= result; // Square the current result.
+        }
+
+        // Return the final computed power.
+        result
     }
 }
 
@@ -1012,5 +1048,58 @@ mod tests {
             result.into_inner(),
             expected.into_inner()
         );
+    }
+
+    #[test]
+    fn test_pow_basic() {
+        // Test a basic power computation.
+        let base = BinaryField128b::new(3);
+        let result = base.pow(4);
+        let expected = base * base * base * base;
+        assert_eq!(result, expected, "Basic power computation failed.");
+    }
+
+    #[test]
+    fn test_pow_zero_exponent() {
+        // Edge case: Base raised to 2^0 (should return the base itself).
+        let base = BinaryField128b::new(7);
+        let result = base.pow(1); // Computes 7^(2^0) = 7
+        assert_eq!(result, base, "Power with zero exponent failed.");
+    }
+
+    #[test]
+    fn test_pow_large_exponent() {
+        // Test a large power computation.
+        let base = BinaryField128b::new(5);
+        let result = base.pow(256); // Computes 5^(2^8)
+        let mut expected = base;
+        for _ in 0..8 {
+            expected *= expected; // Perform repeated squaring.
+        }
+        assert_eq!(result, expected, "Large power computation failed.");
+    }
+
+    #[test]
+    #[should_panic(expected = "Exponent must be a power of 2.")]
+    fn test_pow_invalid_exponent() {
+        // Invalid case: Exponent is not a power of 2.
+        let base = BinaryField128b::new(10);
+        base.pow(7); // Should panic.
+    }
+
+    #[test]
+    fn test_pow_identity() {
+        // Edge case: Raising a number to the power of 1 (2^0) should return the number itself.
+        let base = BinaryField128b::new(42);
+        let result = base.pow(1); // 42^(2^0) = 42
+        assert_eq!(result, base, "Identity power computation failed.");
+    }
+
+    #[test]
+    fn test_pow_zero_base() {
+        // Case: Base is zero, should always return zero.
+        let zero = BinaryField128b::ZERO;
+        let result = zero.pow(16); // 0^(2^4) = 0
+        assert_eq!(result, zero, "Power computation with zero base failed.");
     }
 }

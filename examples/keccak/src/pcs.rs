@@ -18,7 +18,7 @@ use hashcaster_primitives::{
     sumcheck::{EvaluationProvider, Sumcheck, SumcheckBuilder},
 };
 use itertools::Itertools;
-use num_traits::MulAdd;
+use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
 use serde::{Deserialize, Serialize};
 use std::array::from_fn;
@@ -301,10 +301,7 @@ impl HashcasterKeccak {
             let points_inv_orbit = updated_points.to_points_inv_orbit();
 
             // Compute gamma^128 for evaluation.
-            let mut gamma128 = gamma.0;
-            for _ in 0..7 {
-                gamma128 *= gamma128;
-            }
+            let gamma128 = gamma.0.pow(128);
 
             // Compute the equality evaluations at the challenges
             let eq_evaluations: UnivariatePolynomial =

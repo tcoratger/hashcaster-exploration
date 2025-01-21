@@ -19,7 +19,7 @@ use hashcaster_primitives::{
 };
 use itertools::Itertools;
 use linear::{keccak_linround_witness, KeccakLinear};
-use num_traits::MulAdd;
+use num_traits::{MulAdd, Pow};
 use std::{array, time::Instant};
 
 pub mod chi;
@@ -206,10 +206,7 @@ impl Keccak {
         let gamma = Point::random();
 
         // Compute gamma^128 for evaluation.
-        let mut gamma128 = gamma.0;
-        for _ in 0..7 {
-            gamma128 *= gamma128;
-        }
+        let gamma128 = gamma.0.pow(128);
 
         // Initialize the inverse orbit points
         let points_inv_orbit = self.challenges.to_points_inv_orbit();

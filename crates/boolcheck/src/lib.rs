@@ -481,6 +481,7 @@ mod tests {
         poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point},
         sumcheck::SumcheckBuilder,
     };
+    use num_traits::Pow;
 
     #[test]
     fn test_current_rounds() {
@@ -783,12 +784,7 @@ mod tests {
         let gamma = Point::random();
 
         // Generate `gamma^128` for final evaluation
-        let mut gamma128 = gamma.0;
-        for _ in 0..7 {
-            gamma128 *= gamma128;
-        }
-
-        // println!("frob_evals {:?}", frob_evals);
+        let gamma128 = gamma.0.pow(128);
 
         // Setup a multiclaim builder
         let mut multiclaim_builder =

@@ -74,7 +74,7 @@ itertools = "0.13"
 unroll = "0.1"
 criterion = "0.5"
 groestl_crypto = { package = "groestl", version = "0.10.1" }
-serde = "1.0"
+serde = { version = "1.0", features = ["serde_derive"] }
 
 [profile.release]
 debug = true
