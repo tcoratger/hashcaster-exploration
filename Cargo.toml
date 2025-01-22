@@ -29,8 +29,6 @@ all = { level = "warn", priority = -1 }
 # new lints that are still under development
 nursery = { level = "warn", priority = -1 }
 # avoid lints that are too pedantic
-future_not_send = "allow"
-fallible_impl_from = "allow"
 doc_markdown = "allow"
 
 # lints which are rather strict or have occasional false positives
