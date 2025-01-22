@@ -22,10 +22,8 @@ binius_core = { workspace = true }
 binius_field = { workspace = true }
 binius_hal = { workspace = true }
 binius_hash = { workspace = true }
-binius_macros = { workspace = true }
 binius_math = { workspace = true }
 binius_ntt = { workspace = true }
-binius_utils = { workspace = true }
 
 p3-challenger = { workspace = true }
 p3-keccak = { workspace = true }

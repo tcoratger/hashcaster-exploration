@@ -55,10 +55,8 @@ binius_core = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc
 binius_field = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
 binius_hal = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
 binius_hash = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
-binius_macros = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
 binius_math = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
 binius_ntt = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
-binius_utils = { git = "https://github.com/IrreducibleOSS/binius", rev = "9791abc" }
 
 p3-challenger = { git = "https://github.com/Plonky3/Plonky3", rev = "72936761" }
 p3-keccak = { git = "https://github.com/Plonky3/Plonky3", rev = "72936761" }
