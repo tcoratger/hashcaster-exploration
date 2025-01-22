@@ -1,3 +1,4 @@
+use binius_field::AESTowerField8b;
 use hashcaster_primitives::binary_field::BinaryField128b;
 use p3_challenger::{CanObserve, CanSample, HashChallenger};
 use p3_keccak::Keccak256Hash;
@@ -34,6 +35,24 @@ where
 {
     fn observe(&mut self, value: BinaryField128b) {
         self.0.observe_slice(&value.into_inner().to_be_bytes());
+    }
+}
+
+impl<H> CanObserve<u8> for F128Challenger<H>
+where
+    H: CryptographicHasher<u8, [u8; 32]>,
+{
+    fn observe(&mut self, value: u8) {
+        self.0.observe(value);
+    }
+}
+
+impl<H> CanObserve<AESTowerField8b> for F128Challenger<H>
+where
+    H: CryptographicHasher<u8, [u8; 32]>,
+{
+    fn observe(&mut self, value: AESTowerField8b) {
+        self.0.observe(u8::from(value));
     }
 }
 

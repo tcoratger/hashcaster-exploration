@@ -1,11 +1,18 @@
-use crate::chi::ChiPackage;
+use crate::{
+    chi::{chi_round_witness, ChiPackage},
+    linear::{keccak_linround_witness, KeccakLinear},
+};
+use binius_core::tower::{AESTowerFamily, TowerFamily};
+use binius_field::{arch::OptimalUnderlier, PackedField};
+use binius_hash::{Groestl256, GroestlDigest, GroestlDigestCompression};
+use binius_math::IsomorphicEvaluationDomainFactory;
 use hashcaster_boolcheck::{algebraic::AlgebraicOps, builder::BoolCheckBuilder};
 use hashcaster_lincheck::builder::LinCheckBuilder;
 use hashcaster_multiclaim::builder::MulticlaimBuilder;
 use hashcaster_pcs::{
     challenger::F128Challenger,
     proof::{FriPcsProof, SumcheckProof},
-    BatchFriPcs,
+    BatchFRIPCS128,
 };
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
@@ -20,8 +27,7 @@ use hashcaster_primitives::{
 use itertools::Itertools;
 use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
-use serde::{Deserialize, Serialize};
-use std::array::from_fn;
+use std::array::{self, from_fn};
 
 const NUM_VARS_PER_PERMUTATIONS: usize = 2;
 const BOOL_CHECK_C: usize = 5;
@@ -30,19 +36,47 @@ const PCS_LOG_INV_RATE: usize = 1;
 const SECURITY_BITS: usize = 100;
 const BATCH_SIZE: usize = 5;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct HashcasterKeccakProof {
+    commitment: GroestlDigest<<Tower as TowerFamily>::B8>,
     initial_claims: [BinaryField128b; 5],
     rounds: [(SumcheckProof, SumcheckProof, SumcheckProof); 24],
     input_open_proof: FriPcsProof,
 }
 
-#[derive(Debug)]
+/// An alias for the optimal underylying field of the tower.
+///
+/// 128-bit value that is used for 128-bit SIMD operations
+type U = OptimalUnderlier;
+
+/// The AES optimized tower family.
+type Tower = AESTowerFamily;
+
+/// The domain factory for the tower.
+type DomainFactory = IsomorphicEvaluationDomainFactory<<Tower as TowerFamily>::B8>;
+
+/// Binius Groestl256 hash function.
+type BiniusGroestl256 = Groestl256<<Tower as TowerFamily>::B128, <Tower as TowerFamily>::B8>;
+
+/// Binius compression function for Grøstl hash digests based on the Grøstl output transformation.
+type BiniusGroestlDigestCompression = GroestlDigestCompression<<Tower as TowerFamily>::B8>;
+
+/// Binius Groestl hash digest.
+type BiniusGroestlDigest = GroestlDigest<<Tower as TowerFamily>::B8>;
+
+#[allow(missing_debug_implementations)]
 pub struct HashcasterKeccak {
     /// Number of permutations
     num_permutations: usize,
     /// The Polynomial Commitment Scheme
-    pcs: BatchFriPcs,
+    pcs: BatchFRIPCS128<
+        Tower,
+        U,
+        BiniusGroestlDigest,
+        DomainFactory,
+        BiniusGroestl256,
+        BiniusGroestlDigestCompression,
+    >,
 }
 
 impl HashcasterKeccak {
@@ -51,7 +85,7 @@ impl HashcasterKeccak {
 
         Self {
             num_permutations: 3 << (num_vars - 3),
-            pcs: BatchFriPcs::new(SECURITY_BITS, PCS_LOG_INV_RATE, num_vars, BATCH_SIZE),
+            pcs: BatchFRIPCS128::new(SECURITY_BITS, PCS_LOG_INV_RATE, num_vars, BATCH_SIZE),
         }
     }
 
@@ -68,22 +102,64 @@ impl HashcasterKeccak {
         from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars))
     }
 
-    // fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
-    //     let mut challenger = F128Challenger::new_keccak256();
+    fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
+        let mut challenger = F128Challenger::new_keccak256();
 
-    //     let layers = (0..24usize).fold(vec![input], |mut layers, _| {
-    //         let last = layers.last().unwrap();
-    //         let lin = keccak_linround_witness(last.map(|poly| poly.as_slice()));
-    //         let chi = chi_round_witness(&lin);
-    //         layers.extend([lin, chi]);
-    //         layers
-    //     });
+        let layers = (0..24usize).fold(vec![input], |mut layers, _| {
+            layers.extend({
+                let last = layers.last().unwrap();
+                let lin =
+                    keccak_linround_witness([&last[0], &last[1], &last[2], &last[3], &last[4]]);
+                [lin.clone(), chi_round_witness(&lin)]
+            });
+            layers
+        });
 
-    //     let CommitOutput { commitment, committed, codeword } =
-    //         self.pcs.commit(&layers[0].to_vec().into());
+        let (input_packed, commitment, committed) = self.pcs.commit(&layers[0].to_vec().into());
 
-    //     commitment.iter().for_each(|scalar| challenger.observe(scalar));
-    // }
+        // Observe the commitment
+        commitment.iter().for_each(|scalar| challenger.observe(scalar));
+
+        // Sample some random points
+        let mut points: Points = challenger.sample_vec(self.num_vars()).into();
+
+        // Compute the initial claim
+        let initial_claims: [_; 5] =
+            layers.last().unwrap().each_ref().map(|poly| poly.evaluate_at(&points));
+
+        // Challenger observe the initial claim
+        challenger.observe_slice(&initial_claims);
+
+        let mut layers_rev = layers.iter().rev().skip(1);
+
+        // Initial claim to be used in the main loop.
+        let mut claims = initial_claims;
+
+        let rounds: [_; 24] = array::from_fn(|_| {
+            let (bool_check_proof, multi_open_proof, lin_check_proof);
+
+            (bool_check_proof, multi_open_proof, points) =
+                self.prove_chi(layers_rev.next().unwrap(), &points, &claims, &mut challenger);
+
+            claims = multi_open_proof.evals.clone().0.try_into().unwrap();
+
+            (lin_check_proof, points) = self.prove_lin(
+                KeccakLinear::new(),
+                layers_rev.next().unwrap(),
+                &points,
+                &claims,
+                &mut challenger,
+            );
+
+            claims = lin_check_proof.evals.clone().0.try_into().unwrap();
+
+            (bool_check_proof, multi_open_proof, lin_check_proof)
+        });
+
+        let input_open_proof = self.pcs.open(&input_packed, &committed, &points);
+
+        HashcasterKeccakProof { commitment, initial_claims, rounds, input_open_proof }
+    }
 
     pub fn prove_chi(
         &self,
@@ -118,8 +194,10 @@ impl HashcasterKeccak {
             perform_sumcheck(num_vars, &mut builder, challenger, claims)
         };
 
-        // Return the proofs for the BoolCheck and Multiclaim protocols, along with the final
-        // points.
+        // Return:
+        // - BoolCheck proof
+        // - Multiclaim proof
+        // - Final points
         (bool_check_proof, multi_open_proof, final_points)
     }
 

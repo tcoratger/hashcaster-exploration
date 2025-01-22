@@ -1,14 +1,23 @@
-use binius_field::{BinaryField128bPolyval, PackedBinaryPolyval1x128b, PackedField};
-use hashcaster_primitives::binary_field::BinaryField128b;
+use crate::PackedSubfield;
+use binius_field::{
+    as_packed_field::PackScalar, BinaryField128b, BinaryField128bPolyval, Field, PackedField,
+};
+use hashcaster_primitives::binary_field::BinaryField128b as F128;
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 
-fn iso(value: &BinaryField128b) -> BinaryField128bPolyval {
-    BinaryField128bPolyval::from(value.into_inner())
+pub fn iso<F: From<BinaryField128b>>(value: &F128) -> F {
+    F::from(BinaryField128b::from(BinaryField128bPolyval::from(value.into_inner())))
 }
 
-pub(crate) fn iso_slice_packed(values: &[BinaryField128b]) -> Vec<PackedBinaryPolyval1x128b> {
+pub fn iso_slice<F: From<BinaryField128b>>(values: &[F128]) -> Vec<F> {
+    values.iter().map(iso).collect()
+}
+
+pub fn iso_slice_packed<U: PackScalar<F>, F: Field + From<BinaryField128b>>(
+    values: &[F128],
+) -> Vec<PackedSubfield<U, F, F>> {
     values
-        .par_chunks(PackedBinaryPolyval1x128b::WIDTH)
-        .map(|scalars| PackedBinaryPolyval1x128b::from_scalars(scalars.iter().map(iso)))
+        .par_chunks(PackedSubfield::<U, F, F>::WIDTH)
+        .map(|scalars| PackedSubfield::<U, F, F>::from_scalars(scalars.iter().map(iso)))
         .collect()
 }

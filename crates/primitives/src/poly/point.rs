@@ -328,6 +328,17 @@ impl Points {
 
         points_inv_orbit
     }
+
+    /// Converts the `Points` collection into a slice of `BinaryField128b`.
+    ///
+    /// # Returns
+    /// A slice reference to the `BinaryField128b` elements contained in the points.
+    pub fn as_binary_field_slice(&self) -> &[BinaryField128b] {
+        // Safety: The underlying data in `Points` is a `Vec<Point>`, and each `Point`
+        // contains a `BinaryField128b` as its only field.
+        // The slice of `BinaryField128b` is valid as long as the `Points` instance exists.
+        unsafe { std::slice::from_raw_parts(self.0.as_ptr().cast(), self.0.len()) }
+    }
 }
 
 impl From<Vec<BinaryField128b>> for Points {
@@ -624,5 +635,86 @@ mod tests {
             points_inv_orbit, expected_points,
             "The inverse orbit should be the same as the expected points."
         );
+    }
+
+    #[test]
+    fn test_as_binary_field_slice_basic() {
+        // Create a `Points` instance with three points.
+        let points = Points(vec![
+            Point(BinaryField128b::from(1)),
+            Point(BinaryField128b::from(2)),
+            Point(BinaryField128b::from(3)),
+        ]);
+
+        // Get the slice of `BinaryField128b` values.
+        let slice = points.as_binary_field_slice();
+
+        // Verify that the slice length matches the number of points.
+        assert_eq!(slice.len(), points.len());
+
+        // Verify the contents of the slice.
+        assert_eq!(
+            slice,
+            &[BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)]
+        );
+    }
+
+    #[test]
+    fn test_as_binary_field_slice_empty() {
+        // Create an empty `Points` instance.
+        let points = Points::default();
+
+        // Get the slice of `BinaryField128b` values.
+        let slice = points.as_binary_field_slice();
+
+        // Verify that the slice is empty.
+        assert!(slice.is_empty());
+    }
+
+    #[test]
+    fn test_as_binary_field_slice_mutation_safe() {
+        // Create a `Points` instance with predefined values.
+        let mut points = Points(vec![
+            Point(BinaryField128b::from(4)),
+            Point(BinaryField128b::from(5)),
+            Point(BinaryField128b::from(6)),
+        ]);
+
+        // Get the slice of `BinaryField128b` values.
+        let slice = points.as_binary_field_slice();
+
+        // Verify the initial values in the slice.
+        assert_eq!(
+            slice,
+            &[BinaryField128b::from(4), BinaryField128b::from(5), BinaryField128b::from(6)]
+        );
+
+        // Mutate the original `Points`.
+        points[0] = Point(BinaryField128b::from(7));
+
+        // Verify that the slice reflects the updated value.
+        let updated_slice = points.as_binary_field_slice();
+        assert_eq!(
+            updated_slice,
+            &[BinaryField128b::from(7), BinaryField128b::from(5), BinaryField128b::from(6)]
+        );
+    }
+
+    #[test]
+    fn test_as_binary_field_slice_large_input() {
+        // Create a `Points` instance with a large number of values.
+        let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).map(Point).collect();
+        let points = Points(large_points);
+
+        // Get the slice of `BinaryField128b` values.
+        let slice = points.as_binary_field_slice();
+
+        // Verify the slice length matches the number of points.
+        assert_eq!(slice.len(), points.len());
+
+        // Verify the contents match the original input.
+        for (i, val) in slice.iter().enumerate() {
+            assert_eq!(*val, BinaryField128b::from(i as u128));
+        }
     }
 }
