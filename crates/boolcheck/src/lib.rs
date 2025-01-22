@@ -241,12 +241,8 @@ where
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.compute_algebraic(
-                        &self.poly_coords,
-                        i,
-                        1 << (number_variables - self.c - 1),
-                    )
-                    .map(|x| x * eq_poly_round[i])
+                    self.compute_algebraic(i, 1 << (number_variables - self.c - 1))
+                        .map(|x| x * eq_poly_round[i])
                 })
                 .reduce(|| [BinaryField128b::ZERO; 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f])
         };
@@ -440,14 +436,9 @@ where
     /// This function applies algebraic operations on the provided data slice. The resulting values
     /// are then folded by applying a set of predefined folding challenges (`gammas`) to produce
     /// a compressed result, which is returned as a 3-element array.
-    pub fn compute_algebraic(
-        &self,
-        data: &[BinaryField128b],
-        idx_a: usize,
-        offset: usize,
-    ) -> [BinaryField128b; 3] {
+    pub fn compute_algebraic(&self, idx_a: usize, offset: usize) -> [BinaryField128b; 3] {
         // Perform algebraic operations and fold results using gammas.
-        self.algebraic_operations.algebraic(data, idx_a, offset).map(|result| {
+        self.algebraic_operations.algebraic(&self.poly_coords, idx_a, offset).map(|result| {
             result
                 .iter()
                 .zip(&self.gammas)
@@ -989,12 +980,11 @@ mod tests {
         // Verify the correctness of the round polynomial cache.
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
 
+        boolcheck.poly_coords =
+            Evaluations((0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>());
+
         // Test an imaginary algorithm execution.
-        let alg_res = boolcheck.compute_algebraic(
-            &(0..4 * 128).map(BinaryField128b::new).collect::<Vec<_>>(),
-            0,
-            1,
-        );
+        let alg_res = boolcheck.compute_algebraic(0, 1);
 
         // Verify the result of the imaginary algorithm execution.
         assert_eq!(
