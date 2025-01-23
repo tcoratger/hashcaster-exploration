@@ -121,19 +121,16 @@ impl HashcasterKeccak {
         commitment.iter().for_each(|scalar| challenger.observe(scalar));
 
         // Sample some random points
-        let mut points: Points = challenger.sample_vec(self.num_vars()).into();
+        let mut points = challenger.sample_vec(self.num_vars()).into();
 
         // Compute the initial claim
-        let initial_claims: [_; 5] =
+        let mut claims: [_; 5] =
             layers.last().unwrap().each_ref().map(|poly| poly.evaluate_at(&points));
 
         // Challenger observe the initial claim
-        challenger.observe_slice(&initial_claims);
+        challenger.observe_slice(&claims);
 
         let mut layers_rev = layers.iter().rev().skip(1);
-
-        // Initial claim to be used in the main loop.
-        let mut claims = initial_claims;
 
         let rounds: [_; 24] = array::from_fn(|_| {
             let (bool_check_proof, multi_open_proof, lin_check_proof);
@@ -158,7 +155,7 @@ impl HashcasterKeccak {
 
         let input_open_proof = self.pcs.open(&input_packed, &committed, &points);
 
-        HashcasterKeccakProof { commitment, initial_claims, rounds, input_open_proof }
+        HashcasterKeccakProof { commitment, initial_claims: claims, rounds, input_open_proof }
     }
 
     pub fn prove_chi(
