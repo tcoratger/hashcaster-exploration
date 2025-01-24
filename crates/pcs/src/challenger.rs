@@ -38,15 +38,6 @@ where
     }
 }
 
-impl<H> CanObserve<u8> for F128Challenger<H>
-where
-    H: CryptographicHasher<u8, [u8; 32]>,
-{
-    fn observe(&mut self, value: u8) {
-        self.0.observe(value);
-    }
-}
-
 impl<H> CanObserve<AESTowerField8b> for F128Challenger<H>
 where
     H: CryptographicHasher<u8, [u8; 32]>,
