@@ -50,7 +50,8 @@ impl MultilinearLagrangianPolynomial {
 
     /// Generates a random multilinear Lagrangian polynomial with the given number of coefficients.
     pub fn random(n: usize) -> Self {
-        (0..n).map(|_| BinaryField128b::random()).collect()
+        (0..n).map(|i| BinaryField128b::new(i as u128)).collect()
+        // (0..n).map(|i| BinaryField128b::random()).collect()
     }
 
     /// Creates a new [`MultilinearLagrangianPolynomial`] with the given coefficients.

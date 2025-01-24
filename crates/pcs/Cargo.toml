@@ -24,3 +24,4 @@ p3-symmetric = { workspace = true }
 rayon = { workspace = true }
 groestl_crypto = { workspace = true }
 serde = { workspace = true }
+itertools = { workspace = true }

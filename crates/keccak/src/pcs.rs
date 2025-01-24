@@ -11,7 +11,9 @@ use hashcaster_lincheck::builder::LinCheckBuilder;
 use hashcaster_multiclaim::builder::MulticlaimBuilder;
 use hashcaster_pcs::{
     challenger::F128Challenger,
+    error::{PcsError, SumcheckError},
     proof::{FriPcsProof, SumcheckProof},
+    utils::{deserialize_packed, serialize_packed},
     BatchFRIPCS128,
 };
 use hashcaster_primitives::{
@@ -27,7 +29,11 @@ use hashcaster_primitives::{
 use itertools::Itertools;
 use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
-use std::array::{self, from_fn};
+use serde::{Deserialize, Serialize};
+use std::{
+    array::{self, from_fn},
+    borrow::Cow,
+};
 
 const NUM_VARS_PER_PERMUTATIONS: usize = 2;
 const BOOL_CHECK_C: usize = 5;
@@ -36,8 +42,9 @@ const PCS_LOG_INV_RATE: usize = 1;
 const SECURITY_BITS: usize = 100;
 const BATCH_SIZE: usize = 5;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HashcasterKeccakProof {
+    #[serde(serialize_with = "serialize_packed", deserialize_with = "deserialize_packed")]
     commitment: GroestlDigest<<Tower as TowerFamily>::B8>,
     initial_claims: [BinaryField128b; 5],
     rounds: [(SumcheckProof, SumcheckProof, SumcheckProof); 24],
@@ -97,12 +104,12 @@ impl HashcasterKeccak {
         self.num_permutations.ilog2() as usize + NUM_VARS_PER_PERMUTATIONS
     }
 
-    fn generate_input(&self) -> [MultilinearLagrangianPolynomial; 5] {
+    pub fn generate_input(&self) -> [MultilinearLagrangianPolynomial; 5] {
         let num_vars = self.num_vars();
         from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars))
     }
 
-    fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
+    pub fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
         let mut challenger = F128Challenger::new_keccak256();
 
         let layers = (0..24usize).fold(vec![input], |mut layers, _| {
@@ -124,19 +131,20 @@ impl HashcasterKeccak {
         let mut points = challenger.sample_vec(self.num_vars()).into();
 
         // Compute the initial claim
-        let mut claims: [_; 5] =
+        let initial_claims: [_; 5] =
             layers.last().unwrap().each_ref().map(|poly| poly.evaluate_at(&points));
 
         // Challenger observe the initial claim
-        challenger.observe_slice(&claims);
+        challenger.observe_slice(&initial_claims);
 
         let mut layers_rev = layers.iter().rev().skip(1);
+        let mut claims = initial_claims;
 
         let rounds: [_; 24] = array::from_fn(|_| {
             let (bool_check_proof, multi_open_proof, lin_check_proof);
 
             (bool_check_proof, multi_open_proof, points) =
-                self.prove_chi(layers_rev.next().unwrap(), &points, &claims, &mut challenger);
+                self.prove_chi(layers_rev.next().unwrap(), &mut points, &claims, &mut challenger);
 
             claims = multi_open_proof.evals.clone().0.try_into().unwrap();
 
@@ -155,7 +163,47 @@ impl HashcasterKeccak {
 
         let input_open_proof = self.pcs.open(&input_packed, &committed, &points);
 
-        HashcasterKeccakProof { commitment, initial_claims: claims, rounds, input_open_proof }
+        HashcasterKeccakProof { commitment, initial_claims, rounds, input_open_proof }
+    }
+
+    pub fn verify(&self, proof: &HashcasterKeccakProof) -> Result<(), PcsError> {
+        // Setup the challenger
+        let mut challenger = F128Challenger::new_keccak256();
+
+        // For each commitment, observe the scalar
+        proof.commitment.iter().for_each(|scalar| challenger.observe(scalar));
+
+        // Sample some random points using the number of variables
+        let mut points: Points = challenger.sample_vec(self.num_vars()).into();
+
+        // Observe the initial claims
+        challenger.observe_slice(&proof.initial_claims);
+
+        // Setup a mutable claims array
+        let mut claims = proof.initial_claims;
+
+        for (bool_check_proof, multi_open_proof, lin_check_proof) in &proof.rounds {
+            points = self.verify_chi(
+                &points,
+                &claims,
+                bool_check_proof,
+                multi_open_proof,
+                &mut challenger,
+            )?;
+
+            claims = multi_open_proof.evals.clone().0.try_into().unwrap();
+
+            points = self.verify_lin(
+                &KeccakLinear::new(),
+                &points,
+                &claims,
+                lin_check_proof,
+                &mut challenger,
+            )?;
+            claims = lin_check_proof.evals.clone().0.try_into().unwrap();
+        }
+
+        self.pcs.verify(&proof.commitment, &proof.input_open_proof, &points, &claims)
     }
 
     pub fn prove_chi(
@@ -165,37 +213,62 @@ impl HashcasterKeccak {
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
     ) -> (SumcheckProof, SumcheckProof, Points) {
+        let (bool_check_proof, multi_open_proof);
+        let mut points = Cow::Borrowed(points);
+
         // Determine the number of variables in the polynomials.
         let num_vars = self.num_vars();
 
         // Step 1: Perform the BoolCheck sumcheck.
-        let (bool_check_proof, updated_points) = {
+        (bool_check_proof, points) = {
             // Define the Chi package for the BoolCheck protocol.
             let chi = ChiPackage;
 
             // Initialize the BoolCheck builder with the Chi package, points, claims, and input.
-            let mut builder =
-                BoolCheckBuilder::new(chi, BOOL_CHECK_C, points.clone(), *claims, input.clone());
+            let mut builder = BoolCheckBuilder::new(
+                chi,
+                BOOL_CHECK_C,
+                points.to_vec().into(),
+                *claims,
+                input.clone(),
+            );
 
             // Perform the BoolCheck sumcheck using the helper function.
-            perform_sumcheck(num_vars, &mut builder, challenger, claims)
+            let (proof, pts) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+
+            (proof, Cow::Owned(pts.into()))
         };
 
         // Step 2: Perform the Multiclaim sumcheck.
-        let (multi_open_proof, final_points) = {
+        (multi_open_proof, points) = {
+            // Update the claims to the BoolCheck proof evaluations
+            let claims = &bool_check_proof.evals;
+
             // Initialize the Multiclaim builder with the input, updated points, and claims.
-            let mut builder =
-                MulticlaimBuilder::new(input.clone(), updated_points, claims.to_vec().into());
+            let mut builder = MulticlaimBuilder::new(
+                input.clone(),
+                points.to_vec().into(),
+                claims.to_vec().into(),
+            );
 
             // Perform the Multiclaim sumcheck using the helper function.
-            perform_sumcheck(num_vars, &mut builder, challenger, claims)
+            let (proof, pts) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+
+            (proof, Cow::Owned(pts))
         };
 
         // Return:
         // - BoolCheck proof
         // - Multiclaim proof
         // - Final points
-        (bool_check_proof, multi_open_proof, final_points)
+        (
+            bool_check_proof,
+            multi_open_proof,
+            match points {
+                Cow::Borrowed(borrowed_points) => borrowed_points.clone(),
+                Cow::Owned(owned_points) => owned_points,
+            },
+        )
     }
 
     #[allow(clippy::unused_self)]
@@ -216,7 +289,12 @@ impl HashcasterKeccak {
             *claims,
         );
 
-        perform_sumcheck(LIN_CHECK_NUM_VARS, &mut lincheck_builder, challenger, claims)
+        let (sumcheck_proof, mut rs) =
+            perform_sumcheck(LIN_CHECK_NUM_VARS, &mut lincheck_builder, challenger, claims);
+
+        rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
+
+        (sumcheck_proof, rs)
     }
 
     pub fn verify_lin(
@@ -226,7 +304,7 @@ impl HashcasterKeccak {
         claims: &[BinaryField128b; 5],
         lin_check_proof: &SumcheckProof,
         challenger: &mut F128Challenger,
-    ) -> Points {
+    ) -> Result<Points, SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
         assert_eq!(lin_check_proof.round_polys.len(), LIN_CHECK_NUM_VARS);
 
@@ -289,12 +367,13 @@ impl HashcasterKeccak {
             .fold(BinaryField128b::ZERO, |acc, (a, b)| a.mul_add(*b, acc));
 
         // Verify the claim by checking if it matches the expected claim.
-        assert_eq!(claim, expected_claim);
-
-        // Add the points to the challenges vector.
-        rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
-
-        rs
+        (expected_claim == claim)
+            .then(|| {
+                // Add the points to the challenges vector.
+                rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
+                rs
+            })
+            .ok_or_else(|| SumcheckError::UnmatchedSubclaim("LinCheck".to_string()))
     }
 
     pub fn verify_chi(
@@ -304,7 +383,7 @@ impl HashcasterKeccak {
         bool_check_proof: &SumcheckProof,
         multi_open_proof: &SumcheckProof,
         challenger: &mut F128Challenger,
-    ) -> Points {
+    ) -> Result<Points, SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
         assert_eq!(bool_check_proof.round_polys.len(), self.num_vars());
 
@@ -317,7 +396,9 @@ impl HashcasterKeccak {
         // Verify the number of evaluations in the Multiclaim proof.
         assert_eq!(multi_open_proof.evals.len(), 5);
 
-        let updated_points = {
+        let mut points = Cow::Borrowed(points);
+
+        points = {
             // Setup the ChiPackage
             let chi = ChiPackage {};
 
@@ -330,9 +411,6 @@ impl HashcasterKeccak {
 
             // Fetch the frobenius evaluations from the proof.
             let frob_evals = &bool_check_proof.evals;
-
-            // Challenger observes the extracted evaluations.
-            challenger.observe_slice(frob_evals);
 
             // Clone and store the frobenius evaluations
             let mut coord_evals = frob_evals.clone();
@@ -349,16 +427,12 @@ impl HashcasterKeccak {
             let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
             // Validate the final claim
-            assert_eq!(
-                folded_claimed_evaluations * *(points.eq_eval(&rs)),
-                claim,
-                "Final claim mismatch"
-            );
-
-            rs
+            (folded_claimed_evaluations * *(points.eq_eval(&rs)) == claim)
+                .then_some(Cow::Owned(rs))
+                .ok_or_else(|| SumcheckError::UnmatchedSubclaim("BoolCheck".to_string()))?
         };
 
-        let final_points = {
+        points = {
             // Perform common verification for MultiOpen
             let (claim, rs, gamma) = perform_verification(
                 challenger,
@@ -369,11 +443,8 @@ impl HashcasterKeccak {
             // Fetch the evaluations from the proof.
             let evals = &multi_open_proof.evals;
 
-            // Challenger observes the extracted evaluations.
-            challenger.observe_slice(evals);
-
             // Initialize the inverse orbit points
-            let points_inv_orbit = updated_points.to_points_inv_orbit();
+            let points_inv_orbit = points.to_points_inv_orbit();
 
             // Compute gamma^128 for evaluation.
             let gamma128 = gamma.0.pow(128);
@@ -386,16 +457,25 @@ impl HashcasterKeccak {
             let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
             // Validate the claim
-            assert_eq!(
-                UnivariatePolynomial::new(evals.clone().0).evaluate_at(&Point(gamma128)) *
-                    eq_evaluation,
-                claim
-            );
-
-            rs
+            (UnivariatePolynomial::new(evals.clone().0).evaluate_at(&Point(gamma128)) *
+                eq_evaluation ==
+                claim)
+                .then_some(Cow::Owned(rs))
+                .ok_or_else(|| SumcheckError::UnmatchedSubclaim("MulticlaimCheck".to_string()))?
         };
 
-        final_points
+        Ok(match points {
+            Cow::Borrowed(borrowed_points) => borrowed_points.clone(),
+            Cow::Owned(owned_points) => owned_points,
+        })
+    }
+
+    fn serialize_proof(proof: &HashcasterKeccakProof) -> Vec<u8> {
+        bincode::serialize(proof).unwrap()
+    }
+
+    fn deserialize_proof(bytes: &[u8]) -> HashcasterKeccakProof {
+        bincode::deserialize(bytes).unwrap()
     }
 }
 
@@ -488,4 +568,36 @@ fn perform_verification(
     challenger.observe_slice(&proof.evals);
 
     (claim, rs, gamma)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_keccak() {
+        // Iterate over powers of 2 in the range [2^10, 2^13)
+        for num_permutations in (10..13).map(|exp| 1 << exp) {
+            // Initialize the SNARK instance with the given number of permutations
+            let snark = HashcasterKeccak::new(num_permutations);
+
+            // Generate the input data for the SNARK
+            let input = snark.generate_input();
+
+            // Create a proof from the generated input
+            let proof = snark.prove(input);
+
+            // Verify the generated proof to ensure correctness
+            snark.verify(&proof).unwrap();
+
+            // Serialize the proof into bytes for storage or transmission
+            let bytes = HashcasterKeccak::serialize_proof(&proof);
+
+            // Deserialize the bytes back into a proof structure
+            let proof = HashcasterKeccak::deserialize_proof(&bytes);
+
+            // Verify the deserialized proof to ensure data integrity
+            snark.verify(&proof).unwrap();
+        }
+    }
 }

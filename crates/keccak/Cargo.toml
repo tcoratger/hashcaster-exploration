@@ -1,5 +1,5 @@
 [package]
-name = "example-keccak"
+name = "hashcaster-keccak"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -31,3 +31,12 @@ p3-symmetric = { workspace = true }
 
 groestl_crypto = { workspace = true }
 serde = { workspace = true }
+bincode = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+rand = { workspace = true }
+
+[[bench]]
+name = "keccak"
+harness = false
