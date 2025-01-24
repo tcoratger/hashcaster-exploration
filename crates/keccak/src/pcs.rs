@@ -183,8 +183,8 @@ impl HashcasterKeccak {
         let mut claims = proof.initial_claims;
 
         for (bool_check_proof, multi_open_proof, lin_check_proof) in &proof.rounds {
-            points = self.verify_chi(
-                &points,
+            self.verify_chi(
+                &mut points,
                 &claims,
                 bool_check_proof,
                 multi_open_proof,
@@ -378,12 +378,12 @@ impl HashcasterKeccak {
 
     pub fn verify_chi(
         &self,
-        points: &Points,
+        points: &mut Points,
         claims: &[BinaryField128b; 5],
         bool_check_proof: &SumcheckProof,
         multi_open_proof: &SumcheckProof,
         challenger: &mut F128Challenger,
-    ) -> Result<Points, SumcheckError> {
+    ) -> Result<(), SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
         assert_eq!(bool_check_proof.round_polys.len(), self.num_vars());
 
@@ -396,9 +396,7 @@ impl HashcasterKeccak {
         // Verify the number of evaluations in the Multiclaim proof.
         assert_eq!(multi_open_proof.evals.len(), 5);
 
-        let mut points = Cow::Borrowed(points);
-
-        points = {
+        *points = {
             // Setup the ChiPackage
             let chi = ChiPackage {};
 
@@ -428,11 +426,11 @@ impl HashcasterKeccak {
 
             // Validate the final claim
             (folded_claimed_evaluations * *(points.eq_eval(&rs)) == claim)
-                .then_some(Cow::Owned(rs))
+                .then_some(rs)
                 .ok_or_else(|| SumcheckError::UnmatchedSubclaim("BoolCheck".to_string()))?
         };
 
-        points = {
+        *points = {
             // Perform common verification for MultiOpen
             let (claim, rs, gamma) = perform_verification(
                 challenger,
@@ -460,14 +458,11 @@ impl HashcasterKeccak {
             (UnivariatePolynomial::new(evals.clone().0).evaluate_at(&Point(gamma128)) *
                 eq_evaluation ==
                 claim)
-                .then_some(Cow::Owned(rs))
+                .then_some(rs)
                 .ok_or_else(|| SumcheckError::UnmatchedSubclaim("MulticlaimCheck".to_string()))?
         };
 
-        Ok(match points {
-            Cow::Borrowed(borrowed_points) => borrowed_points.clone(),
-            Cow::Owned(owned_points) => owned_points,
-        })
+        Ok(())
     }
 
     fn serialize_proof(proof: &HashcasterKeccakProof) -> Vec<u8> {
@@ -575,7 +570,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_keccak() {
+    fn test_keccak_with_pcs() {
         // Iterate over powers of 2 in the range [2^10, 2^13)
         for num_permutations in (10..13).map(|exp| 1 << exp) {
             // Initialize the SNARK instance with the given number of permutations
