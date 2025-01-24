@@ -30,10 +30,7 @@ use itertools::Itertools;
 use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
 use serde::{Deserialize, Serialize};
-use std::{
-    array::{self, from_fn},
-    borrow::Cow,
-};
+use std::array::{self, from_fn};
 
 const NUM_VARS_PER_PERMUTATIONS: usize = 2;
 const BOOL_CHECK_C: usize = 5;
@@ -143,7 +140,7 @@ impl HashcasterKeccak {
         let rounds: [_; 24] = array::from_fn(|_| {
             let (bool_check_proof, multi_open_proof, lin_check_proof);
 
-            (bool_check_proof, multi_open_proof, points) =
+            (bool_check_proof, multi_open_proof) =
                 self.prove_chi(layers_rev.next().unwrap(), &mut points, &claims, &mut challenger);
 
             claims = multi_open_proof.evals.clone().0.try_into().unwrap();
@@ -209,66 +206,55 @@ impl HashcasterKeccak {
     pub fn prove_chi(
         &self,
         input: &[MultilinearLagrangianPolynomial; 5],
-        points: &Points,
+        points: &mut Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
-    ) -> (SumcheckProof, SumcheckProof, Points) {
+    ) -> (SumcheckProof, SumcheckProof) {
         let (bool_check_proof, multi_open_proof);
-        let mut points = Cow::Borrowed(points);
 
         // Determine the number of variables in the polynomials.
         let num_vars = self.num_vars();
 
         // Step 1: Perform the BoolCheck sumcheck.
-        (bool_check_proof, points) = {
+        bool_check_proof = {
             // Define the Chi package for the BoolCheck protocol.
             let chi = ChiPackage;
 
             // Initialize the BoolCheck builder with the Chi package, points, claims, and input.
-            let mut builder = BoolCheckBuilder::new(
-                chi,
-                BOOL_CHECK_C,
-                points.to_vec().into(),
-                *claims,
-                input.clone(),
-            );
+            let mut builder =
+                BoolCheckBuilder::new(chi, BOOL_CHECK_C, points.clone(), *claims, input.clone());
 
             // Perform the BoolCheck sumcheck using the helper function.
-            let (proof, pts) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+            let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
 
-            (proof, Cow::Owned(pts.into()))
+            // Update points in place with the result from BoolCheck
+            *points = new_points;
+
+            proof
         };
 
         // Step 2: Perform the Multiclaim sumcheck.
-        (multi_open_proof, points) = {
+        multi_open_proof = {
             // Update the claims to the BoolCheck proof evaluations
             let claims = &bool_check_proof.evals;
 
             // Initialize the Multiclaim builder with the input, updated points, and claims.
-            let mut builder = MulticlaimBuilder::new(
-                input.clone(),
-                points.to_vec().into(),
-                claims.to_vec().into(),
-            );
+            let mut builder =
+                MulticlaimBuilder::new(input.clone(), points.clone(), claims.to_vec().into());
 
             // Perform the Multiclaim sumcheck using the helper function.
-            let (proof, pts) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+            let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
 
-            (proof, Cow::Owned(pts))
+            // Update points in place with the result from Multiclaim
+            *points = new_points;
+
+            proof
         };
 
         // Return:
         // - BoolCheck proof
         // - Multiclaim proof
-        // - Final points
-        (
-            bool_check_proof,
-            multi_open_proof,
-            match points {
-                Cow::Borrowed(borrowed_points) => borrowed_points.clone(),
-                Cow::Owned(owned_points) => owned_points,
-            },
-        )
+        (bool_check_proof, multi_open_proof)
     }
 
     #[allow(clippy::unused_self)]
