@@ -131,7 +131,7 @@ impl Keccak {
         );
 
         // Reset the challenges
-        self.challenges = Points(Vec::new());
+        self.challenges = Points::default();
 
         // Perform the BoolCheck rounds.
         for _ in 0..self.num_vars {
@@ -227,7 +227,7 @@ impl Keccak {
                 .evaluate_at(&gamma);
 
         // Reset the challenges
-        self.challenges = Points(Vec::new());
+        self.challenges = Points::default();
 
         // Perform the Multiclaim rounds.
         for _ in 0..self.num_vars {
@@ -311,7 +311,7 @@ impl Keccak {
         );
 
         // Reset the challenges
-        self.challenges = Points(Vec::new());
+        self.challenges = Points::default();
 
         // Perform the LinCheck rounds.
         for _ in 0..self.num_active_vars {

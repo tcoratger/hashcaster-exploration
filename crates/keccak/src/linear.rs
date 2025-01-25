@@ -402,7 +402,7 @@ mod tests {
         let mut claim = UnivariatePolynomial::from(initial_claims.to_vec()).evaluate_at(&gamma);
 
         // Empty vector to store challenges
-        let mut challenges = Points(Vec::new());
+        let mut challenges = Points::default();
 
         // Main loop
         for _ in 0..NUM_ACTIVE_VARS {

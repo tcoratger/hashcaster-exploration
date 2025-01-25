@@ -481,7 +481,7 @@ where
 
     // Initialize vectors to store round polynomials and challenges.
     let mut round_polys = Vec::new();
-    let mut rs = Points(Vec::new());
+    let mut rs = Points::default();
 
     for _ in 0..num_vars {
         // Compute the round polynomial for the current sumcheck round.
@@ -528,7 +528,7 @@ fn perform_verification(
     let mut claim = initial_claim_poly.evaluate_at(&gamma);
 
     // Initialize a vector to store the challenges
-    let mut rs = Points(Vec::new());
+    let mut rs = Points::default();
 
     // Iterate over the round polynomials in the proof
     for round_poly in &proof.round_polys {

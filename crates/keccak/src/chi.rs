@@ -284,7 +284,7 @@ mod tests {
         assert_eq!(claim, prover.claim, "Claim does not match prover claim after initialization");
 
         // Setup an empty vector to store the challenges
-        let mut challenges = Points(Vec::new());
+        let mut challenges = Points::default();
 
         // Main loop
         for i in 0..NUM_VARS {
