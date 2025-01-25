@@ -778,8 +778,9 @@ mod tests {
         let gamma128 = gamma.0.pow(128);
 
         // Setup a multiclaim builder
+        let polys_multiclaim = [p.clone(), q.clone()];
         let mut multiclaim_builder =
-            MulticlaimBuilder::new([p.clone(), q.clone()], points, frob_evals.clone());
+            MulticlaimBuilder::new(&polys_multiclaim, points, frob_evals.clone());
 
         // Builder the multiclaim prover via folding
         let mut multiclaim_prover = multiclaim_builder.build(&gamma);

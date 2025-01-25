@@ -17,7 +17,6 @@ use hashcaster_primitives::{
 };
 use num_traits::MulAdd;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
-use std::array;
 
 pub mod builder;
 
@@ -26,9 +25,9 @@ pub mod builder;
 /// This struct encapsulates data and operations for handling multilinear
 /// lagrangian polynomials and their corresponding claims over a series of rounds.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MultiClaim<const N: usize> {
+pub struct MultiClaim<'a, const N: usize> {
     /// The array of multilinear lagrangian polynomials used in the proof.
-    pub polys: [MultilinearLagrangianPolynomial; N],
+    pub polys: &'a [MultilinearLagrangianPolynomial; N],
 
     /// The gamma value used for Frobenius transformations.
     pub gamma: Point,
@@ -37,17 +36,7 @@ pub struct MultiClaim<const N: usize> {
     pub object: ProdCheck<1>,
 }
 
-impl<const N: usize> Default for MultiClaim<N> {
-    fn default() -> Self {
-        Self {
-            polys: array::from_fn(|_| Default::default()),
-            gamma: Default::default(),
-            object: Default::default(),
-        }
-    }
-}
-
-impl<const N: usize> Sumcheck for MultiClaim<N> {
+impl<const N: usize> Sumcheck for MultiClaim<'_, N> {
     type Output = Evaluations;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
@@ -79,7 +68,7 @@ impl<const N: usize> Sumcheck for MultiClaim<N> {
     }
 }
 
-impl<const N: usize> MultiClaim<N> {
+impl<'a, const N: usize> MultiClaim<'a, N> {
     /// Creates a new instance of `MultiClaim` with the provided parameters.
     ///
     /// # Parameters
@@ -96,7 +85,7 @@ impl<const N: usize> MultiClaim<N> {
         points: &Points,
         openings: &[BinaryField128b],
         gamma_pows: &[BinaryField128b],
-        polys: [MultilinearLagrangianPolynomial; N],
+        polys: &'a [MultilinearLagrangianPolynomial; N],
     ) -> Self {
         // Compute the Frobenius linear combination matrix.
         // This matrix represents the operation \( M_\gamma = \sum \gamma_i \cdot Frob^{-i} \).
@@ -141,6 +130,7 @@ mod tests {
         sumcheck::SumcheckBuilder,
     };
     use num_traits::MulAdd;
+    use std::array;
 
     #[test]
     fn test_new_default_inputs() {
@@ -166,10 +156,10 @@ mod tests {
         });
 
         // Call the `new` function
-        let claim = MultiClaim::new(poly, &points, &openings, &gamma_pows, polys.clone());
+        let claim = MultiClaim::new(poly, &points, &openings, &gamma_pows, &polys);
 
         // Validate the fields of the returned claim
-        assert_eq!(claim.polys, polys, "Polynomials should match the input polys.");
+        assert_eq!(claim.polys, &polys, "Polynomials should match the input polys.");
         assert_eq!(
             claim.gamma,
             Point(BinaryField128b::from(0)),
@@ -205,7 +195,7 @@ mod tests {
         });
 
         // Call the `new` function
-        let claim = MultiClaim::new(poly, &points, &openings, &gamma_pows, polys.clone());
+        let claim = MultiClaim::new(poly, &points, &openings, &gamma_pows, &polys);
 
         // Compute expected initial claim
         let mut expected_claim = BinaryField128b::from(0);
@@ -214,7 +204,7 @@ mod tests {
         }
 
         // Validate the fields of the returned claim
-        assert_eq!(claim.polys, polys, "Polynomials should match the input polys.");
+        assert_eq!(claim.polys, &polys, "Polynomials should match the input polys.");
         assert_eq!(
             claim.gamma,
             Point(BinaryField128b::from(128)),
@@ -246,8 +236,9 @@ mod tests {
             (0..128).map(|i| poly.evaluate_at(&points_inv_orbit[i])).collect();
 
         // Setup a multiclaim builder
+        let polys = [poly.clone()];
         let mut prover_builder =
-            MulticlaimBuilder::new([poly.clone()], points, evaluations_inv_orbit.clone());
+            MulticlaimBuilder::new(&polys, points, evaluations_inv_orbit.clone());
 
         // Generate a random gamma for folding
         let gamma = Point::random();

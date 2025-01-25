@@ -213,7 +213,7 @@ impl Keccak {
 
         // Initialize the Multiclaim prover builder.
         let mut multiclaim_builder = MulticlaimBuilder::new(
-            self.witness_linear.clone(),
+            &self.witness_linear,
             self.challenges.clone(),
             self.boolcheck_output.clone().unwrap().frob_evals,
         );

@@ -239,8 +239,7 @@ impl HashcasterKeccak {
             let claims = &bool_check_proof.evals;
 
             // Initialize the Multiclaim builder with the input, updated points, and claims.
-            let mut builder =
-                MulticlaimBuilder::new(input.clone(), points.clone(), claims.to_vec().into());
+            let mut builder = MulticlaimBuilder::new(input, points.clone(), claims.to_vec().into());
 
             // Perform the Multiclaim sumcheck using the helper function.
             let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
