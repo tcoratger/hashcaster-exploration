@@ -17,6 +17,7 @@ hashcaster-pcs = { workspace = true }
 num-traits = { workspace = true }
 rayon = { workspace = true }
 itertools = { workspace = true }
+clap = { workspace = true }
 
 binius_core = { workspace = true }
 binius_field = { workspace = true }
@@ -32,11 +33,19 @@ p3-symmetric = { workspace = true }
 groestl_crypto = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
+criterion = { workspace = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
 rand = { workspace = true }
 
 [[bench]]
 name = "keccak"
 harness = false
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false

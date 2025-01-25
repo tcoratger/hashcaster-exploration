@@ -451,7 +451,7 @@ impl HashcasterKeccak {
         Ok(())
     }
 
-    fn serialize_proof(proof: &HashcasterKeccakProof) -> Vec<u8> {
+    pub fn serialize_proof(proof: &HashcasterKeccakProof) -> Vec<u8> {
         bincode::serialize(proof).unwrap()
     }
 
