@@ -388,12 +388,7 @@ where
         // Ensure all input polynomials have the expected length
         let expected_poly_len = 1 << self.points.len();
         assert!(
-            self.polys.iter().all(|poly| {
-                // println!("poly: {:?}", poly.len());
-                // println!("expected_poly_len: {:?}", expected_poly_len);
-
-                poly.len() == expected_poly_len
-            }),
+            self.polys.iter().all(|poly| { poly.len() == expected_poly_len }),
             "Polynomial length mismatch"
         );
 
