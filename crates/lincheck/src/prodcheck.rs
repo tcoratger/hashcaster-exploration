@@ -277,6 +277,7 @@ impl EvaluationProvider for ProdCheckOutput {
 mod tests {
     use super::*;
     use hashcaster_primitives::poly::point::Point;
+    use rand::rngs::OsRng;
     use std::array;
 
     #[test]
@@ -735,13 +736,15 @@ mod tests {
         // Number of variables for the polynomials.
         const NUM_VARS: usize = 15;
 
+        let rng = &mut OsRng;
+
         // Generate random polynomials for `p_polys` and `q_polys`.
         // Each polynomial has `2^NUM_VARS` evaluations.
         let p_polys: [_; N] =
-            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS, rng));
 
         let q_polys: [_; N] =
-            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS, rng));
 
         // Compute the initial claim: the sum of the element-wise products of `P` and `Q`.
         let mut current_claim =
@@ -758,7 +761,7 @@ mod tests {
             let compressed_round_polynomial = prodcheck.round_polynomial();
 
             // Generate a random challenge `r` for the current round.
-            let r = Point::random();
+            let r = Point::random(rng);
 
             // Decompress the round polynomial to obtain its coefficients.
             // The round polynomial is represented as a univariate polynomial in `r`.

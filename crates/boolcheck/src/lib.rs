@@ -473,6 +473,7 @@ mod tests {
         sumcheck::SumcheckBuilder,
     };
     use num_traits::Pow;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_current_rounds() {
@@ -532,19 +533,21 @@ mod tests {
         // Set the number of variables for the test.
         let num_vars = 20;
 
+        let rng = &mut OsRng;
+
         // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
         // This represents a set of random variables that will be used in the test.
-        let points = Points::random(num_vars);
+        let points = Points::random(num_vars, rng);
 
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
-        let p = MultilinearLagrangianPolynomial::random(1 << num_vars);
+        let p = MultilinearLagrangianPolynomial::random(1 << num_vars, rng);
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
-        let q = MultilinearLagrangianPolynomial::random(1 << num_vars);
+        let q = MultilinearLagrangianPolynomial::random(1 << num_vars, rng);
 
         // Start a timer to measure the execution time of the test.
         let start = std::time::Instant::now();
@@ -560,7 +563,7 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -593,7 +596,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point::random();
+            let r = Point::random(rng);
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -647,19 +650,21 @@ mod tests {
         // Set the number of variables for the test.
         let num_vars = 20;
 
+        let rng = &mut OsRng;
+
         // Generate a vector `points` of `num_vars` random field elements in `BinaryField128b`.
         // This represents a set of random variables that will be used in the test.
-        let points = Points::random(num_vars);
+        let points = Points::random(num_vars, rng);
 
         // Generate a multilinear polynomial `p` with 2^num_vars random elements in
         // `BinaryField128b`. This represents one operand (a polynomial) in the AND
         // operation.
-        let p = MultilinearLagrangianPolynomial::random(1 << num_vars);
+        let p = MultilinearLagrangianPolynomial::random(1 << num_vars, rng);
 
         // Generate another multilinear polynomial `q` with 2^num_vars random elements in
         // `BinaryField128b`. This represents the second operand (a polynomial) in the AND
         // operation.
-        let q = MultilinearLagrangianPolynomial::random(1 << num_vars);
+        let q = MultilinearLagrangianPolynomial::random(1 << num_vars, rng);
 
         // Start a timer to measure the execution time of the test.
         let start = std::time::Instant::now();
@@ -675,7 +680,7 @@ mod tests {
         let phase_switch = 5;
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -708,7 +713,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point::random();
+            let r = Point::random(rng);
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -772,7 +777,7 @@ mod tests {
             (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
 
         // Generate a random gamma for folding
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Generate `gamma^128` for final evaluation
         let gamma128 = gamma.0.pow(128);
@@ -800,7 +805,7 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial.evaluate_at(&challenge);

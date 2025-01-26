@@ -29,6 +29,7 @@ use hashcaster_primitives::{
 use itertools::Itertools;
 use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::array::{self, from_fn};
 
@@ -101,9 +102,9 @@ impl HashcasterKeccak {
         self.num_permutations.ilog2() as usize + NUM_VARS_PER_PERMUTATIONS
     }
 
-    pub fn generate_input(&self) -> [MultilinearLagrangianPolynomial; 5] {
+    pub fn generate_input<RNG: Rng>(&self, rng: &mut RNG) -> [MultilinearLagrangianPolynomial; 5] {
         let num_vars = self.num_vars();
-        from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars))
+        from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars, rng))
     }
 
     pub fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
@@ -552,17 +553,21 @@ fn perform_verification(
 
 #[cfg(test)]
 mod test {
+    use rand::rngs::OsRng;
+
     use super::*;
 
     #[test]
     fn test_keccak_with_pcs() {
+        let rng = &mut OsRng;
+
         // Iterate over powers of 2 in the range [2^10, 2^13)
         for num_permutations in (10..13).map(|exp| 1 << exp) {
             // Initialize the SNARK instance with the given number of permutations
             let snark = HashcasterKeccak::new(num_permutations);
 
             // Generate the input data for the SNARK
-            let input = snark.generate_input();
+            let input = snark.generate_input(rng);
 
             // Create a proof from the generated input
             let proof = snark.prove(input);

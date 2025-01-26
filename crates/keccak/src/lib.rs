@@ -20,6 +20,7 @@ use hashcaster_primitives::{
 use itertools::Itertools;
 use linear::{keccak_linround_witness, KeccakLinear};
 use num_traits::{MulAdd, Pow};
+use rand::Rng;
 use std::{array, time::Instant};
 
 pub mod chi;
@@ -58,13 +59,13 @@ pub struct Keccak {
 
 impl Keccak {
     /// Initialize the protocol with configuration and random data.
-    pub fn new(num_vars: usize, c: usize, num_active_vars: usize) -> Self {
+    pub fn new<RNG: Rng>(num_vars: usize, c: usize, num_active_vars: usize, rng: &mut RNG) -> Self {
         // Generate random points for the protocol.
-        let points = Points::random(num_vars);
+        let points = Points::random(num_vars, rng);
 
         // Generate 5 multilinear lagrangian polynomials with random coefficients.
-        let polys: [MultilinearLagrangianPolynomial; 5] =
-            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars));
+        let polys: [_; 5] =
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars, rng));
 
         // Initialize the Chi package.
         let chi = ChiPackage;
@@ -78,11 +79,21 @@ impl Keccak {
         // Generate witness for the Chi round.
         let witness_chi = chi_round_witness(&witness_linear);
 
+        let witness_finish = Instant::now();
+        println!(">>>> Witness generation took {} ms", (witness_finish - start).as_millis());
+
         // Evaluate the claims using the Chi witness and points.
         let evaluation_claims: [_; 5] = array::from_fn(|i| witness_chi[i].evaluate_at(&points));
 
-        let duration = start.elapsed();
-        println!(">>>> Witness generation took {} ms", duration.as_millis());
+        let evaluation_finish = Instant::now();
+        println!(
+            ">>>> Evaluation claims took {} ms",
+            (evaluation_finish - witness_finish).as_millis()
+        );
+        println!(
+            ">>>> Total time for witness and evaluation took {} ms",
+            (evaluation_finish - start).as_millis()
+        );
 
         // Return the initialized protocol.
         Self {
@@ -101,12 +112,12 @@ impl Keccak {
     }
 
     /// Perform the BoolCheck protocol phase.
-    pub fn boolcheck(&mut self) {
+    pub fn boolcheck<RNG: Rng>(&mut self, rng: &mut RNG) {
         println!("... Starting BoolCheck protocol...");
         let start = Instant::now();
 
         // Generate a random gamma value for folding.
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Initialize the BoolCheck prover builder.
         let mut boolcheck_builder = BoolCheckBuilder::new(
@@ -117,8 +128,22 @@ impl Keccak {
             self.witness_linear.clone(),
         );
 
+        let end_boolcheck_init = Instant::now();
+
+        println!(
+            ">>>> Boolcheck initialization took {} ms",
+            (end_boolcheck_init - start).as_millis()
+        );
+
         // Build the BoolCheck prover.
         let mut boolcheck_prover = boolcheck_builder.build(&gamma);
+
+        let end_boolcheck_extension = Instant::now();
+
+        println!(
+            ">>>> Boolcheck table extension took {} ms",
+            (end_boolcheck_extension - end_boolcheck_init).as_millis()
+        );
 
         // Initialize the claim.
         let mut claim =
@@ -139,7 +164,7 @@ impl Keccak {
             let round_poly = boolcheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");
@@ -162,6 +187,13 @@ impl Keccak {
 
         // Finalize the BoolCheck protocol and retrieve the output.
         let output = boolcheck_prover.finish();
+
+        let boolcheck_final = Instant::now();
+
+        println!(
+            ">>>> Boolcheck rounds took {} ms",
+            (boolcheck_final - end_boolcheck_extension).as_millis()
+        );
 
         // Assert the Frobenius evaluations have the expected length.
         assert_eq!(
@@ -191,19 +223,26 @@ impl Keccak {
             "Final claim mismatch"
         );
 
-        let duration = start.elapsed();
-        println!(">>>> BoolCheck protocol took {} ms", duration.as_millis());
+        let end_boolcheck_verify = Instant::now();
+        println!(
+            ">>>> BoolCheck verifier took {} ms",
+            (end_boolcheck_verify - boolcheck_final).as_millis()
+        );
+        println!(
+            ">>>> BoolCheck total protocol took {} ms",
+            (end_boolcheck_verify - start).as_millis()
+        );
 
         self.boolcheck_output = Some(output);
     }
 
     /// Perform the Multiclaim protocol phase.
-    pub fn multiclaim(&mut self) {
+    pub fn multiclaim<RNG: Rng>(&mut self, rng: &mut RNG) {
         println!("... Starting Multiclaim protocol...");
         let start = Instant::now();
 
         // Generate a random gamma for folding.
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Compute gamma^128 for evaluation.
         let gamma128 = gamma.0.pow(128);
@@ -235,7 +274,7 @@ impl Keccak {
             let round_poly = multiclaim_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");
@@ -276,7 +315,7 @@ impl Keccak {
     }
 
     /// Execute the LinCheck protocol phase.
-    pub fn lincheck(&mut self) {
+    pub fn lincheck<RNG: Rng>(&mut self, rng: &mut RNG) {
         println!("... Starting LinCheck protocol...");
         let start = Instant::now();
 
@@ -284,7 +323,7 @@ impl Keccak {
         let points = self.challenges.clone();
 
         // Generate a random gamma for folding.
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0.try_into().unwrap();
 
@@ -319,7 +358,7 @@ impl Keccak {
             let round_poly = lincheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");
@@ -413,6 +452,8 @@ impl Keccak {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::OsRng;
+
     use super::*;
 
     #[test]
@@ -424,21 +465,23 @@ mod tests {
         // Number of active variables for LinCheck.
         const NUM_ACTIVE_VARS: usize = 10;
 
+        let rng = &mut OsRng;
+
         println!("... Initializing protocol ...");
 
         let start = Instant::now();
 
         // Initialize the protocol with the given parameters.
-        let mut protocol = Keccak::new(NUM_VARS, C, NUM_ACTIVE_VARS);
+        let mut protocol = Keccak::new(NUM_VARS, C, NUM_ACTIVE_VARS, rng);
 
         // Execute the BoolCheck protocol.
-        protocol.boolcheck();
+        protocol.boolcheck(rng);
 
         // Execute the Multiclaim protocol.
-        protocol.multiclaim();
+        protocol.multiclaim(rng);
 
         // Execute the LinCheck protocol.
-        protocol.lincheck();
+        protocol.lincheck(rng);
 
         let end = Instant::now();
 

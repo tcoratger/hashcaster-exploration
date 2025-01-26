@@ -130,6 +130,7 @@ mod tests {
         sumcheck::SumcheckBuilder,
     };
     use num_traits::MulAdd;
+    use rand::rngs::OsRng;
     use std::array;
 
     #[test]
@@ -221,11 +222,13 @@ mod tests {
         // Number of variables
         const NUM_VARS: usize = 20;
 
+        let rng = &mut OsRng;
+
         // Create a multilinear polynomial with `2^NUM_VARS` coefficients
-        let poly = MultilinearLagrangianPolynomial::random(1 << NUM_VARS);
+        let poly = MultilinearLagrangianPolynomial::random(1 << NUM_VARS, rng);
 
         // Create points for evaluation
-        let points = Points::random(NUM_VARS);
+        let points = Points::random(NUM_VARS, rng);
 
         // Map the points to the inverse Frobenius orbit
         let points_inv_orbit: Vec<Points> =
@@ -241,7 +244,7 @@ mod tests {
             MulticlaimBuilder::new(&polys, points, evaluations_inv_orbit.clone());
 
         // Generate a random gamma for folding
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Builder the prover via folding
         let mut prover = prover_builder.build(&gamma);
@@ -267,7 +270,7 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial.evaluate_at(&challenge);

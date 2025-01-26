@@ -113,13 +113,16 @@ impl LinearOperations for ThetaAC {
 mod tests {
     use super::*;
     use hashcaster_primitives::binary_field::BinaryField128b;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_thetaac_apply() {
+        let rng = &mut OsRng;
+
         let theta_ac = ThetaAC;
 
         // Initialize input with a random value repeated 1600 times.
-        let i1 = BinaryField128b::random();
+        let i1 = BinaryField128b::random(rng);
         let input = [i1; 1600];
 
         // Initialize output with zeros.
@@ -141,10 +144,12 @@ mod tests {
 
     #[test]
     fn test_thetaac_apply_transposed() {
+        let rng = &mut OsRng;
+
         let theta_ac = ThetaAC;
 
         // Initialize input with a random value repeated 320 times.
-        let i1 = BinaryField128b::random();
+        let i1 = BinaryField128b::random(rng);
         let input = [i1; 320];
 
         // Initialize output with zeros.

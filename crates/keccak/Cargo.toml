@@ -34,8 +34,6 @@ groestl_crypto = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
 criterion = { workspace = true }
-
-[dev-dependencies]
 rand = { workspace = true }
 
 [[bench]]

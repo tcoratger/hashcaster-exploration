@@ -1,4 +1,8 @@
 use hashcaster_keccak::pcs::HashcasterKeccak;
+use rand::{
+    rngs::{OsRng, StdRng},
+    Rng, SeedableRng,
+};
 use std::{
     fmt::Debug,
     hint::black_box,
@@ -51,8 +55,8 @@ fn main() {
     run_with_hash(&args.hash, args.log_permutations, args.sample_size);
 }
 
-fn routine(snark: &HashcasterKeccak) -> (Duration, usize) {
-    let input = black_box(snark.generate_input());
+fn routine<RNG: Rng>(snark: &HashcasterKeccak, rng: &mut RNG) -> (Duration, usize) {
+    let input = black_box(snark.generate_input(rng));
 
     let start = Instant::now();
     let proof = snark.prove(input);
@@ -64,22 +68,24 @@ fn routine(snark: &HashcasterKeccak) -> (Duration, usize) {
     (elapsed, proof_size)
 }
 
-fn warm_up(snark: &HashcasterKeccak) {
+fn warm_up<RNG: Rng>(snark: &HashcasterKeccak, rng: &mut RNG) {
     let mut total_elapsed = Duration::default();
     while total_elapsed.as_secs_f64() < 3.0 {
-        total_elapsed += routine(snark).0;
+        total_elapsed += routine(snark, rng).0;
     }
 }
 
 pub fn bench(num_permutations: usize, sample_size: usize) -> (usize, Duration, f64, f64) {
+    let rng = &mut OsRng;
+
     let snark = HashcasterKeccak::new(num_permutations);
 
-    warm_up(&snark);
+    warm_up(&snark, rng);
 
     let mut total_elapsed = Duration::default();
     let mut total_proof_size = 0;
     for _ in 0..sample_size {
-        let (elapsed, proof_size) = routine(&snark);
+        let (elapsed, proof_size) = routine(&snark, rng);
         total_elapsed += elapsed;
         total_proof_size += proof_size;
     }
@@ -93,7 +99,7 @@ pub fn bench(num_permutations: usize, sample_size: usize) -> (usize, Duration, f
 
 pub fn run(num_permutations: usize) {
     let snark = HashcasterKeccak::new(num_permutations);
-    let input = black_box(snark.generate_input());
+    let input = black_box(snark.generate_input(&mut StdRng::from_entropy()));
     let proof = snark.prove(input);
     drop(black_box(proof));
 }

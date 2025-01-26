@@ -59,12 +59,15 @@ impl<const I: usize, const O: usize> AlgebraicOps<I, O> for AndPackage<I, O> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_exec_alg_and() {
+        let rng = &mut OsRng;
+
         // Generate two random field elements as input.
-        let a1 = BinaryField128b::random();
-        let a2 = BinaryField128b::random();
+        let a1 = BinaryField128b::random(rng);
+        let a2 = BinaryField128b::random(rng);
 
         let a = [a1, a2];
         let b = [

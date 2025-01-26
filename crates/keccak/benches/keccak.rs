@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hashcaster_keccak::pcs::HashcasterKeccak;
+use rand::rngs::OsRng;
 use std::time::Duration;
 
 fn configure_criterion() -> Criterion {
@@ -12,6 +13,7 @@ fn configure_criterion() -> Criterion {
 fn benchmark_snark(c: &mut Criterion) {
     let log_permutations = 10; // Example : 2^10 permutations
     let num_permutations = 1 << log_permutations;
+    let rng = &mut OsRng;
 
     let snark = HashcasterKeccak::new(num_permutations);
 
@@ -23,7 +25,7 @@ fn benchmark_snark(c: &mut Criterion) {
             let mut total_duration = Duration::ZERO;
 
             for _ in 0..iters {
-                let input = snark.generate_input();
+                let input = snark.generate_input(rng);
                 let start = std::time::Instant::now();
                 let proof = snark.prove(input);
                 total_duration += start.elapsed();

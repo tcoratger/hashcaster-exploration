@@ -254,9 +254,12 @@ mod tests {
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
     use num_traits::MulAdd;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_keccak_linear() {
+        let rng = &mut OsRng;
+
         // Create a new instance of the KeccakLinear operator.
         let keccak_linear = KeccakLinear::new();
 
@@ -268,7 +271,7 @@ mod tests {
 
         // **Generate random input vector `a`**
         // - This simulates a realistic input for the KeccakLinear transformation.
-        let a: Vec<_> = (0..1024 * 5).map(|_| BinaryField128b::random()).collect();
+        let a: Vec<_> = (0..1024 * 5).map(|_| BinaryField128b::random(rng)).collect();
 
         // **Apply the KeccakLinear transformation**
         // - `m_a` will store the result of applying the transformation to `a`.
@@ -277,7 +280,7 @@ mod tests {
 
         // **Generate another random input vector `b`**
         // - This will be used to test the transpose operation.
-        let b: Vec<_> = (0..1024 * 5).map(|_| BinaryField128b::random()).collect();
+        let b: Vec<_> = (0..1024 * 5).map(|_| BinaryField128b::random(rng)).collect();
 
         // **Apply the transposed transformation**
         // - `m_b` will store the result of applying the transpose operation to `b`.
@@ -312,12 +315,14 @@ mod tests {
         const NUM_BATCHES: usize = 2;
         const BATCH_SIZE: usize = 1024;
 
+        let rng = &mut OsRng;
+
         // Create a new instance of the KeccakLinear operator.
         let keccak_linear = KeccakLinear::new();
 
         // Generate random input data for all 5 inputs.
         let input_data: [Vec<_>; 5] = array::from_fn(|_| {
-            (0..NUM_BATCHES * BATCH_SIZE).map(|_| BinaryField128b::random()).collect()
+            (0..NUM_BATCHES * BATCH_SIZE).map(|_| BinaryField128b::random(rng)).collect()
         });
 
         // Create slices for the input to `keccak_linround_witness`.
@@ -367,15 +372,17 @@ mod tests {
         // Setup the phase switch parameter
         const PHASE_SWITCH: usize = 5;
 
+        let rng = &mut OsRng;
+
         // Setup a Keccak linear matrix
         let keccak_linear = KeccakLinear::new();
 
         // Setup NUM_VARS random points
-        let points = Points::random(NUM_VARS);
+        let points = Points::random(NUM_VARS, rng);
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
         let polys: [MultilinearLagrangianPolynomial; 5] =
-            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS, rng));
 
         // Apply the Keccak linear round witness computation
         let m_p = keccak_linround_witness(array::from_fn(|i| polys[i].as_slice()));
@@ -393,7 +400,7 @@ mod tests {
         );
 
         // Setup a random gamma for folding
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         // Build the prover
         let mut prover = prover_builder.build(&gamma);
@@ -410,7 +417,7 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Update the claim
             claim = round_poly[0] +

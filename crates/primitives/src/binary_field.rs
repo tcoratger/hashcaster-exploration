@@ -3,7 +3,7 @@ use crate::{
     bit_iterator::BitIterator,
     frobenius::FROBENIUS,
 };
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{cast, Pod, Zeroable};
 use num_traits::{MulAdd, MulAddAssign, One, Pow, Zero};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -112,9 +112,11 @@ impl BinaryField128b {
     /// # Returns
     /// - A random `BinaryField128b` instance, with the internal `u128` value generated uniformly
     ///   across the entire range of 128 bits.
-    pub fn random() -> Self {
+    pub fn random<RNG: Rng>(rng: &mut RNG) -> Self {
         // Use the `rand` crate to generate a random `u128` value.
-        Self::new(rand::thread_rng().gen())
+        let a = rng.next_u64();
+        let b = rng.next_u64();
+        Self::new(cast::<[u64; 2], u128>([a, b]))
     }
 
     /// Generates a random vector of [`BinaryField128b`] elements.
@@ -418,6 +420,8 @@ impl From<bool> for BinaryField128b {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::OsRng;
+
     use crate::backend::test_utils::expected_pmull_result;
 
     use super::*;
@@ -856,8 +860,10 @@ mod tests {
 
     #[test]
     fn test_frobenius() {
+        let rng = &mut OsRng;
+
         // Generate a random field element in GF(2^128).
-        let a = BinaryField128b::random();
+        let a = BinaryField128b::random(rng);
 
         // Initialize a variable `apow` with the same value as `a`.
         // This variable will be used to compute successive powers of `a` using repeated squaring.
@@ -924,9 +930,11 @@ mod tests {
 
     #[test]
     fn test_muladd_basic() {
-        let a = BinaryField128b::random();
-        let b = BinaryField128b::random();
-        let c = BinaryField128b::random();
+        let rng = &mut OsRng;
+
+        let a = BinaryField128b::random(rng);
+        let b = BinaryField128b::random(rng);
+        let c = BinaryField128b::random(rng);
 
         // Expected result: (a * b) + c
         let expected = (a * b) + c;

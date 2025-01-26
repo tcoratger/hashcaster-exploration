@@ -3,6 +3,7 @@ use crate::{
     sumcheck::EvaluationProvider,
 };
 use num_traits::MulAdd;
+use rand::Rng;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,8 +22,8 @@ impl Evaluations {
     }
 
     /// Creates a new `Evaluations` instance with random evaluations.
-    pub fn random(n: usize) -> Self {
-        Self((0..n).map(|_| BinaryField128b::random()).collect())
+    pub fn random<RNG: Rng>(n: usize, rng: &mut RNG) -> Self {
+        Self((0..n).map(|_| BinaryField128b::random(rng)).collect())
     }
 
     /// Consumes the `Evaluations` instance and returns the inner vector of evaluations.
@@ -194,11 +195,14 @@ impl EvaluationProvider for Evaluations {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_pi() {
+        let rng = &mut OsRng;
+
         // Generate a random element `r` in the binary field.
-        let mut r = BinaryField128b::random();
+        let mut r = BinaryField128b::random(rng);
 
         // Create an `Evaluations` instance representing the Frobenius orbit of `r`.
         // This orbit contains 128 successive squarings of `r`.
@@ -276,7 +280,9 @@ mod tests {
 
     #[test]
     fn test_pi_random_orbit() {
-        let orbit = Evaluations::random(128);
+        let rng = &mut OsRng;
+
+        let orbit = Evaluations::random(128, rng);
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
@@ -289,8 +295,10 @@ mod tests {
 
     #[test]
     fn twist_untwist() {
+        let rng = &mut OsRng;
+
         // Generate a random set of 128 evaluations.
-        let lhs = Evaluations::random(128);
+        let lhs = Evaluations::random(128, rng);
 
         // Clone `lhs` to create an independent copy for transformation.
         let mut rhs = lhs.clone();

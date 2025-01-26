@@ -182,6 +182,7 @@ mod tests {
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
     use itertools::Itertools;
+    use rand::rngs::OsRng;
     use std::array;
 
     #[test]
@@ -189,8 +190,10 @@ mod tests {
         // Setup the Chi package.
         let chi = ChiPackage;
 
+        let rng = &mut OsRng;
+
         // Generate random field elements as input.
-        let input: [_; 5] = array::from_fn(|_| BinaryField128b::random());
+        let input: [_; 5] = array::from_fn(|_| BinaryField128b::random(rng));
 
         // Compute the linear and quadratic components of the Chi package.
         let linear_part = chi.linear(&input);
@@ -211,9 +214,11 @@ mod tests {
         // Setup the Chi package.
         let chi = ChiPackage;
 
+        let rng = &mut OsRng;
+
         // Generate random field elements as input.
-        let input_a: [_; 5] = array::from_fn(|_| BinaryField128b::random());
-        let input_b: [_; 5] = array::from_fn(|_| BinaryField128b::random());
+        let input_a: [_; 5] = array::from_fn(|_| BinaryField128b::random(rng));
+        let input_b: [_; 5] = array::from_fn(|_| BinaryField128b::random(rng));
 
         // Compute the chi compressed for both inputs.
         let lhs_a = chi_compressed(input_a);
@@ -246,12 +251,14 @@ mod tests {
         // Setup the switch parameter.
         const SWITCH: usize = 5;
 
+        let rng = &mut OsRng;
+
         // Setup some random points
-        let points = Points::random(NUM_VARS);
+        let points = Points::random(NUM_VARS, rng);
 
         // Create 5 multilinear lagrangian polynomials with `2^NUM_VARS` coefficients each
         let polys: [MultilinearLagrangianPolynomial; 5] =
-            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS));
+            array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << NUM_VARS, rng));
 
         // Compute chi witness
         let witness = chi_round_witness(&polys);
@@ -263,7 +270,7 @@ mod tests {
         let chi = ChiPackage;
 
         // Generate a random gamma for folding
-        let gamma = Point::random();
+        let gamma = Point::random(rng);
 
         let start = std::time::Instant::now();
 
@@ -292,7 +299,7 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random();
+            let challenge = Point::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");

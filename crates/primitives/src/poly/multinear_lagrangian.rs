@@ -5,6 +5,7 @@ use crate::{
 };
 use bytemuck::cast_slice;
 use num_traits::Zero;
+use rand::Rng;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
@@ -49,8 +50,8 @@ impl MultilinearLagrangianPolynomial {
     }
 
     /// Generates a random multilinear Lagrangian polynomial with the given number of coefficients.
-    pub fn random(n: usize) -> Self {
-        (0..n).map(|_| BinaryField128b::random()).collect()
+    pub fn random<RNG: Rng>(n: usize, rng: &mut RNG) -> Self {
+        (0..n).map(|_| BinaryField128b::random(rng)).collect()
     }
 
     /// Creates a new [`MultilinearLagrangianPolynomial`] with the given coefficients.
@@ -412,6 +413,8 @@ impl DerefMut for MultilinearLagrangianPolynomials {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::OsRng;
+
     use super::*;
 
     #[test]
@@ -538,6 +541,8 @@ mod tests {
     fn test_eq_poly_sequence_random_values() {
         use rand::Rng;
 
+        let rng_pts = &mut OsRng;
+
         // Define the number of iterations for the test.
         let iterations = 10;
 
@@ -547,7 +552,7 @@ mod tests {
         for _ in 0..iterations {
             // Step 1: Generate random points for the test.
             let num_points = rng.gen_range(2..6); // Random number of points between 2 and 5.
-            let points = Points::random(num_points);
+            let points = Points::random(num_points, rng_pts);
 
             // Step 2: Compute the equality polynomial using `new_eq_poly`.
             let result = points.to_eq_poly();
@@ -578,19 +583,21 @@ mod tests {
 
     #[test]
     fn test_evaluate() {
+        let rng = &mut OsRng;
+
         // Define a simple multilinear polynomial.
         // Coefficients represent the polynomial's evaluation at the points (0, 0), (0, 1), (1, 0),
         // (1, 1).
-        let coeff0 = BinaryField128b::random(); // p(0, 0)
-        let coeff1 = BinaryField128b::random(); // p(0, 1)
-        let coeff2 = BinaryField128b::random(); // p(1, 0)
-        let coeff3 = BinaryField128b::random(); // p(1, 1)
+        let coeff0 = BinaryField128b::random(rng); // p(0, 0)
+        let coeff1 = BinaryField128b::random(rng); // p(0, 1)
+        let coeff2 = BinaryField128b::random(rng); // p(1, 0)
+        let coeff3 = BinaryField128b::random(rng); // p(1, 1)
 
         // Create a multilinear polynomial with the coefficients.
         let polynomial = MultilinearLagrangianPolynomial::new(vec![coeff0, coeff1, coeff2, coeff3]);
 
         // Define the evaluation points.
-        let points = Points::random(2);
+        let points = Points::random(2, rng);
 
         // Compute the evaluation.
         let result = polynomial.evaluate_at(&points);

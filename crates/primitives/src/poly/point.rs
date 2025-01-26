@@ -5,6 +5,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rand::Rng;
 use rayon::{
     iter::{
         IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator,
@@ -24,8 +25,8 @@ impl Point {
     /// # Returns
     /// - A random `Point` instance, with the internal `u128` value generated uniformly across the
     ///   entire range of 128 bits.
-    pub fn random() -> Self {
-        Self(BinaryField128b::random())
+    pub fn random<RNG: Rng>(rng: &mut RNG) -> Self {
+        Self(BinaryField128b::random(rng))
     }
 }
 
@@ -81,8 +82,8 @@ pub struct Points(pub Vec<Point>);
 
 impl Points {
     /// Generates a random collection of `n` points.
-    pub fn random(n: usize) -> Self {
-        (0..n).map(|_| BinaryField128b::random()).collect()
+    pub fn random<RNG: Rng>(n: usize, rng: &mut RNG) -> Self {
+        (0..n).map(|_| BinaryField128b::random(rng)).collect()
     }
 
     /// Constructs the equality polynomial based on the provided points.
@@ -387,6 +388,8 @@ impl FromIterator<BinaryField128b> for Points {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::OsRng;
+
     use super::*;
     use crate::binary_field::BinaryField128b;
 
@@ -556,8 +559,10 @@ mod tests {
 
     #[test]
     fn test_eq_poly_sequence_cross_check() {
+        let rng = &mut OsRng;
+
         // Generate a random vector of 20 points in the finite field.
-        let points = Points::random(20);
+        let points = Points::random(20, rng);
 
         // Compute the equality polynomial sequence for the points.
         let eq_sequence = points.to_eq_poly_sequence();
