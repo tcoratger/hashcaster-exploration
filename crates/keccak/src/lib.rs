@@ -1,5 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(generic_arg_infer)]
 
 use crate::chi::ChiPackage;
 use chi::chi_round_witness;
@@ -32,11 +33,9 @@ pub mod theta;
 
 /// Struct to encapsulate protocol state and reusable components.
 #[derive(Debug)]
-pub struct Keccak {
+pub struct Keccak<const C: usize> {
     /// Number of variables in the protocol.
     num_vars: usize,
-    /// Switch parameter for BoolCheck.
-    c: usize,
     /// Number of active variables for LinCheck.
     num_active_vars: usize,
     /// Set of random points used in the protocol.
@@ -57,9 +56,9 @@ pub struct Keccak {
     evaluation_claims: [BinaryField128b; 5],
 }
 
-impl Keccak {
+impl<const C: usize> Keccak<C> {
     /// Initialize the protocol with configuration and random data.
-    pub fn new<RNG: Rng>(num_vars: usize, c: usize, num_active_vars: usize, rng: &mut RNG) -> Self {
+    pub fn new<RNG: Rng>(num_vars: usize, num_active_vars: usize, rng: &mut RNG) -> Self {
         // Generate random points for the protocol.
         let points = Points::random(num_vars, rng);
 
@@ -98,7 +97,6 @@ impl Keccak {
         // Return the initialized protocol.
         Self {
             num_vars,
-            c,
             num_active_vars,
             points,
             polys,
@@ -120,9 +118,8 @@ impl Keccak {
         let gamma = Point::random(rng);
 
         // Initialize the BoolCheck prover builder.
-        let mut boolcheck_builder = BoolCheckBuilder::new(
+        let mut boolcheck_builder = BoolCheckBuilder::<_, _, C, _>::new(
             self.chi.clone(),
-            self.c,
             self.points.clone(),
             self.evaluation_claims,
             self.witness_linear.clone(),
@@ -472,7 +469,7 @@ mod tests {
         let start = Instant::now();
 
         // Initialize the protocol with the given parameters.
-        let mut protocol = Keccak::new(NUM_VARS, C, NUM_ACTIVE_VARS, rng);
+        let mut protocol = Keccak::<C>::new(NUM_VARS, NUM_ACTIVE_VARS, rng);
 
         // Execute the BoolCheck protocol.
         protocol.boolcheck(rng);

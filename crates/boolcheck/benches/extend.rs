@@ -21,11 +21,8 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
     });
 
     // Create a BoolCheckBuilder instance with test data
-    let bool_check = BoolCheckBuilder::<N, M, AndPackage<N, M>> {
-        c: 2, // Recursion depth
-        polys: tables,
-        ..Default::default()
-    };
+    let bool_check =
+        BoolCheckBuilder::<N, M, 2, AndPackage<N, M>> { polys: tables, ..Default::default() };
 
     // Generate the ternary mapping
     let (_, trit_mapping) = bool_check.trit_mapping();

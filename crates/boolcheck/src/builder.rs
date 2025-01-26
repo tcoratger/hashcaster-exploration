@@ -31,6 +31,7 @@ use std::array;
 /// # Fields
 /// - `N`: The number of multilinear polynomials (`polys`) involved in the `BoolCheck`.
 /// - `M`: The number of outputs produced by the Boolean operations (e.g., AND, OR).
+/// - `C`: The phase switch parameter (`c`).
 ///
 /// # Purpose
 /// The primary purpose of `BoolCheckBuilder` is to:
@@ -38,12 +39,7 @@ use std::array;
 /// - Precompute intermediate parameters such as folding challenges and mappings.
 /// - Construct the extended tables and claims required for the `BoolCheck` protocol.
 #[derive(Clone, Debug)]
-pub struct BoolCheckBuilder<const N: usize, const M: usize, A: AlgebraicOps<N, M>> {
-    /// The phase switch parameter (`c`).
-    ///
-    /// This parameter controls the number of initial rounds in the protocol.
-    pub c: usize,
-
+pub struct BoolCheckBuilder<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M>> {
     /// The evaluation points for the multilinear polynomials.
     ///
     /// A collection of field elements where the Boolean operations are evaluated.
@@ -73,12 +69,11 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize, A: AlgebraicOps<N, M
     pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
-    for BoolCheckBuilder<N, M, A>
+impl<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M> + Default> Default
+    for BoolCheckBuilder<N, M, C, A>
 {
     fn default() -> Self {
         Self {
-            c: 0,
             points: Default::default(),
             gammas: array::from_fn(|_| Default::default()),
             claims: array::from_fn(|_| Default::default()),
@@ -88,15 +83,13 @@ impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Default> Default
     }
 }
 
-impl<const N: usize, const M: usize, A> BoolCheckBuilder<N, M, A>
+impl<const N: usize, const M: usize, const C: usize, A> BoolCheckBuilder<N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
 {
     /// Creates a new instance of `BoolCheckBuilder`.
     ///
     /// # Parameters
-    /// - `c`: The phase switch parameter, representing the number of initial rounds in the
-    ///   protocol.
     /// - `points`: A collection of field elements (`Points`) where the Boolean operations are
     ///   evaluated.
     /// - `gamma`: A reference to a random field element (`Point`) used to compute folding
@@ -116,7 +109,6 @@ where
     /// - The `gammas` field is computed from the provided `gamma` using a folding strategy.
     pub fn new(
         algebraic_operations: A,
-        c: usize,
         points: Points,
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
@@ -125,8 +117,8 @@ where
         // `c` must be less than the number of evaluation points (`points.len()`).
         //
         // This ensures the phase switch does not exceed the dimensionality of the input space.
-        assert!(c < points.len());
-        Self { c, points, claims, polys, algebraic_operations, ..Default::default() }
+        assert!(C < points.len());
+        Self { points, claims, polys, algebraic_operations, ..Default::default() }
     }
 
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
@@ -157,12 +149,11 @@ where
     ///   - `bit_mapping`: Maps binary numbers to ternary equivalents.
     ///   - `trit_mapping`: Maps ternary numbers based on their digit properties.
     pub fn trit_mapping(&self) -> (Vec<u16>, Vec<u16>) {
-        let c = self.c;
         // Calculate 3^(c+1), the total number of ternary numbers to process
-        let pow3 = 3usize.pow((c + 1) as u32);
+        let pow3 = 3usize.pow((C + 1) as u32);
 
         // Preallocate memory for efficiency
-        let mut bit_mapping = Vec::with_capacity(1 << (c + 1));
+        let mut bit_mapping = Vec::with_capacity(1 << (C + 1));
         let mut trit_mapping = Vec::with_capacity(pow3);
 
         // Iterate over all possible ternary numbers from 0 to 3^(c+1)-1
@@ -172,7 +163,7 @@ where
             let (mut current, mut bin_value, mut msd) = (i, 0u16, None);
 
             // Decompose the number `i` into base-3 and calculate mappings
-            for idx in 0..=c {
+            for idx in 0..=C {
                 // Extract the least significant ternary digit
                 let digit = (current % 3) as u16;
                 current /= 3;
@@ -241,22 +232,20 @@ where
         L: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
         Q: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
     {
-        // Recursion depth parameter.
-        let c = self.c;
         // Log2 of table size, determines the dimensions.
         let dims = self.polys[0].len().ilog2() as usize;
 
         // pow3: Total number of ternary indices to process (3^(c+1)).
-        let pow3 = 3usize.pow((c + 1) as u32);
+        let pow3 = 3usize.pow((C + 1) as u32);
 
         // pow3_adj: Adjusted size for indices that require recursive processing.
         let pow3_adj = 2 * pow3 / 3;
 
         // pow2: Determines the number of chunks to process based on table size and recursion depth.
-        let pow2 = 1 << (dims - c - 1);
+        let pow2 = 1 << (dims - C - 1);
 
         // base_stride: Offset step for table chunks.
-        let base_stride = 1 << (c + 1);
+        let base_stride = 1 << (C + 1);
 
         // Preallocate the result vector to store the extended table.
         let mut result = vec![BinaryField128b::ZERO; pow3 * pow2];
@@ -334,16 +323,14 @@ where
     {
         use rayon::prelude::*;
 
-        // Recursion depth parameter.
-        let c = self.c;
         let dims = self.polys[0].len().ilog2() as usize;
 
-        let pow3 = 3usize.pow((c + 1) as u32);
+        let pow3 = 3usize.pow((C + 1) as u32);
         let pow3_adj = 2 * pow3 / 3;
-        let pow2 = 1 << (dims - c - 1);
+        let pow2 = 1 << (dims - C - 1);
 
-        let chunk_size = 3usize.pow((c - 2) as u32);
-        let base_stride = 1 << (c + 1);
+        let chunk_size = 3usize.pow((C - 2) as u32);
+        let base_stride = 1 << (C + 1);
 
         assert_eq!(pow3 % chunk_size, 0, "Chunk size must evenly divide total size");
 
@@ -387,11 +374,12 @@ where
     }
 }
 
-impl<const N: usize, const M: usize, A> SumcheckBuilder for BoolCheckBuilder<N, M, A>
+impl<const N: usize, const M: usize, const C: usize, A> SumcheckBuilder
+    for BoolCheckBuilder<N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
 {
-    type Sumcheck = BoolCheck<N, M, A>;
+    type Sumcheck = BoolCheck<N, M, C, A>;
 
     fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the folding challenges using the provided gamma.
@@ -417,7 +405,6 @@ where
 
         // Return the constructed BoolCheck
         BoolCheck {
-            c: self.c,
             bit_mapping,
             eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
             claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
@@ -435,8 +422,8 @@ where
     }
 }
 
-impl<const N: usize, const M: usize, A: AlgebraicOps<N, M> + Send + Sync> CompressedFoldedOps<N>
-    for BoolCheckBuilder<N, M, A>
+impl<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M> + Send + Sync>
+    CompressedFoldedOps<N> for BoolCheckBuilder<N, M, C, A>
 {
     fn linear_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute and fold the linear part of the boolean formula using gammas.
@@ -480,8 +467,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
-            BoolCheckBuilder { c: 1, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, 1, AndPackage<0, 0>> = BoolCheckBuilder::default();
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -496,8 +482,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
-            BoolCheckBuilder { c: 2, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, 2, AndPackage<0, 0>> = BoolCheckBuilder::default();
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -516,8 +501,7 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
-            BoolCheckBuilder { c: 4, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, 4, AndPackage<0, 0>> = BoolCheckBuilder::default();
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -550,8 +534,7 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckBuilder with c = 0 (single ternary digit).
-        let bool_check: BoolCheckBuilder<0, 0, AndPackage<0, 0>> =
-            BoolCheckBuilder { c: 0, ..Default::default() };
+        let bool_check: BoolCheckBuilder<0, 0, 0, AndPackage<0, 0>> = BoolCheckBuilder::default();
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -587,8 +570,8 @@ mod tests {
         // Create a BoolCheckBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckBuilder<3, 1, AndPackage<3, 1>> =
-            BoolCheckBuilder { c: 2, polys: tabs, ..Default::default() };
+        let bool_check: BoolCheckBuilder<3, 1, 2, AndPackage<3, 1>> =
+            BoolCheckBuilder { polys: tabs, ..Default::default() };
 
         // Compute the ternary mapping for the current value of `c`
         // `trit_mapping` is a precomputed array that determines how table values are combined

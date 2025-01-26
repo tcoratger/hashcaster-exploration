@@ -222,8 +222,12 @@ impl HashcasterKeccak {
             let chi = ChiPackage;
 
             // Initialize the BoolCheck builder with the Chi package, points, claims, and input.
-            let mut builder =
-                BoolCheckBuilder::new(chi, BOOL_CHECK_C, points.clone(), *claims, input.clone());
+            let mut builder = BoolCheckBuilder::<_, _, BOOL_CHECK_C, _>::new(
+                chi,
+                points.clone(),
+                *claims,
+                input.clone(),
+            );
 
             // Perform the BoolCheck sumcheck using the helper function.
             let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
