@@ -411,34 +411,39 @@ impl Keccak {
     }
 }
 
-/// Main entry point to execute the protocol phases.
-pub fn main() {
-    // Total number of variables.
-    const NUM_VARS: usize = 20;
-    // Switch parameter for BoolCheck.
-    const C: usize = 5;
-    // Number of active variables for LinCheck.
-    const NUM_ACTIVE_VARS: usize = 10;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    println!("... Initializing protocol ...");
+    #[test]
+    fn test_keccak_without_pcs() {
+        // Total number of variables.
+        const NUM_VARS: usize = 20;
+        // Switch parameter for BoolCheck.
+        const C: usize = 5;
+        // Number of active variables for LinCheck.
+        const NUM_ACTIVE_VARS: usize = 10;
 
-    let start = Instant::now();
+        println!("... Initializing protocol ...");
 
-    // Initialize the protocol with the given parameters.
-    let mut protocol = Keccak::new(NUM_VARS, C, NUM_ACTIVE_VARS);
+        let start = Instant::now();
 
-    // Execute the BoolCheck protocol.
-    protocol.boolcheck();
+        // Initialize the protocol with the given parameters.
+        let mut protocol = Keccak::new(NUM_VARS, C, NUM_ACTIVE_VARS);
 
-    // Execute the Multiclaim protocol.
-    protocol.multiclaim();
+        // Execute the BoolCheck protocol.
+        protocol.boolcheck();
 
-    // Execute the LinCheck protocol.
-    protocol.lincheck();
+        // Execute the Multiclaim protocol.
+        protocol.multiclaim();
 
-    let end = Instant::now();
+        // Execute the LinCheck protocol.
+        protocol.lincheck();
 
-    println!("Protocol execution took {} ms", (end - start).as_millis());
+        let end = Instant::now();
 
-    println!("Keccak completed successfully.");
+        println!("Protocol execution took {} ms", (end - start).as_millis());
+
+        println!("Keccak completed successfully.");
+    }
 }
