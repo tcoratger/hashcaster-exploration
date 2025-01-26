@@ -92,7 +92,7 @@ impl MultilinearLagrangianPolynomial {
     pub fn evaluate_at(&self, points: &Points) -> BinaryField128b {
         // Ensure the number of coefficients matches the number of points.
         // The number of coefficients should be 2^n, where n is the length of `points`.
-        assert!(self.coeffs.len() == 1 << points.len());
+        assert_eq!(self.coeffs.len(), 1 << points.len());
 
         // Compute the weighted sum of coefficients.
         // Each coefficient is multiplied by the corresponding weight from the equality polynomial.

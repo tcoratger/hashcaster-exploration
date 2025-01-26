@@ -151,7 +151,8 @@ impl Points {
         // Iterate over the points to construct the equality polynomial.
         self.iter().enumerate().for_each(|(i, point)| {
             // Split the coefficient vector into two parts: `left` and `right`.
-            // `left` contains existing coefficients, `right` will store the new coefficients.
+            // - `left` contains existing coefficients,
+            // - `right` will store the new coefficients.
             let (left, right) = coeffs.split_at_mut(1 << i);
 
             // Update coefficients in parallel using iterators over `left` and `right`.
@@ -212,8 +213,10 @@ impl Points {
                 |(chunk, &prev_coeff)| {
                     // Calculate the updated coefficients.
                     let multiplied = **multiplier * prev_coeff;
-                    chunk[0] = prev_coeff + multiplied; // Update the first coefficient.
-                    chunk[1] = multiplied; // Update the second coefficient.
+                    // Update the first coefficient.
+                    chunk[0] = prev_coeff + multiplied;
+                    // Update the second coefficient.
+                    chunk[1] = multiplied;
                 },
             );
 
