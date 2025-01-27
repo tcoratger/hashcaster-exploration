@@ -188,7 +188,7 @@ impl BinaryField128b {
     ///
     /// # Returns
     /// An array of size `M` containing the computed sequence of gamma values.
-    pub fn compute_gammas_folding<const M: usize>(gamma: Self) -> [Self; M] {
+    pub fn compute_gammas_folding<const M: usize>(gamma: &Self) -> [Self; M] {
         // Initialize the array with the identity element
         let mut gammas = [Self::ONE; M];
         // Start with the multiplicative identity
@@ -888,7 +888,7 @@ mod tests {
     fn test_compute_gammas_folding_identity() {
         // Case: Gamma = 1
         let gamma = BinaryField128b::ONE;
-        let result = BinaryField128b::compute_gammas_folding(gamma);
+        let result = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Expected result is a sequence of ones
         let expected = [BinaryField128b::ONE; 5];
@@ -899,7 +899,7 @@ mod tests {
     fn test_compute_gammas_folding_simple_case() {
         // Case: Gamma = 2
         let gamma = BinaryField128b::new(2);
-        let result = BinaryField128b::compute_gammas_folding(gamma);
+        let result = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Expected result
         let expected = [BinaryField128b::ONE, gamma, gamma * gamma, gamma * gamma * gamma];
@@ -910,7 +910,7 @@ mod tests {
     fn test_compute_gammas_folding_large_gamma() {
         // Case: Gamma = large value
         let gamma = BinaryField128b::new(123_456_789);
-        let result = BinaryField128b::compute_gammas_folding(gamma);
+        let result = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Expected result calculated manually: [1, gamma, gamma^2]
         let expected = [BinaryField128b::ONE, gamma, gamma * gamma];
@@ -921,7 +921,7 @@ mod tests {
     fn test_compute_gammas_folding_zero_gamma() {
         // Case: Gamma = 0
         let gamma = BinaryField128b::ZERO;
-        let result = BinaryField128b::compute_gammas_folding(gamma);
+        let result = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Expected result: [1, 0, 0]
         let expected = [BinaryField128b::ONE, BinaryField128b::ZERO, BinaryField128b::ZERO];

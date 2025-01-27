@@ -124,7 +124,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
         // Compute powers of gamma for folding.
         //
         // Computes successive powers `[1, γ, γ², ..., γ^(M-1)]`.
-        let gammas: [_; M] = BinaryField128b::compute_gammas_folding(**gamma);
+        let gammas: [_; M] = BinaryField128b::compute_gammas_folding(gamma);
 
         // Generate equality polynomial for active variables.
         let eq_active = pt_active.to_eq_poly();

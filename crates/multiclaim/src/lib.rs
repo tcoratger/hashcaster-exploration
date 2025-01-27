@@ -250,7 +250,7 @@ mod tests {
         let mut prover = prover_builder.build(&gamma);
 
         // Compute powers of gamma for future checks
-        let gamma_pows: [_; 128] = BinaryField128b::compute_gammas_folding(*gamma);
+        let gamma_pows: [_; 128] = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Compute the claim
         let mut claim = gamma_pows

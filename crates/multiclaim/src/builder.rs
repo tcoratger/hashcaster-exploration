@@ -66,7 +66,7 @@ where
 
     fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the powers of gamma for the folding process.
-        let gamma_pows: [_; 128 * N] = BinaryField128b::compute_gammas_folding(**gamma);
+        let gamma_pows: [_; 128 * N] = BinaryField128b::compute_gammas_folding(gamma);
 
         // Determine the number of coefficients in the polynomials (2^number_of_points).
         let l = 1 << self.points.len();
@@ -233,7 +233,7 @@ mod tests {
         let claim = builder.build(&gamma);
 
         // Compute gamma powers for validation
-        let gamma_pows: [_; 128 * 2] = BinaryField128b::compute_gammas_folding((**gamma).into());
+        let gamma_pows: [_; 128 * 2] = BinaryField128b::compute_gammas_folding(&gamma);
 
         // Compute the expected folded polynomial
         let poly = vec![
