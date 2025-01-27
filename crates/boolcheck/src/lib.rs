@@ -24,7 +24,6 @@ pub mod algebraic;
 pub mod and;
 pub mod bool_trait;
 pub mod builder;
-pub mod ternary_mapping;
 
 /// A struct representing Boolean check protocol.
 ///
