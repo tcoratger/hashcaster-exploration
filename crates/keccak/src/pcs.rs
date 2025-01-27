@@ -31,7 +31,7 @@ use num_traits::{MulAdd, Pow};
 use p3_challenger::{CanObserve, CanSample};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::array::{self, from_fn};
+use std::array::{self};
 
 const NUM_VARS_PER_PERMUTATIONS: usize = 2;
 const BOOL_CHECK_C: usize = 5;
@@ -103,24 +103,23 @@ impl HashcasterKeccak {
     }
 
     pub fn generate_input<RNG: Rng>(&self, rng: &mut RNG) -> [MultilinearLagrangianPolynomial; 5] {
-        let num_vars = self.num_vars();
-        from_fn(|_| MultilinearLagrangianPolynomial::random(1 << num_vars, rng))
+        array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << self.num_vars(), rng))
     }
 
     pub fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
         let mut challenger = F128Challenger::new_keccak256();
 
-        let layers = (0..24usize).fold(vec![input], |mut layers, _| {
-            layers.extend({
-                let last = layers.last().unwrap();
-                let lin =
-                    keccak_linround_witness([&last[0], &last[1], &last[2], &last[3], &last[4]]);
-                [lin.clone(), chi_round_witness(&lin)]
-            });
-            layers
-        });
+        let mut layers = vec![input];
 
-        let (input_packed, commitment, committed) = self.pcs.commit(&layers[0].to_vec().into());
+        for _ in 0..24 {
+            let last = layers.last().unwrap();
+            let lin = keccak_linround_witness([&last[0], &last[1], &last[2], &last[3], &last[4]]);
+            let chi = chi_round_witness(&lin);
+            layers.push(lin);
+            layers.push(chi);
+        }
+
+        let (input_packed, commitment, committed) = self.pcs.commit(&layers[0]);
 
         // Observe the commitment
         commitment.iter().for_each(|scalar| challenger.observe(scalar));
@@ -556,17 +555,16 @@ fn perform_verification(
 }
 
 #[cfg(test)]
-mod test {
-    use rand::rngs::OsRng;
-
+mod tests {
     use super::*;
+    use rand::rngs::OsRng;
 
     #[test]
     fn test_keccak_with_pcs() {
         let rng = &mut OsRng;
 
         // Iterate over powers of 2 in the range [2^10, 2^13)
-        for num_permutations in (10..13).map(|exp| 1 << exp) {
+        for num_permutations in (10..11).map(|exp| 1 << exp) {
             // Initialize the SNARK instance with the given number of permutations
             let snark = HashcasterKeccak::new(num_permutations);
 

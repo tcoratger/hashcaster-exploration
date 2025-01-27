@@ -39,11 +39,3 @@ rand = { workspace = true }
 [[bench]]
 name = "keccak"
 harness = false
-
-[profile.bench]
-opt-level = 3
-debug = false
-rpath = false
-lto = "thin"
-incremental = true
-debug-assertions = false

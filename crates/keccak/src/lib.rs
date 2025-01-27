@@ -73,7 +73,8 @@ impl<const C: usize> Keccak<C> {
         let start = Instant::now();
 
         // Generate witness for the Keccak linear round.
-        let witness_linear = keccak_linround_witness(array::from_fn(|i| polys[i].as_slice()));
+        let witness_linear =
+            keccak_linround_witness([&polys[0], &polys[1], &polys[2], &polys[3], &polys[4]]);
 
         // Generate witness for the Chi round.
         let witness_chi = chi_round_witness(&witness_linear);
@@ -470,6 +471,8 @@ mod tests {
 
         // Initialize the protocol with the given parameters.
         let mut protocol = Keccak::<C>::new(NUM_VARS, NUM_ACTIVE_VARS, rng);
+
+        println!("Generating Keccak inputs took {} ms", (start.elapsed().as_millis()));
 
         // Execute the BoolCheck protocol.
         protocol.boolcheck(rng);

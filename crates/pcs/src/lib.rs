@@ -19,7 +19,7 @@ use error::PcsError;
 use groestl_crypto::Groestl256;
 use hashcaster_primitives::{
     binary_field::BinaryField128b as F128,
-    poly::{multinear_lagrangian::MultilinearLagrangianPolynomials, point::Points},
+    poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points},
 };
 use p3_symmetric::PseudoCompressionFunction;
 use proof::FriPcsProof;
@@ -164,7 +164,7 @@ where
 
     pub fn commit(
         &self,
-        polys: &MultilinearLagrangianPolynomials,
+        polys: &[MultilinearLagrangianPolynomial; 5],
     ) -> CommitResult<Tower, U, Digest, DomainFactory, Hash, Compress> {
         let polys: Vec<_> = polys
             .par_iter()
