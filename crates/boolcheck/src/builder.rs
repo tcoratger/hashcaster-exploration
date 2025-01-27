@@ -248,9 +248,7 @@ where
         let mut result = vec![BinaryField128b::ZERO; pow3 * pow2];
 
         // Parallelize over chunks of the result to maximize performance.
-        let chunk_id_iter = result.par_chunks_mut(pow3);
-
-        chunk_id_iter.enumerate().for_each(|(chunk_id, result_chunk)| {
+        result.par_chunks_mut(pow3).enumerate().for_each(|(chunk_id, result_chunk)| {
             // `tables_ext` stores intermediate results for each ternary index.
             let mut tables_ext = vec![[BinaryField128b::ZERO; N]; pow3_adj];
 
