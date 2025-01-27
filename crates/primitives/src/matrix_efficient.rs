@@ -118,7 +118,7 @@ impl EfficientMatrix {
                     let bits = (cpu_v_movemask_epi8(t) as u64) << shift;
 
                     // Update the atomic column value with the computed bitmask.
-                    cols[2 * (8 * i + 7 - j) + idx_u64].fetch_xor(bits, Ordering::Relaxed);
+                    cols[2 * (8 * i + 7 - j) + idx_u64].fetch_xor(bits, Ordering::SeqCst);
 
                     // Shift all bits in the array `t` to the left by 1 for the next iteration.
                     t = v_slli_epi64::<1>(t);
