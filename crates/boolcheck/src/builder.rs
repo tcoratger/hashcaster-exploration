@@ -219,16 +219,7 @@ where
     ///
     /// ### Output:
     /// - Returns an extended table as a `Vec<BinaryField128b>` containing the computed values.
-    pub fn extend_n_tables<L, Q>(
-        &self,
-        trit_mapping: &[u16],
-        f_lin: L,
-        f_quad: Q,
-    ) -> Vec<BinaryField128b>
-    where
-        L: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
-        Q: Fn(&[BinaryField128b; N]) -> BinaryField128b + Send + Sync,
-    {
+    pub fn extend_n_tables(&self, trit_mapping: &[u16]) -> Vec<BinaryField128b> {
         // Log2 of table size, determines the dimensions.
         let dims = self.polys[0].len().ilog2() as usize;
 
@@ -271,7 +262,8 @@ where
                         }
 
                         // Sum the linear and quadratic parts.
-                        result_chunk[j] = f_quad(tab_ext) + f_lin(tab_ext);
+                        result_chunk[j] =
+                            self.quadratic_compressed(tab_ext) + self.linear_compressed(tab_ext);
                     } else {
                         // Odd offset: Combine results from previous indices.
                         let tab_ext1 = tables_ext[j - offset];
@@ -283,7 +275,7 @@ where
                         }
 
                         // Compute the quadratic part.
-                        result_chunk[j] = f_quad(tab_ext);
+                        result_chunk[j] = self.quadratic_compressed(tab_ext);
                     }
                 } else {
                     // Case 2: Large indices (recursive range).
@@ -296,7 +288,7 @@ where
                     }
 
                     // Apply the quadratic function.
-                    result_chunk[j] = f_quad(&args);
+                    result_chunk[j] = self.quadratic_compressed(&args);
                 }
             }
         });
@@ -335,11 +327,7 @@ where
             bit_mapping,
             eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
             claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
-            extended_table: self.extend_n_tables(
-                &trit_mapping,
-                |args| self.linear_compressed(args),
-                |args| self.quadratic_compressed(args),
-            ),
+            extended_table: self.extend_n_tables(&trit_mapping),
             polys: self.polys.clone(),
             points: self.points.clone(),
             gammas: self.gammas,
@@ -383,6 +371,36 @@ impl<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M> + Sen
         array::from_fn(|j| {
             (0..M).fold(BinaryField128b::ZERO, |acc, i| acc + alg[j][i] * self.gammas[i])
         })
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DummyPackage<const I: usize, const O: usize>;
+
+impl<const I: usize, const O: usize> AlgebraicOps<I, O> for DummyPackage<I, O> {
+    fn algebraic(
+        &self,
+        _data: &[BinaryField128b],
+        _idx_a: usize,
+        _offset: usize,
+    ) -> [[BinaryField128b; O]; 3] {
+        [[BinaryField128b::ZERO; O]; 3]
+    }
+
+    fn linear(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
+        let mut result = BinaryField128b::ZERO;
+        for &x in data {
+            result += x;
+        }
+        [result; O]
+    }
+
+    fn quadratic(&self, data: &[BinaryField128b; I]) -> [BinaryField128b; O] {
+        let mut result = BinaryField128b::ZERO;
+        for &x in data {
+            result += x * x;
+        }
+        [result; O]
     }
 }
 
@@ -497,38 +515,21 @@ mod tests {
         // Create a BoolCheckBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckBuilder<3, 1, 2, AndPackage<3, 1>> =
-            BoolCheckBuilder { polys: tabs, ..Default::default() };
+        let bool_check: BoolCheckBuilder<3, 1, 2, DummyPackage<3, 1>> = BoolCheckBuilder {
+            polys: tabs,
+            gammas: [BinaryField128b::ONE; 1],
+            ..Default::default()
+        };
 
         // Compute the ternary mapping for the current value of `c`
         // `trit_mapping` is a precomputed array that determines how table values are combined
         // recursively.
         let (_, trit_mapping) = bool_check.trit_mapping();
 
-        // Define the linear function (f_lin)
-        // `f_lin` computes the sum of all values in the input slice.
-        let f_lin = |args: &[BinaryField128b; 3]| {
-            let mut res = BinaryField128b::ZERO;
-            for &x in args {
-                res += x;
-            }
-            res
-        };
-
-        // Define the quadratic function (f_quad)
-        // `f_quad` computes the sum of the squares of all values in the input slice.
-        let f_quad = |args: &[BinaryField128b; 3]| {
-            let mut res = BinaryField128b::ZERO;
-            for &x in args {
-                res += x * x;
-            }
-            res
-        };
-
         // Call the `extend_n_tables` function
         // This function extends the input tables using the ternary mapping and applies the linear
         // and quadratic functions to combine the table values hierarchically.
-        let result = bool_check.extend_n_tables(&trit_mapping, f_lin, f_quad);
+        let result = bool_check.extend_n_tables(&trit_mapping);
 
         // Validate the result
         // The result is compared to a hardcoded expected output. The expected output is the result

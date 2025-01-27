@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use hashcaster_boolcheck::{and::AndPackage, builder::BoolCheckBuilder};
+use hashcaster_boolcheck::builder::{BoolCheckBuilder, DummyPackage};
 use hashcaster_primitives::{
     binary_field::BinaryField128b, poly::multinear_lagrangian::MultilinearLagrangianPolynomial,
 };
@@ -22,24 +22,14 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
 
     // Create a BoolCheckBuilder instance with test data
     let bool_check =
-        BoolCheckBuilder::<N, M, 2, AndPackage<N, M>> { polys: tables, ..Default::default() };
+        BoolCheckBuilder::<N, M, 2, DummyPackage<N, M>> { polys: tables, ..Default::default() };
 
     // Generate the ternary mapping
     let (_, trit_mapping) = bool_check.trit_mapping();
 
-    // Define the linear and quadratic functions
-    let f_lin = |args: &[BinaryField128b; N]| args.iter().copied().sum();
-    let f_quad = |args: &[BinaryField128b; N]| args.iter().map(|&x| x * x).sum();
-
     // Benchmark the `extend_n_tables` function
     c.bench_function("extend_n_tables", |b| {
-        b.iter(|| {
-            bool_check.extend_n_tables(
-                black_box(&trit_mapping),
-                black_box(f_lin),
-                black_box(f_quad),
-            )
-        });
+        b.iter(|| bool_check.extend_n_tables(black_box(&trit_mapping)));
     });
 }
 
