@@ -115,7 +115,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
         //
         // For each polynomial `P(x)`:
         // `P'(x) = Σ(eq_dormant[j] * P_chunk[j])` for chunks `j`.
-        self.polys.clone().into_iter().enumerate().for_each(|(i, poly)| {
+        self.polys.iter().enumerate().for_each(|(i, poly)| {
             poly.chunks(chunk_size).enumerate().for_each(|(j, chunk)| {
                 p_polys[i].iter_mut().zip(chunk).for_each(|(p, &c)| *p += eq_dormant[j] * c);
             });
