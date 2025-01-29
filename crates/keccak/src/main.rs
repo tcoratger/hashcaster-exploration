@@ -1,4 +1,4 @@
-use hashcaster_keccak::pcs::HashcasterKeccak;
+use hashcaster_keccak::keccak_pcs::HashcasterKeccak;
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,

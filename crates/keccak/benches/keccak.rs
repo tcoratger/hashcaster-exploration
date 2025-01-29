@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hashcaster_keccak::pcs::HashcasterKeccak;
+use hashcaster_keccak::keccak_pcs::HashcasterKeccak;
 use rand::rngs::OsRng;
 use std::time::Duration;
 
