@@ -224,191 +224,158 @@ impl DerefMut for MultilinearLagrangianPolynomial {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MultilinearLagrangianPolynomials(pub Vec<MultilinearLagrangianPolynomial>);
+/// Applies the restriction operation to a set of multilinear Lagrangian polynomials.
+///
+/// # Overview
+/// The `restrict` function evaluates a set of multilinear Lagrangian polynomials
+/// over a restricted subset of their domain, as defined by `challenges`.
+///
+/// # Parameters
+/// - `polys`: A reference to an array of `MultilinearLagrangianPolynomial` structures, which
+///   contain one or more multilinear Lagrangian polynomials.
+/// - `challenges`: A slice of `BinaryField128b` values specifying the challenge points that define
+///   the restriction.
+/// - `dims`: The dimensionality of the domain of the input polynomials (i.e., the number of
+///   variables in the Boolean hypercube).
+///
+/// # Returns
+/// A `Vec<BinaryField128b>` containing the computed restricted evaluations for all input
+/// polynomials.
+///
+/// # Key Concepts
+/// 1. **Equality Polynomial**:
+///    - For each `challenges` point, the equality polynomial encodes interpolation conditions that
+///      ensure correct evaluation at the given challenges.
+///
+/// 2. **Subset Sums**:
+///    - Subsets of polynomial coefficients are grouped into chunks, and sums over these subsets are
+///      computed efficiently.
+///
+/// 3. **Parallelism**:
+///    - This implementation leverages parallel iteration (`par_iter`) to achieve efficient
+///      computation, especially for high-dimensional inputs.
+///
+/// # Implementation Details
+/// - The function validates that the input polynomials and challenges have appropriate dimensions.
+/// - It precomputes sums of the equality polynomial coefficients for efficient evaluation.
+/// - Results are accumulated in a thread-safe manner using intermediate buffers to avoid race
+///   conditions.
+///
+/// # Complexity
+/// - The complexity depends on:
+///     - The number of polynomials (`n`),
+///     - The number of chunks (`2^(dims-num_challenges)`)
+///     - The chunk size (`2^num_challenges`).
+///
+/// Parallelism mitigates the high computational cost for large input sizes.
+///
+/// # Safety
+/// - The function assumes that input polynomials are properly formatted and aligned in memory.
+/// - Panics occur if dimensions do not match the required constraints.
+///
+/// # Panics
+/// - If the number of coefficients in a polynomial does not match `2^dims`.
+/// - If the number of challenges exceeds `dims`.
+pub fn restrict<const N: usize>(
+    polys: &[MultilinearLagrangianPolynomial; N],
+    challenges: &Points,
+    dims: usize,
+) -> Evaluations {
+    // Ensure that all input polynomials have the correct length of 2^n.
+    // Panics if this condition is violated.
+    polys.iter().for_each(|poly| assert_eq!(poly.len(), 1 << dims));
 
-impl MultilinearLagrangianPolynomials {
-    /// Returns the polynomial at the specified index in the sequence.
-    pub fn poly_at(&self, index: usize) -> &MultilinearLagrangianPolynomial {
-        &self.0[index]
-    }
+    // Ensure the number of challenges does not exceed the dimensionality of the polynomials.
+    let num_challenges = challenges.len();
+    assert!(num_challenges <= dims);
 
-    /// Applies the restriction operation to a set of multilinear Lagrangian polynomials.
-    ///
-    /// # Overview
-    /// The `restrict` function evaluates a set of multilinear Lagrangian polynomials
-    /// over a restricted subset of their domain, as defined by `challenges`.
-    ///
-    /// # Parameters
-    /// - `self`: A reference to a `MultilinearLagrangianPolynomials` structure, which contains one
-    ///   or more multilinear Lagrangian polynomials.
-    /// - `challenges`: A slice of `BinaryField128b` values specifying the challenge points that
-    ///   define the restriction.
-    /// - `dims`: The dimensionality of the domain of the input polynomials (i.e., the number of
-    ///   variables in the Boolean hypercube).
-    ///
-    /// # Returns
-    /// A `Vec<BinaryField128b>` containing the computed restricted evaluations for all input
-    /// polynomials.
-    ///
-    /// # Key Concepts
-    /// 1. **Equality Polynomial**:
-    ///    - For each `challenges` point, the equality polynomial encodes interpolation conditions
-    ///      that ensure correct evaluation at the given challenges.
-    ///
-    /// 2. **Subset Sums**:
-    ///    - Subsets of polynomial coefficients are grouped into chunks, and sums over these subsets
-    ///      are computed efficiently.
-    ///
-    /// 3. **Parallelism**:
-    ///    - This implementation leverages parallel iteration (`par_iter`) to achieve efficient
-    ///      computation, especially for high-dimensional inputs.
-    ///
-    /// # Implementation Details
-    /// - The function validates that the input polynomials and challenges have appropriate
-    ///   dimensions.
-    /// - It precomputes sums of the equality polynomial coefficients for efficient evaluation.
-    /// - Results are accumulated in a thread-safe manner using intermediate buffers to avoid race
-    ///   conditions.
-    ///
-    /// # Complexity
-    /// - The complexity depends on:
-    ///     - The number of polynomials (`n`),
-    ///     - The number of chunks (`2^(dims-num_challenges)`)
-    ///     - The chunk size (`2^num_challenges`).
-    ///
-    /// Parallelism mitigates the high computational cost for large input sizes.
-    ///
-    /// # Safety
-    /// - The function assumes that input polynomials are properly formatted and aligned in memory.
-    /// - Panics occur if dimensions do not match the required constraints.
-    ///
-    /// # Panics
-    /// - If the number of coefficients in a polynomial does not match `2^dims`.
-    /// - If the number of challenges exceeds `dims`.
-    pub fn restrict(&self, challenges: &Points, dims: usize) -> Evaluations {
-        // Ensure that all input polynomials have the correct length of 2^n.
-        // Panics if this condition is violated.
-        self.iter().for_each(|poly| assert_eq!(poly.len(), 1 << dims));
+    // Compute the chunk size and the number of chunks.
+    // - Chunk size corresponds to 2^num_challenges.
+    // - Number of chunks corresponds to 2^(dims - num_challenges).
+    let chunk_size = 1 << num_challenges;
+    let num_chunks = 1 << (dims - num_challenges);
 
-        // Ensure the number of challenges does not exceed the dimensionality of the polynomials.
-        let num_challenges = challenges.len();
-        assert!(num_challenges <= dims);
+    // Compute the equality polynomial for the given challenges.
+    let eq = challenges.to_eq_poly();
 
-        // Compute the chunk size and the number of chunks.
-        // - Chunk size corresponds to 2^num_challenges.
-        // - Number of chunks corresponds to 2^(dims - num_challenges).
-        let chunk_size = 1 << num_challenges;
-        let num_chunks = 1 << (dims - num_challenges);
+    // Verify that the number of coefficients in the equality polynomial is divisible by 16.
+    let eq_len = eq.len();
+    assert_eq!(
+        eq_len % 16,
+        0,
+        "The number of coefficients in the equality polynomial must be divisible by 16."
+    );
 
-        // Compute the equality polynomial for the given challenges.
-        let eq = challenges.to_eq_poly();
+    // Compute pre-summed coefficients for the equality polynomial.
+    // This is used to efficiently evaluate sums over subsets of coefficients.
+    let eq_sums = eq.eq_sums();
 
-        // Verify that the number of coefficients in the equality polynomial is divisible by 16.
-        let eq_len = eq.len();
-        assert_eq!(
-            eq_len % 16,
-            0,
-            "The number of coefficients in the equality polynomial must be divisible by 16."
-        );
+    // Initialize a result vector with zeros.
+    // The size of the result vector is `num_chunks * 128 * n`, where:
+    // - `num_chunks` is the number of chunks,
+    // - `128` corresponds to the number of slots for each chunk,
+    // - `n` is the number of input polynomials.
+    let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * N];
 
-        // Compute pre-summed coefficients for the equality polynomial.
-        // This is used to efficiently evaluate sums over subsets of coefficients.
-        let eq_sums = eq.eq_sums();
+    // Create an atomic pointer to the `ret` vector for shared mutable access.
+    let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
 
-        // Initialize a result vector with zeros.
-        // The size of the result vector is `num_chunks * 128 * n`, where:
-        // - `num_chunks` is the number of chunks,
-        // - `128` corresponds to the number of slots for each chunk,
-        // - `n` is the number of input polynomials.
-        let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * self.len()];
+    // Iterate over each polynomial in the input set.
+    polys.par_iter().enumerate().for_each(|(q, poly)| {
+        // Compute the starting index for the current polynomial in the result vector.
+        let ret_chunk_start = q * 128 * num_chunks;
 
-        // Create an atomic pointer to the `ret` vector for shared mutable access.
-        let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
+        // Iterate over chunks in parallel using `par_iter` for efficiency.
+        (0..num_chunks).into_par_iter().for_each(|i| {
+            // Process the equality polynomial sums in blocks of size 16.
+            for j in 0..eq_len / 16 {
+                // Retrieve two segments of precomputed sums (`v0` and `v1`):
+                // - `v0` corresponds to lower 8 bits.
+                // - `v1` corresponds to upper 8 bits.
+                let b1 = j * 512;
+                let b2 = b1 + 256;
+                let b3 = b2 + 256;
+                let v0 = &eq_sums[b1..b2];
+                let v1 = &eq_sums[b2..b3];
 
-        // Iterate over each polynomial in the input set.
-        self.par_iter().enumerate().for_each(|(q, poly)| {
-            // Compute the starting index for the current polynomial in the result vector.
-            let ret_chunk_start = q * 128 * num_chunks;
+                // Extract a block of coefficients from the current polynomial.
+                // This block corresponds to 16 bytes.
+                let bytearr = cast_slice::<BinaryField128b, [u8; 16]>(
+                    &poly[i * chunk_size + j * 16..i * chunk_size + (j + 1) * 16],
+                );
 
-            // Iterate over chunks in parallel using `par_iter` for efficiency.
-            (0..num_chunks).into_par_iter().for_each(|i| {
-                // Process the equality polynomial sums in blocks of size 16.
-                for j in 0..eq_len / 16 {
-                    // Retrieve two segments of precomputed sums (`v0` and `v1`):
-                    // - `v0` corresponds to lower 8 bits.
-                    // - `v1` corresponds to upper 8 bits.
-                    let b1 = j * 512;
-                    let b2 = b1 + 256;
-                    let b3 = b2 + 256;
-                    let v0 = &eq_sums[b1..b2];
-                    let v1 = &eq_sums[b2..b3];
+                // Process each byte in the extracted block.
+                for s in 0..16 {
+                    // Extract the `s`-th byte from each element in the block.
+                    let mut t = [0u8; 16];
+                    for (idx, val) in bytearr.iter().enumerate() {
+                        t[idx] = val[s];
+                    }
 
-                    // Extract a block of coefficients from the current polynomial.
-                    // This block corresponds to 16 bytes.
-                    let bytearr = cast_slice::<BinaryField128b, [u8; 16]>(
-                        &poly[i * chunk_size + j * 16..i * chunk_size + (j + 1) * 16],
-                    );
+                    // Process the 8 bits of the extracted byte, applying bitwise masks.
+                    for u in 0..8 {
+                        // Compute the bit mask for the current state of the array.
+                        #[allow(clippy::cast_sign_loss)]
+                        let bits = cpu_v_movemask_epi8(t) as usize;
 
-                    // Process each byte in the extracted block.
-                    for s in 0..16 {
-                        // Extract the `s`-th byte from each element in the block.
-                        let mut t = [0u8; 16];
-                        for (idx, val) in bytearr.iter().enumerate() {
-                            t[idx] = val[s];
+                        // Update the result vector using the computed sums.
+                        unsafe {
+                            *ret_ptr
+                                .load(Ordering::SeqCst)
+                                .add(ret_chunk_start + (s * 8 + 7 - u) * num_chunks + i) +=
+                                v0[bits & 255] + v1[(bits >> 8) & 255];
                         }
 
-                        // Process the 8 bits of the extracted byte, applying bitwise masks.
-                        for u in 0..8 {
-                            // Compute the bit mask for the current state of the array.
-                            #[allow(clippy::cast_sign_loss)]
-                            let bits = cpu_v_movemask_epi8(t) as usize;
-
-                            // Update the result vector using the computed sums.
-                            unsafe {
-                                *ret_ptr
-                                    .load(Ordering::SeqCst)
-                                    .add(ret_chunk_start + (s * 8 + 7 - u) * num_chunks + i) +=
-                                    v0[bits & 255] + v1[(bits >> 8) & 255];
-                            }
-
-                            // Shift the array `t` left by one bit for the next iteration.
-                            t = v_slli_epi64::<1>(t);
-                        }
+                        // Shift the array `t` left by one bit for the next iteration.
+                        t = v_slli_epi64::<1>(t);
                     }
                 }
-            });
+            }
         });
+    });
 
-        // Return the final evaluations.
-        Evaluations::new(ret)
-    }
-}
-
-impl From<Vec<MultilinearLagrangianPolynomial>> for MultilinearLagrangianPolynomials {
-    fn from(polys: Vec<MultilinearLagrangianPolynomial>) -> Self {
-        Self(polys)
-    }
-}
-
-impl From<Vec<Vec<BinaryField128b>>> for MultilinearLagrangianPolynomials {
-    fn from(coeffs: Vec<Vec<BinaryField128b>>) -> Self {
-        Self(coeffs.into_iter().map(MultilinearLagrangianPolynomial::new).collect())
-    }
-}
-
-impl Deref for MultilinearLagrangianPolynomials {
-    type Target = Vec<MultilinearLagrangianPolynomial>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for MultilinearLagrangianPolynomials {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+    // Return the final evaluations.
+    Evaluations::new(ret)
 }
 
 #[cfg(test)]
@@ -491,7 +458,7 @@ mod tests {
         // This ensures the function is working as intended.
         assert_eq!(
             eq_sequence,
-            MultilinearLagrangianPolynomials(vec![
+            vec![
                 MultilinearLagrangianPolynomial::new(vec![BinaryField128b::from(
                     257870231182273679343338569694386847745
                 )]),
@@ -533,7 +500,7 @@ mod tests {
                     BinaryField128b::from(30950013923125879264268791915275616264),
                     BinaryField128b::from(326990117386703710211842172749841694743)
                 ])
-            ])
+            ]
         );
     }
 
@@ -731,11 +698,8 @@ mod tests {
         let poly2: MultilinearLagrangianPolynomial =
             (0..(1 << num_vars)).map(|i| BinaryField128b::new(i + 2)).collect();
 
-        // Create a sequence of multilinear polynomials.
-        let polynomials = MultilinearLagrangianPolynomials(vec![poly0, poly1, poly2]);
-
         // Restrict the polynomials to the given points.
-        let restricted_polynomials = polynomials.restrict(&points, num_vars);
+        let restricted_polynomials = restrict(&[poly0, poly1, poly2], &points, num_vars);
 
         // Verify the restricted evaluations match the expected results.
         assert_eq!(

@@ -1,8 +1,5 @@
 use crate::{
-    binary_field::BinaryField128b,
-    poly::multinear_lagrangian::{
-        MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials,
-    },
+    binary_field::BinaryField128b, poly::multinear_lagrangian::MultilinearLagrangianPolynomial,
 };
 use itertools::Itertools;
 use rand::Rng;
@@ -175,8 +172,8 @@ impl Points {
     /// * `points` - A slice of `BinaryField128b` elements representing the input points.
     ///
     /// # Returns
-    /// A [`MultilinearLagrangianPolynomials`] instance containing the sequence of equality
-    /// polynomials.
+    /// A vector of [`MultilinearLagrangianPolynomial`] instances containing the sequence of
+    /// equality polynomials.
     ///
     /// # Explanation
     /// This method generates a sequence of equality polynomials, where each polynomial encodes the
@@ -194,7 +191,7 @@ impl Points {
     /// This sequence is useful in efficiently constructing multilinear extensions, where each
     /// polynomial in the sequence serves as a building block for interpolating functions over
     /// the Boolean hypercube \( \{0, 1\}^n \).
-    pub fn to_eq_poly_sequence(&self) -> MultilinearLagrangianPolynomials {
+    pub fn to_eq_poly_sequence(&self) -> Vec<MultilinearLagrangianPolynomial> {
         // Start with the base case: eq_0(x) = 1.
         let mut polynomials =
             vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE])];
@@ -225,7 +222,7 @@ impl Points {
         }
 
         // Return the constructed sequence of equality polynomials.
-        MultilinearLagrangianPolynomials(polynomials)
+        polynomials
     }
 
     /// Computes the evaluation of the equality polynomial for two sets of points.

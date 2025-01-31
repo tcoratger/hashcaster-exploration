@@ -8,7 +8,7 @@ use hashcaster_primitives::{
     poly::{
         compressed::CompressedPoly,
         evaluation::Evaluations,
-        multinear_lagrangian::{MultilinearLagrangianPolynomial, MultilinearLagrangianPolynomials},
+        multinear_lagrangian::{restrict, MultilinearLagrangianPolynomial},
         point::{Point, Points},
         univariate::UnivariatePolynomial,
     },
@@ -55,7 +55,7 @@ pub struct BoolCheck<const N: usize, const M: usize, const C: usize, A: Algebrai
     pub bit_mapping: Vec<u16>,
 
     /// A sequence of equality polynomials used to verify claims.
-    pub eq_sequence: MultilinearLagrangianPolynomials,
+    pub eq_sequence: Vec<MultilinearLagrangianPolynomial>,
 
     /// A vector of compressed polynomials computed at each round.
     pub round_polys: Vec<CompressedPoly>,
@@ -82,7 +82,7 @@ where
             poly_coords: Evaluations::default(),
             challenges: Points::default(),
             bit_mapping: Vec::new(),
-            eq_sequence: MultilinearLagrangianPolynomials::default(),
+            eq_sequence: Vec::new(),
             round_polys: Vec::new(),
             claim: BinaryField128b::ZERO,
             gammas: array::from_fn(|_| Default::default()),
@@ -131,7 +131,7 @@ where
             //
             // The equality polynomials for all the points are stored in cache during the setup
             // phase.
-            let eq_poly_round = self.eq_sequence.poly_at(number_variables - round - 1);
+            let eq_poly_round = &self.eq_sequence[number_variables - round - 1];
 
             // The first phase of the protocol lasts `c` rounds.
             //
@@ -216,7 +216,7 @@ where
             // subset.
 
             // Fetch the equality polynomial for the current round.
-            let eq_poly_round = self.eq_sequence.poly_at(self.points.len() - round - 1);
+            let eq_poly_round = &self.eq_sequence[self.points.len() - round - 1];
 
             // Fetch the number of coefficients in the equality polynomial (Lagrangian polynomial).
             let half = eq_poly_round.len();
@@ -367,8 +367,7 @@ where
             self.extended_table.clear();
 
             // Restrict the polynomial coordinates based on the accumulated challenges.
-            self.poly_coords = MultilinearLagrangianPolynomials::from(self.polys.to_vec())
-                .restrict(&self.challenges, number_variables);
+            self.poly_coords = restrict(&self.polys, &self.challenges, number_variables);
         }
     }
 
@@ -653,7 +652,7 @@ mod tests {
         // Print the execution time of the test.
         println!("Execution time: {:?} ms", start.elapsed().as_millis());
 
-        println!("Time in bind: {:?} ms", time_in_bind);
+        println!("Time in bind: {time_in_bind:?} ms");
     }
 
     #[test]
