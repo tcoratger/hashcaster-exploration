@@ -1,4 +1,8 @@
-use hashcaster_keccak::keccak_pcs::HashcasterKeccak;
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+#![feature(generic_arg_infer)]
+
+use hashcaster_keccak::{keccak_no_pcs::Keccak, keccak_pcs::HashcasterKeccak};
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
@@ -50,9 +54,42 @@ fn run_with_hash(hash: &Hash, log_permutations: usize, sample_size: Option<usize
 }
 
 fn main() {
-    let args: Args = clap::Parser::parse();
+    // let args: Args = clap::Parser::parse();
 
-    run_with_hash(&args.hash, args.log_permutations, args.sample_size);
+    // run_with_hash(&args.hash, args.log_permutations, args.sample_size);
+
+    // Total number of variables.
+    const NUM_VARS: usize = 20;
+    // Switch parameter for BoolCheck.
+    const C: usize = 5;
+    // Number of active variables for LinCheck.
+    const NUM_ACTIVE_VARS: usize = 10;
+
+    let rng = &mut OsRng;
+
+    println!("... Initializing protocol ...");
+
+    let start = Instant::now();
+
+    // Initialize the protocol with the given parameters.
+    let mut protocol = Keccak::<C>::new(NUM_VARS, NUM_ACTIVE_VARS, rng);
+
+    println!("Generating Keccak inputs took {} ms", (start.elapsed().as_millis()));
+
+    // Execute the BoolCheck protocol.
+    protocol.boolcheck(rng);
+
+    // Execute the Multiclaim protocol.
+    protocol.multiclaim(rng);
+
+    // Execute the LinCheck protocol.
+    protocol.lincheck(rng);
+
+    let end = Instant::now();
+
+    println!("Protocol execution took {} ms", (end - start).as_millis());
+
+    println!("Keccak completed successfully.");
 }
 
 fn routine<RNG: Rng>(snark: &HashcasterKeccak, rng: &mut RNG) -> (Duration, usize) {

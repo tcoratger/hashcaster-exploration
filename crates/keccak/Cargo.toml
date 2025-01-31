@@ -36,6 +36,10 @@ bincode = { workspace = true }
 criterion = { workspace = true }
 rand = { workspace = true }
 
+[profile.profiling]
+inherits = "release"
+debug = true
+
 [[bench]]
 name = "keccak"
 harness = false

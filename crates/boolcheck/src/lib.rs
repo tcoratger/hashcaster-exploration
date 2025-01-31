@@ -16,7 +16,7 @@ use hashcaster_primitives::{
 };
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
-    slice::{ParallelSlice, ParallelSliceMut},
+    slice::ParallelSliceMut,
 };
 use std::array;
 
@@ -328,11 +328,19 @@ where
             // ```
             // P(0, r) = P(0, r) + (P(0, r) + P(1, r) + P(∞, r)) * r + P(∞, r) * r^2
             // ```
-            self.extended_table = self
-                .extended_table
-                .par_chunks(3)
-                .map(|chunk| chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * **r + chunk[2] * r2)
-                .collect();
+            self.extended_table.par_chunks_mut(3).for_each(|chunk| {
+                chunk[0] = chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * **r + chunk[2] * r2;
+            });
+
+            // We want to avoid a new allocation:
+            // - We use a linear passing of the data
+            // - We truncate the vector to the new size
+            let new_len = self.extended_table.len() / 3;
+            for i in 0..new_len {
+                self.extended_table[i] = self.extended_table[i * 3];
+            }
+
+            self.extended_table.truncate(new_len);
         } else {
             // At each round we halve the number of variables in the hypercube.
             //
@@ -525,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn test_new_andcheck() {
+    fn test_new_andcheck1() {
         // Set a phase switch parameter, which controls the folding phases.
         const PHASE_SWITCH: usize = 5;
 
@@ -585,6 +593,8 @@ mod tests {
         // Empty vector to store random values sent by the verifier at each round.
         let mut challenges = Points::default();
 
+        let mut time_in_bind = 0;
+
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
             // Compute the round polynomial for the current round.
@@ -609,8 +619,13 @@ mod tests {
             // ```
             current_claim = round_polynomial.evaluate_at(&r);
 
+            let start = std::time::Instant::now();
+
             // Bind the random value `r` to the Boolean check for the next round.
             boolcheck.bind(&r);
+
+            let end = std::time::Instant::now();
+            time_in_bind += end.duration_since(start).as_millis();
 
             // Store the random value in the challenges vector.
             challenges.push(r);
@@ -637,6 +652,8 @@ mod tests {
 
         // Print the execution time of the test.
         println!("Execution time: {:?} ms", start.elapsed().as_millis());
+
+        println!("Time in bind: {:?} ms", time_in_bind);
     }
 
     #[test]
