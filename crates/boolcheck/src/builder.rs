@@ -1,4 +1,5 @@
 use crate::{algebraic::AlgebraicOps, bool_trait::CompressedFoldedOps, BoolCheck};
+use bytemuck::zeroed_vec;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
@@ -236,7 +237,7 @@ where
         let base_stride = 1 << (C + 1);
 
         // Preallocate the result vector to store the extended table.
-        let mut result = vec![BinaryField128b::ZERO; pow3 * pow2];
+        let mut result = zeroed_vec(pow3 * pow2);
 
         // Parallelize over chunks of the result to maximize performance.
         result.par_chunks_mut(pow3).enumerate().for_each(|(chunk_id, result_chunk)| {
