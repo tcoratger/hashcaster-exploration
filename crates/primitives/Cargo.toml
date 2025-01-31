@@ -13,6 +13,7 @@ bytemuck = { workspace = true, features = [
     "derive",
     "min_const_generics",
     "must_cast",
+    "extern_crate_alloc",
 ] }
 num-traits = { workspace = true }
 ruint = { workspace = true }

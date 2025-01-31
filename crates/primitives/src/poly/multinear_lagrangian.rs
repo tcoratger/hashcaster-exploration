@@ -3,7 +3,7 @@ use crate::{
     poly::{evaluation::Evaluations, point::Points},
     utils::{cpu_v_movemask_epi8, drop_top_bit, v_slli_epi64},
 };
-use bytemuck::cast_slice;
+use bytemuck::{cast_slice, zeroed_vec};
 use num_traits::Zero;
 use rand::Rng;
 use rayon::iter::{
@@ -315,7 +315,8 @@ pub fn restrict<const N: usize>(
     // - `num_chunks` is the number of chunks,
     // - `128` corresponds to the number of slots for each chunk,
     // - `n` is the number of input polynomials.
-    let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * N];
+    // let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * N];
+    let mut ret = zeroed_vec::<BinaryField128b>(num_chunks * 128 * N);
 
     // Create an atomic pointer to the `ret` vector for shared mutable access.
     let ret_ptr = AtomicPtr::new(ret.as_mut_ptr());
