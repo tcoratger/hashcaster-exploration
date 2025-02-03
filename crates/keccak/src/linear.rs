@@ -249,7 +249,7 @@ mod tests {
     use hashcaster_primitives::{
         poly::{
             point::{Point, Points},
-            univariate::UnivariatePolynomial,
+            univariate::FixedUnivariatePolynomial,
         },
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
@@ -401,7 +401,7 @@ mod tests {
         let mut prover = prover_builder.build(&gamma);
 
         // Claim to be updated during the main loop
-        let mut claim = UnivariatePolynomial::from(initial_claims.to_vec()).evaluate_at(&gamma);
+        let mut claim = FixedUnivariatePolynomial::new(initial_claims).evaluate_at(&gamma);
 
         // Empty vector to store challenges
         let mut challenges = Points::default();

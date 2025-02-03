@@ -8,10 +8,10 @@ use hashcaster_primitives::{
     matrix_efficient::EfficientMatrix,
     poly::{
         compressed::CompressedPoly,
-        evaluation::Evaluations,
+        evaluation::FixedEvaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
-        univariate::UnivariatePolynomial,
+        univariate::FixedUnivariatePolynomial,
     },
     sumcheck::Sumcheck,
 };
@@ -37,7 +37,7 @@ pub struct MultiClaim<'a, const N: usize> {
 }
 
 impl<const N: usize> Sumcheck for MultiClaim<'_, N> {
-    type Output = Evaluations;
+    type Output = FixedEvaluations<N>;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
         self.object.round_polynomial()
@@ -47,51 +47,30 @@ impl<const N: usize> Sumcheck for MultiClaim<'_, N> {
         self.object.bind(challenge);
     }
 
-    // fn finish(&self) -> Self::Output {
-    //     // Compute the folded openings.
-    //     // - The first opening is initialized to zero,
-    //     // - Subsequent openings are evaluated for each polynomial at the challenges derived
-    // during     //   the sumcheck.
-    //     let mut ret = UnivariatePolynomial::new(
-    //         std::iter::once(BinaryField128b::ZERO)
-    //             .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
-    //             .collect(),
-    //     );
-
-    //     // Adjust the first opening:
-    //     // - Use a univariate evaluation to account for gamma powers.
-    //     // - Update the first opening with the adjusted value.
-    //     ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
-
-    //     // Return the resulting openings.
-    //     Evaluations(ret.coeffs)
-    // }
-
     fn finish(&self) -> Self::Output {
         // Compute the folded openings.
         // - The first opening is initialized to zero.
         // - Subsequent openings are evaluated for each polynomial at the challenges derived during
         //   the sumcheck.
 
-        // Preallocate capacity to avoid unnecessary reallocations
-        let mut coeffs = Vec::with_capacity(N);
+        // Initialize an array with all elements set to zero.
+        let mut coeffs = [BinaryField128b::ZERO; N];
 
-        // Insert the first opening as zero
-        coeffs.push(BinaryField128b::ZERO);
+        // Compute and store the subsequent openings (starting from index 1).
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(N).skip(1) {
+            *coeff = self.polys[i].evaluate_at(&self.object.challenges);
+        }
 
-        // Compute and store the subsequent openings
-        coeffs.extend((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)));
-
-        // Construct the univariate polynomial with preallocated coefficients
-        let mut ret = UnivariatePolynomial::new(coeffs);
+        // Construct the fixed-size univariate polynomial with preallocated coefficients.
+        let mut ret = FixedUnivariatePolynomial::new(coeffs);
 
         // Adjust the first opening:
         // - Use a univariate evaluation to account for gamma powers.
         // - Update the first opening with the adjusted value.
-        ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
+        ret.coeffs[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
 
         // Return the resulting openings.
-        Evaluations(ret.coeffs)
+        FixedEvaluations::new(ret.coeffs)
     }
 }
 

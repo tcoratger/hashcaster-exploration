@@ -9,10 +9,10 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
-        evaluation::Evaluations,
+        evaluation::FixedEvaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
-        univariate::UnivariatePolynomial,
+        univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
     },
     sumcheck::{Sumcheck, SumcheckBuilder},
 };
@@ -39,7 +39,7 @@ pub struct Keccak<const C: usize> {
     /// Optional output from the BoolCheck protocol.
     boolcheck_output: Option<BoolCheckOutput>,
     /// Optional output from the Multiclaim protocol.
-    multiclaim_output: Option<Evaluations>,
+    multiclaim_output: Option<FixedEvaluations<5>>,
     /// Linear witness for the protocol.
     witness_linear: [MultilinearLagrangianPolynomial; 5],
     /// Evaluation claims for the protocol.
@@ -134,8 +134,7 @@ impl<const C: usize> Keccak<C> {
         );
 
         // Initialize the claim.
-        let mut claim =
-            UnivariatePolynomial::new(self.evaluation_claims.to_vec()).evaluate_at(&gamma);
+        let mut claim = FixedUnivariatePolynomial::new(self.evaluation_claims).evaluate_at(&gamma);
 
         // Verify that the claim agrees with the Boolcheck prover
         assert_eq!(
@@ -201,7 +200,7 @@ impl<const C: usize> Keccak<C> {
 
         // Compute the claimed evaluations and fold them
         let claimed_evaluations =
-            UnivariatePolynomial::new(self.chi.algebraic(&coord_evals, 0, 1)[0].to_vec());
+            FixedUnivariatePolynomial::new(self.chi.algebraic(&coord_evals, 0, 1)[0]);
         let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
         // Validate the final claim
@@ -289,7 +288,7 @@ impl<const C: usize> Keccak<C> {
 
         // Validate the claim
         assert_eq!(
-            UnivariatePolynomial::new(multiclaim_output.clone().0).evaluate_at(&Point(gamma128)) *
+            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&Point(gamma128)) *
                 eq_evaluation,
             claim
         );
@@ -313,7 +312,7 @@ impl<const C: usize> Keccak<C> {
         // Generate a random gamma for folding.
         let gamma = Point::random(rng);
 
-        let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0.try_into().unwrap();
+        let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0;
 
         // Initialize the LinCheck prover builder.
         let matrix = KeccakLinear::new();
@@ -329,7 +328,7 @@ impl<const C: usize> Keccak<C> {
         let mut lincheck_prover = lincheck_builder.build(&gamma);
 
         // Initialize the claim
-        let mut claim = UnivariatePolynomial::new(evaluations.to_vec()).evaluate_at(&gamma);
+        let mut claim = FixedUnivariatePolynomial::new(evaluations).evaluate_at(&gamma);
 
         let linlayer_preparation = Instant::now();
 

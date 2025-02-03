@@ -454,7 +454,10 @@ mod tests {
     use builder::BoolCheckBuilder;
     use hashcaster_multiclaim::builder::MulticlaimBuilder;
     use hashcaster_primitives::{
-        poly::{multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point},
+        poly::{
+            multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point,
+            univariate::FixedUnivariatePolynomial,
+        },
         sumcheck::SumcheckBuilder,
     };
     use num_traits::Pow;
@@ -873,7 +876,7 @@ mod tests {
 
         // Validate the claim
         assert_eq!(
-            UnivariatePolynomial::new(multiclaim_output.clone().0).evaluate_at(&Point(gamma128)) *
+            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&Point(gamma128)) *
                 eq_evaluation,
             claim
         );

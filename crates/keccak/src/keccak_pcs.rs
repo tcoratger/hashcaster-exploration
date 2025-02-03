@@ -22,7 +22,7 @@ use hashcaster_primitives::{
     poly::{
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
-        univariate::UnivariatePolynomial,
+        univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
     },
     sumcheck::{EvaluationProvider, Sumcheck, SumcheckBuilder},
 };
@@ -401,7 +401,7 @@ impl HashcasterKeccak {
 
             // Compute the claimed evaluations and fold them
             let claimed_evaluations =
-                UnivariatePolynomial::new(chi.algebraic(&coord_evals, 0, 1)[0].to_vec());
+                FixedUnivariatePolynomial::new(chi.algebraic(&coord_evals, 0, 1)[0]);
             let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
             // Validate the final claim

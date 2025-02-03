@@ -177,7 +177,7 @@ mod tests {
             evaluation::Evaluations,
             multinear_lagrangian::MultilinearLagrangianPolynomial,
             point::{Point, Points},
-            univariate::UnivariatePolynomial,
+            univariate::FixedUnivariatePolynomial,
         },
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
@@ -280,7 +280,7 @@ mod tests {
         let mut prover = prover_builder.build(&gamma);
 
         // Initialize the claim
-        let mut claim = UnivariatePolynomial::new(evaluation_claims.to_vec()).evaluate_at(&gamma);
+        let mut claim = FixedUnivariatePolynomial::new(evaluation_claims).evaluate_at(&gamma);
 
         // Verify that the claim agrees with the prover
         assert_eq!(claim, prover.claim, "Claim does not match prover claim after initialization");
@@ -353,7 +353,7 @@ mod tests {
 
         // Compute the claimed evaluations and fold them
         let claimed_evaluations =
-            UnivariatePolynomial::new(chi.algebraic(&frob_evals, 0, 1)[0].to_vec());
+            FixedUnivariatePolynomial::new(chi.algebraic(&frob_evals, 0, 1)[0]);
         let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
         // Validate the final claim

@@ -192,6 +192,43 @@ impl EvaluationProvider for Evaluations {
     }
 }
 
+/// Evaluations of a polynomial at some fixed points using a constant-size array.
+///
+/// # Generic Parameters
+/// - `N`: The number of evaluations stored.
+///
+/// # Fields
+/// - `evaluations`: An array of `BinaryField128b` elements representing the evaluations.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FixedEvaluations<const N: usize>(pub [BinaryField128b; N]);
+
+impl<const N: usize> FixedEvaluations<N> {
+    /// Creates a new `FixedEvaluations` instance from an array of evaluations.
+    ///
+    /// # Parameters
+    /// - `evaluations`: A fixed-size array of `BinaryField128b` values.
+    ///
+    /// # Returns
+    /// A `FixedEvaluations<N>` instance storing the provided evaluations.
+    pub const fn new(evaluations: [BinaryField128b; N]) -> Self {
+        Self(evaluations)
+    }
+}
+
+impl<const N: usize> Deref for FixedEvaluations<N> {
+    type Target = [BinaryField128b; N];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize> EvaluationProvider for FixedEvaluations<N> {
+    fn evals(&self) -> Evaluations {
+        self.0.to_vec().into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

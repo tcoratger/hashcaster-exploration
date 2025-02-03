@@ -210,6 +210,54 @@ impl FromIterator<BinaryField128b> for UnivariatePolynomial {
     }
 }
 
+/// Represents a univariate polynomial with coefficients over a binary field,
+/// but using a fixed-size array instead of a `Vec`.
+///
+/// # Generic Parameters
+/// - `N`: The maximum degree + 1 (i.e., the number of coefficients).
+///
+/// # Fields
+/// - `coeffs`: An array of `BinaryField128b` elements representing the coefficients of the
+///   polynomial, stored in increasing order of degree, where the 0th index corresponds to the
+///   constant term.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FixedUnivariatePolynomial<const N: usize> {
+    /// The coefficients of the polynomial, stored in increasing order of degree.
+    pub coeffs: [BinaryField128b; N],
+}
+
+impl<const N: usize> FixedUnivariatePolynomial<N> {
+    /// Creates a new polynomial from an array of coefficients.
+    ///
+    /// # Parameters
+    /// - `coeffs`: An array of `BinaryField128b` coefficients, with the constant term at index 0.
+    ///
+    /// # Returns
+    /// A `FixedUnivariatePolynomial` instance representing the polynomial with the given
+    /// coefficients.
+    pub const fn new(coeffs: [BinaryField128b; N]) -> Self {
+        Self { coeffs }
+    }
+
+    /// Evaluates the polynomial at a given point using Horner's method.
+    ///
+    /// # Parameters
+    /// - `at`: The point at which to evaluate the polynomial, represented as a `Point`.
+    ///
+    /// # Returns
+    /// The result of evaluating the polynomial at the given point, as a `BinaryField128b`.
+    ///
+    /// # Methodology
+    /// This method employs Horner's method for efficient polynomial evaluation:
+    /// `P(x) = (((a_n * x + a_{n-1}) * x + a_{n-2}) * x + ... + a_0)`
+    pub fn evaluate_at(&self, at: &Point) -> BinaryField128b {
+        self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
+            acc.mul_add_assign(**at, coeff);
+            acc
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

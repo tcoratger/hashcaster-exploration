@@ -5,7 +5,7 @@ use hashcaster_primitives::{
     poly::{
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
-        univariate::UnivariatePolynomial,
+        univariate::FixedUnivariatePolynomial,
     },
     sumcheck::SumcheckBuilder,
 };
@@ -140,7 +140,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
         // Evaluate the initial claims using a univariate polynomial.
         //
         // `claim(γ) = Σ(initial_claims[i] * γ^i)` for `i = 0, ..., M-1`.
-        let claim = UnivariatePolynomial::new(self.initial_claims.to_vec()).evaluate_at(gamma);
+        let claim = FixedUnivariatePolynomial::new(self.initial_claims).evaluate_at(gamma);
 
         // Return a `ProdCheck` object with the computed data.
         ProdCheck::new(p_polys, q_polys, claim, false)
