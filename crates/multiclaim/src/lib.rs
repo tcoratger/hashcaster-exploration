@@ -47,16 +47,43 @@ impl<const N: usize> Sumcheck for MultiClaim<'_, N> {
         self.object.bind(challenge);
     }
 
+    // fn finish(&self) -> Self::Output {
+    //     // Compute the folded openings.
+    //     // - The first opening is initialized to zero,
+    //     // - Subsequent openings are evaluated for each polynomial at the challenges derived
+    // during     //   the sumcheck.
+    //     let mut ret = UnivariatePolynomial::new(
+    //         std::iter::once(BinaryField128b::ZERO)
+    //             .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
+    //             .collect(),
+    //     );
+
+    //     // Adjust the first opening:
+    //     // - Use a univariate evaluation to account for gamma powers.
+    //     // - Update the first opening with the adjusted value.
+    //     ret[0] = ret.evaluate_at(&self.gamma) + self.object.p_polys[0][0];
+
+    //     // Return the resulting openings.
+    //     Evaluations(ret.coeffs)
+    // }
+
     fn finish(&self) -> Self::Output {
         // Compute the folded openings.
-        // - The first opening is initialized to zero,
+        // - The first opening is initialized to zero.
         // - Subsequent openings are evaluated for each polynomial at the challenges derived during
         //   the sumcheck.
-        let mut ret = UnivariatePolynomial::new(
-            std::iter::once(BinaryField128b::ZERO)
-                .chain((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)))
-                .collect(),
-        );
+
+        // Preallocate capacity to avoid unnecessary reallocations
+        let mut coeffs = Vec::with_capacity(N);
+
+        // Insert the first opening as zero
+        coeffs.push(BinaryField128b::ZERO);
+
+        // Compute and store the subsequent openings
+        coeffs.extend((1..N).map(|i| self.polys[i].evaluate_at(&self.object.challenges)));
+
+        // Construct the univariate polynomial with preallocated coefficients
+        let mut ret = UnivariatePolynomial::new(coeffs);
 
         // Adjust the first opening:
         // - Use a univariate evaluation to account for gamma powers.
