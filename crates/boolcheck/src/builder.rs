@@ -67,10 +67,10 @@ pub struct BoolCheckBuilder<
     /// An array of polynomials representing the operands for the Boolean operations.
     /// Each polynomial must have a length equal to `2^dim`, where `dim` is the
     /// dimensionality of the input space.
-    pub polys: [MultilinearLagrangianPolynomial; N],
+    pub polys: &'a [MultilinearLagrangianPolynomial; N],
 
     /// Abstract algebraic operations.
-    pub algebraic_operations: A,
+    pub algebraic_operations: &'a A,
 }
 
 impl<'a, const N: usize, const M: usize, const C: usize, A> BoolCheckBuilder<'a, N, M, C, A>
@@ -98,10 +98,10 @@ where
     /// # Notes
     /// - The `gammas` field is computed from the provided `gamma` using a folding strategy.
     pub fn new(
-        algebraic_operations: A,
+        algebraic_operations: &'a A,
         points: &'a Points,
         claims: [BinaryField128b; M],
-        polys: [MultilinearLagrangianPolynomial; N],
+        polys: &'a [MultilinearLagrangianPolynomial; N],
     ) -> Self {
         // Ensure the phase switch parameter `c` is valid.
         // `c` must be less than the number of evaluation points (`points.len()`).
@@ -417,9 +417,9 @@ mod tests {
         let bool_check: BoolCheckBuilder<'_, 0, 0, 1, AndPackage<0, 0>> = BoolCheckBuilder {
             points: &points,
             claims: Default::default(),
-            polys: Default::default(),
+            polys: &Default::default(),
             gammas: Default::default(),
-            algebraic_operations: Default::default(),
+            algebraic_operations: &Default::default(),
         };
 
         // Call the trit_mapping method to compute the mappings.
@@ -439,9 +439,9 @@ mod tests {
         let bool_check: BoolCheckBuilder<'_, 0, 0, 2, AndPackage<0, 0>> = BoolCheckBuilder {
             points: &points,
             claims: Default::default(),
-            polys: Default::default(),
+            polys: &Default::default(),
             gammas: Default::default(),
-            algebraic_operations: Default::default(),
+            algebraic_operations: &Default::default(),
         };
 
         // Call the trit_mapping method to compute the mappings.
@@ -465,9 +465,9 @@ mod tests {
         let bool_check: BoolCheckBuilder<'_, 0, 0, 4, AndPackage<0, 0>> = BoolCheckBuilder {
             points: &points,
             claims: Default::default(),
-            polys: Default::default(),
+            polys: &Default::default(),
             gammas: Default::default(),
-            algebraic_operations: Default::default(),
+            algebraic_operations: &Default::default(),
         };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -505,9 +505,9 @@ mod tests {
         let bool_check: BoolCheckBuilder<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheckBuilder {
             points: &points,
             claims: Default::default(),
-            polys: Default::default(),
+            polys: &Default::default(),
             gammas: Default::default(),
-            algebraic_operations: Default::default(),
+            algebraic_operations: &Default::default(),
         };
 
         // Call the trit_mapping method to compute the mappings.
@@ -546,11 +546,11 @@ mod tests {
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
         let points = Points::default();
         let bool_check: BoolCheckBuilder<'_, 3, 1, 2, DummyPackage<3, 1>> = BoolCheckBuilder {
-            polys: tabs,
+            polys: &tabs,
             gammas: [BinaryField128b::ONE; 1],
             points: &points,
             claims: Default::default(),
-            algebraic_operations: Default::default(),
+            algebraic_operations: &Default::default(),
         };
 
         // Compute the ternary mapping for the current value of `c`

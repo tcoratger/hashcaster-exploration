@@ -23,11 +23,11 @@ fn benchmark_extend_n_tables(c: &mut Criterion) {
     // Create a BoolCheckBuilder instance with test data
     let points = Default::default();
     let bool_check = BoolCheckBuilder::<N, M, 2, DummyPackage<N, M>> {
-        polys: tables,
+        polys: &tables,
         points: &points,
         gammas: Default::default(),
         claims: Default::default(),
-        algebraic_operations: Default::default(),
+        algebraic_operations: &Default::default(),
     };
 
     // Generate the ternary mapping

@@ -222,7 +222,7 @@ impl HashcasterKeccak {
 
             // Initialize the BoolCheck builder with the Chi package, points, claims, and input.
             let builder =
-                BoolCheckBuilder::<_, _, BOOL_CHECK_C, _>::new(chi, points, *claims, input.clone());
+                BoolCheckBuilder::<_, _, BOOL_CHECK_C, _>::new(&chi, points, *claims, input);
 
             // Perform the BoolCheck sumcheck using the helper function.
             let (proof, new_points) = perform_sumcheck(num_vars, builder, challenger, claims);
