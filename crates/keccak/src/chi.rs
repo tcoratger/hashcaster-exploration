@@ -277,7 +277,7 @@ mod tests {
         // Setup the prover builder
         let prover_builder = BoolCheckBuilder::<_, _, SWITCH, _>::new(
             chi.clone(),
-            points.clone(),
+            &points,
             evaluation_claims,
             polys.clone(),
         );

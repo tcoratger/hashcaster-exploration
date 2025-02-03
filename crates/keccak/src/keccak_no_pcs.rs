@@ -111,7 +111,7 @@ impl<const C: usize> Keccak<C> {
         // Initialize the BoolCheck prover builder.
         let boolcheck_builder = BoolCheckBuilder::<_, _, C, _>::new(
             self.chi.clone(),
-            self.points.clone(),
+            &self.points,
             self.evaluation_claims,
             self.witness_linear.clone(),
         );

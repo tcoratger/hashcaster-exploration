@@ -18,7 +18,6 @@ use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
-use std::array;
 
 pub mod algebraic;
 pub mod and;
@@ -35,9 +34,9 @@ pub mod builder;
 /// - `N`: The number of multilinear polynomials used in the protocol.
 /// - `M`: The number of folding challenges (gammas) used for compression.
 #[derive(Clone, Debug)]
-pub struct BoolCheck<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M>> {
+pub struct BoolCheck<'a, const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M>> {
     /// The evaluation points for the multilinear polynomials.
-    pub points: Points,
+    pub points: &'a Points,
 
     /// An array of multilinear polynomials used in the protocol.
     pub polys: [MultilinearLagrangianPolynomial; N],
@@ -70,28 +69,7 @@ pub struct BoolCheck<const N: usize, const M: usize, const C: usize, A: Algebrai
     pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize, const C: usize, A> Default for BoolCheck<N, M, C, A>
-where
-    A: AlgebraicOps<N, M> + Default,
-{
-    fn default() -> Self {
-        Self {
-            points: Points::default(),
-            polys: array::from_fn(|_| Default::default()),
-            extended_table: Vec::new(),
-            poly_coords: Evaluations::default(),
-            challenges: Points::default(),
-            bit_mapping: Vec::new(),
-            eq_sequence: Vec::new(),
-            round_polys: Vec::new(),
-            claim: BinaryField128b::ZERO,
-            gammas: array::from_fn(|_| Default::default()),
-            algebraic_operations: Default::default(),
-        }
-    }
-}
-
-impl<const N: usize, const M: usize, const C: usize, A> Sumcheck for BoolCheck<N, M, C, A>
+impl<const N: usize, const M: usize, const C: usize, A> Sumcheck for BoolCheck<'_, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Send + Sync,
 {
@@ -404,7 +382,7 @@ where
     }
 }
 
-impl<const N: usize, const M: usize, const C: usize, A> BoolCheck<N, M, C, A>
+impl<const N: usize, const M: usize, const C: usize, A> BoolCheck<'_, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Send + Sync,
 {
@@ -481,12 +459,26 @@ mod tests {
     };
     use num_traits::Pow;
     use rand::rngs::OsRng;
+    use std::array;
 
     #[test]
     fn test_current_rounds() {
         // Define a sample BoolCheck instance.
         // No challenges have been submitted yet.
-        let mut bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>>::default();
+        let points = Points::default();
+        let mut bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
+            points: &points,
+            polys: Default::default(),
+            extended_table: Default::default(),
+            poly_coords: Default::default(),
+            challenges: Default::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
+        };
 
         // Assert the initial round (no challenges yet).
         assert_eq!(bool_check.current_round(), 0);
@@ -514,25 +506,53 @@ mod tests {
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
         let bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: points.clone().into(),
-            ..Default::default()
+            points: &points.clone().into(),
+            polys: Default::default(),
+            extended_table: Default::default(),
+            poly_coords: Default::default(),
+            challenges: Default::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
         };
 
         // Assert that the number of variables matches the length of the points vector.
         assert_eq!(bool_check.number_variables(), points.len());
 
         // Test with no points (empty vector).
+        let points = Points::default();
         let empty_bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: Points::default(),
-            ..Default::default()
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
         assert_eq!(empty_bool_check.number_variables(), 0);
 
         // Test with a large number of points.
         let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
         let large_bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: large_points.clone().into(),
-            ..Default::default()
+            points: &large_points.clone().into(),
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
         assert_eq!(large_bool_check.number_variables(), large_points.len());
     }
@@ -580,7 +600,7 @@ mod tests {
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.clone(),
+            &points,
             [initial_claim],
             [p, q],
         );
@@ -711,7 +731,7 @@ mod tests {
         // - the Boolean package (AND operation for this test).
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.clone(),
+            &points,
             [initial_claim],
             [p.clone(), q.clone()],
         );
@@ -898,9 +918,10 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );
@@ -1084,9 +1105,10 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );
@@ -1146,9 +1168,10 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );
@@ -1195,9 +1218,10 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );
@@ -1247,9 +1271,10 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [incorrect_claim],
             [p, q],
         );
@@ -1296,9 +1321,10 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );
@@ -1334,7 +1360,20 @@ mod tests {
     #[test]
     fn test_current_round_initial_state() {
         // Create a default BoolCheck instance with no challenges added.
-        let bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Assert that the initial round is 0 because no challenges have been added yet.
         assert_eq!(bool_check.current_round(), 0);
@@ -1343,7 +1382,20 @@ mod tests {
     #[test]
     fn test_current_round_after_single_challenge() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let mut bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Add one challenge to the challenges vector.
         bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
@@ -1355,7 +1407,20 @@ mod tests {
     #[test]
     fn test_current_round_after_multiple_challenges() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let mut bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1371,7 +1436,20 @@ mod tests {
     #[test]
     fn test_current_round_after_removing_challenges() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let mut bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1390,7 +1468,20 @@ mod tests {
     #[test]
     fn test_current_round_with_no_challenges_after_clear() {
         // Create a default BoolCheck instance.
-        let mut bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let mut bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
@@ -1408,7 +1499,20 @@ mod tests {
     #[test]
     fn test_number_variables_initial_state() {
         // Create a BoolCheck instance with no points defined (default state).
-        let bool_check: BoolCheck<0, 0, 0, AndPackage<0, 0>> = BoolCheck::default();
+        let points = Points::default();
+        let bool_check: BoolCheck<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheck {
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
+        };
 
         // Assert that the number of variables is 0 as no points are defined.
         assert_eq!(bool_check.number_variables(), 0);
@@ -1418,8 +1522,17 @@ mod tests {
     fn test_number_variables_with_single_point() {
         // Create a BoolCheck instance with a single point.
         let bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: Points::from(vec![BinaryField128b::from(1)]),
-            ..Default::default()
+            points: &Points::from(vec![BinaryField128b::from(1)]),
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
 
         // Assert that the number of variables is 1, corresponding to the single point.
@@ -1432,8 +1545,17 @@ mod tests {
         let points =
             vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
         let bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: Points::from(points.clone()),
-            ..Default::default()
+            points: &Points::from(points.clone()),
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
 
         // Assert that the number of variables matches the number of points (3).
@@ -1443,9 +1565,19 @@ mod tests {
     #[test]
     fn test_number_variables_with_empty_points() {
         // Create a BoolCheck instance with an empty points vector.
+        let points = Points::default();
         let bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: Points::default(),
-            ..Default::default()
+            points: &points,
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
 
         // Assert that the number of variables is 0 when no points are defined.
@@ -1459,8 +1591,17 @@ mod tests {
 
         // Create a BoolCheck instance with these points.
         let bool_check = BoolCheck::<0, 0, 0, AndPackage<0, 0>> {
-            points: Points::from(points.clone()),
-            ..Default::default()
+            points: &Points::from(points.clone()),
+            polys: array::from_fn(|_| Default::default()),
+            extended_table: Default::default(),
+            poly_coords: Evaluations::default(),
+            challenges: Points::default(),
+            bit_mapping: Default::default(),
+            eq_sequence: Default::default(),
+            round_polys: Default::default(),
+            claim: BinaryField128b::ZERO,
+            gammas: array::from_fn(|_| Default::default()),
+            algebraic_operations: Default::default(),
         };
 
         // Assert that the number of variables matches the number of points (1000).
@@ -1496,9 +1637,10 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
+        let pts = points.into();
         let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
-            points.into(),
+            &pts,
             [initial_claim],
             [p, q],
         );

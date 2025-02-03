@@ -37,12 +37,18 @@ use std::array;
 /// - Precompute intermediate parameters such as folding challenges and mappings.
 /// - Construct the extended tables and claims required for the `BoolCheck` protocol.
 #[derive(Clone, Debug)]
-pub struct BoolCheckBuilder<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M>> {
+pub struct BoolCheckBuilder<
+    'a,
+    const N: usize,
+    const M: usize,
+    const C: usize,
+    A: AlgebraicOps<N, M>,
+> {
     /// The evaluation points for the multilinear polynomials.
     ///
     /// A collection of field elements where the Boolean operations are evaluated.
     /// These points represent the input space for the `BoolCheck` protocol.
-    pub points: Points,
+    pub points: &'a Points,
 
     /// Precomputed folding challenges (`gammas`).
     ///
@@ -67,21 +73,7 @@ pub struct BoolCheckBuilder<const N: usize, const M: usize, const C: usize, A: A
     pub algebraic_operations: A,
 }
 
-impl<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M> + Default> Default
-    for BoolCheckBuilder<N, M, C, A>
-{
-    fn default() -> Self {
-        Self {
-            points: Default::default(),
-            gammas: array::from_fn(|_| Default::default()),
-            claims: array::from_fn(|_| Default::default()),
-            polys: array::from_fn(|_| Default::default()),
-            algebraic_operations: Default::default(),
-        }
-    }
-}
-
-impl<const N: usize, const M: usize, const C: usize, A> BoolCheckBuilder<N, M, C, A>
+impl<'a, const N: usize, const M: usize, const C: usize, A> BoolCheckBuilder<'a, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
 {
@@ -107,7 +99,7 @@ where
     /// - The `gammas` field is computed from the provided `gamma` using a folding strategy.
     pub fn new(
         algebraic_operations: A,
-        points: Points,
+        points: &'a Points,
         claims: [BinaryField128b; M],
         polys: [MultilinearLagrangianPolynomial; N],
     ) -> Self {
@@ -116,7 +108,13 @@ where
         //
         // This ensures the phase switch does not exceed the dimensionality of the input space.
         assert!(C < points.len());
-        Self { points, claims, polys, algebraic_operations, ..Default::default() }
+        Self {
+            points,
+            claims,
+            polys,
+            algebraic_operations,
+            gammas: array::from_fn(|_| Default::default()),
+        }
     }
 
     /// This function calculates two mappings for a ternary (base-3) representation of integers:
@@ -299,12 +297,12 @@ where
     }
 }
 
-impl<const N: usize, const M: usize, const C: usize, A> SumcheckBuilder
-    for BoolCheckBuilder<N, M, C, A>
+impl<'a, const N: usize, const M: usize, const C: usize, A> SumcheckBuilder
+    for BoolCheckBuilder<'a, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
 {
-    type Sumcheck = BoolCheck<N, M, C, A>;
+    type Sumcheck = BoolCheck<'a, N, M, C, A>;
 
     fn build(mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the folding challenges using the provided gamma.
@@ -333,13 +331,15 @@ where
             points: self.points,
             gammas: self.gammas,
             algebraic_operations: self.algebraic_operations,
-            ..Default::default()
+            poly_coords: Default::default(),
+            challenges: Default::default(),
+            round_polys: Default::default(),
         }
     }
 }
 
 impl<const N: usize, const M: usize, const C: usize, A: AlgebraicOps<N, M> + Send + Sync>
-    CompressedFoldedOps<N> for BoolCheckBuilder<N, M, C, A>
+    CompressedFoldedOps<N> for BoolCheckBuilder<'_, N, M, C, A>
 {
     fn linear_compressed(&self, arg: &[BinaryField128b; N]) -> BinaryField128b {
         // Compute and fold the linear part of the boolean formula using gammas.
@@ -413,7 +413,14 @@ mod tests {
     #[test]
     fn test_trit_mapping_small_c() {
         // Create an instance of BoolCheckBuilder with c = 1 (two ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0, 1, AndPackage<0, 0>> = BoolCheckBuilder::default();
+        let points = Points::default();
+        let bool_check: BoolCheckBuilder<'_, 0, 0, 1, AndPackage<0, 0>> = BoolCheckBuilder {
+            points: &points,
+            claims: Default::default(),
+            polys: Default::default(),
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
+        };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -428,7 +435,14 @@ mod tests {
     #[test]
     fn test_trit_mapping_medium_c() {
         // Create an instance of BoolCheckBuilder with c = 2 (three ternary digits: 0, 1, 2).
-        let bool_check: BoolCheckBuilder<0, 0, 2, AndPackage<0, 0>> = BoolCheckBuilder::default();
+        let points = Points::default();
+        let bool_check: BoolCheckBuilder<'_, 0, 0, 2, AndPackage<0, 0>> = BoolCheckBuilder {
+            points: &points,
+            claims: Default::default(),
+            polys: Default::default(),
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
+        };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -447,7 +461,14 @@ mod tests {
 
     #[test]
     fn test_trit_mapping_large_c() {
-        let bool_check: BoolCheckBuilder<0, 0, 4, AndPackage<0, 0>> = BoolCheckBuilder::default();
+        let points = Points::default();
+        let bool_check: BoolCheckBuilder<'_, 0, 0, 4, AndPackage<0, 0>> = BoolCheckBuilder {
+            points: &points,
+            claims: Default::default(),
+            polys: Default::default(),
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
+        };
 
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
 
@@ -480,7 +501,14 @@ mod tests {
     #[test]
     fn test_trit_mapping_no_c() {
         // Create an instance of BoolCheckBuilder with c = 0 (single ternary digit).
-        let bool_check: BoolCheckBuilder<0, 0, 0, AndPackage<0, 0>> = BoolCheckBuilder::default();
+        let points = Points::default();
+        let bool_check: BoolCheckBuilder<'_, 0, 0, 0, AndPackage<0, 0>> = BoolCheckBuilder {
+            points: &points,
+            claims: Default::default(),
+            polys: Default::default(),
+            gammas: Default::default(),
+            algebraic_operations: Default::default(),
+        };
 
         // Call the trit_mapping method to compute the mappings.
         let (bit_mapping, trit_mapping) = bool_check.trit_mapping();
@@ -516,10 +544,13 @@ mod tests {
         // Create a BoolCheckBuilder instance
         // The `c` parameter sets the recursion depth for ternary mappings.
         // Here, `c = 2`, meaning we work with ternary numbers up to 3^(2+1) = 27.
-        let bool_check: BoolCheckBuilder<3, 1, 2, DummyPackage<3, 1>> = BoolCheckBuilder {
+        let points = Points::default();
+        let bool_check: BoolCheckBuilder<'_, 3, 1, 2, DummyPackage<3, 1>> = BoolCheckBuilder {
             polys: tabs,
             gammas: [BinaryField128b::ONE; 1],
-            ..Default::default()
+            points: &points,
+            claims: Default::default(),
+            algebraic_operations: Default::default(),
         };
 
         // Compute the ternary mapping for the current value of `c`
