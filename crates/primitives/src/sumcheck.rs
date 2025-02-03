@@ -6,7 +6,7 @@ pub trait SumcheckBuilder {
     type Sumcheck: Sumcheck;
 
     /// Builds a new sumcheck instance.
-    fn build(&mut self, gamma: &Point) -> Self::Sumcheck;
+    fn build(self, gamma: &Point) -> Self::Sumcheck;
 }
 
 /// A trait that abstracts the sumcheck protocol methods.

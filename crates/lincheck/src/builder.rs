@@ -90,7 +90,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
 {
     type Sumcheck = ProdCheck<N>;
 
-    fn build(&mut self, gamma: &Point) -> ProdCheck<N> {
+    fn build(self, gamma: &Point) -> ProdCheck<N> {
         // Compute chunk size based on active variables.
         // Each polynomial is divided into chunks of size `2^num_active_vars`.
         let chunk_size = 1 << self.num_active_vars;
@@ -425,7 +425,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Construct LinCheckBuilder
-        let mut lincheck_builder =
+        let lincheck_builder =
             LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover

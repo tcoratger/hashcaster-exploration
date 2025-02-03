@@ -391,7 +391,7 @@ mod tests {
         let initial_claims: [_; 5] = array::from_fn(|i| m_p[i].evaluate_at(&points));
 
         // Setup the lincheck prover
-        let mut prover_builder = LinCheckBuilder::new(
+        let prover_builder = LinCheckBuilder::new(
             polys.clone(),
             points.clone(),
             keccak_linear,

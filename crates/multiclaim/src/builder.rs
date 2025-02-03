@@ -64,7 +64,7 @@ where
 {
     type Sumcheck = MultiClaim<'a, N>;
 
-    fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
+    fn build(self, gamma: &Point) -> Self::Sumcheck {
         // Compute the powers of gamma for the folding process.
         let gamma_pows: [_; 128 * N] = BinaryField128b::compute_gammas_folding(gamma);
 
@@ -224,7 +224,7 @@ mod tests {
         }
 
         // Create a new MulticlaimBuilder instance
-        let mut builder = MulticlaimBuilder::new(&polys, points, openings.clone().into());
+        let builder = MulticlaimBuilder::new(&polys, points, openings.clone().into());
 
         // Define gamma (random point for testing)
         let gamma = Point::from(BinaryField128b::from(2));

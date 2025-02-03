@@ -109,7 +109,7 @@ impl<const C: usize> Keccak<C> {
         let gamma = Point::random(rng);
 
         // Initialize the BoolCheck prover builder.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, C, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, C, _>::new(
             self.chi.clone(),
             self.points.clone(),
             self.evaluation_claims,
@@ -239,7 +239,7 @@ impl<const C: usize> Keccak<C> {
         let points_inv_orbit = self.challenges.to_points_inv_orbit();
 
         // Initialize the Multiclaim prover builder.
-        let mut multiclaim_builder = MulticlaimBuilder::new(
+        let multiclaim_builder = MulticlaimBuilder::new(
             &self.witness_linear,
             self.challenges.clone(),
             self.boolcheck_output.clone().unwrap().frob_evals,
@@ -316,7 +316,7 @@ impl<const C: usize> Keccak<C> {
         let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0.try_into().unwrap();
 
         // Initialize the LinCheck prover builder.
-        let mut lincheck_builder = LinCheckBuilder::new(
+        let lincheck_builder = LinCheckBuilder::new(
             self.polys.clone(),
             self.challenges.clone(),
             KeccakLinear::new(),

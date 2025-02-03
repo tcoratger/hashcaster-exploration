@@ -221,7 +221,7 @@ impl HashcasterKeccak {
             let chi = ChiPackage;
 
             // Initialize the BoolCheck builder with the Chi package, points, claims, and input.
-            let mut builder = BoolCheckBuilder::<_, _, BOOL_CHECK_C, _>::new(
+            let builder = BoolCheckBuilder::<_, _, BOOL_CHECK_C, _>::new(
                 chi,
                 points.clone(),
                 *claims,
@@ -229,7 +229,7 @@ impl HashcasterKeccak {
             );
 
             // Perform the BoolCheck sumcheck using the helper function.
-            let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+            let (proof, new_points) = perform_sumcheck(num_vars, builder, challenger, claims);
 
             // Update points in place with the result from BoolCheck
             *points = new_points;
@@ -243,10 +243,10 @@ impl HashcasterKeccak {
             let claims = &bool_check_proof.evals;
 
             // Initialize the Multiclaim builder with the input, updated points, and claims.
-            let mut builder = MulticlaimBuilder::new(input, points.clone(), claims.to_vec().into());
+            let builder = MulticlaimBuilder::new(input, points.clone(), claims.to_vec().into());
 
             // Perform the Multiclaim sumcheck using the helper function.
-            let (proof, new_points) = perform_sumcheck(num_vars, &mut builder, challenger, claims);
+            let (proof, new_points) = perform_sumcheck(num_vars, builder, challenger, claims);
 
             // Update points in place with the result from Multiclaim
             *points = new_points;
@@ -270,7 +270,7 @@ impl HashcasterKeccak {
         challenger: &mut F128Challenger,
     ) -> (SumcheckProof, Points) {
         // Perform the sumcheck process for LinCheck using the shared helper function.
-        let mut lincheck_builder = LinCheckBuilder::new(
+        let lincheck_builder = LinCheckBuilder::new(
             input.clone(),
             points.clone(),
             matrix,
@@ -279,7 +279,7 @@ impl HashcasterKeccak {
         );
 
         let (sumcheck_proof, mut rs) =
-            perform_sumcheck(LIN_CHECK_NUM_VARS, &mut lincheck_builder, challenger, claims);
+            perform_sumcheck(LIN_CHECK_NUM_VARS, lincheck_builder, challenger, claims);
 
         rs.extend_from_slice(&points[LIN_CHECK_NUM_VARS..]);
 
@@ -466,7 +466,7 @@ impl HashcasterKeccak {
 // Helper function to perform a sumcheck round.
 fn perform_sumcheck<B>(
     num_vars: usize,
-    builder: &mut B,
+    builder: B,
     challenger: &mut F128Challenger,
     claims: &[BinaryField128b],
 ) -> (SumcheckProof, Points)

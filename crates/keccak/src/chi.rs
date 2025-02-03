@@ -275,7 +275,7 @@ mod tests {
         let start = std::time::Instant::now();
 
         // Setup the prover builder
-        let mut prover_builder = BoolCheckBuilder::<_, _, SWITCH, _>::new(
+        let prover_builder = BoolCheckBuilder::<_, _, SWITCH, _>::new(
             chi.clone(),
             points.clone(),
             evaluation_claims,

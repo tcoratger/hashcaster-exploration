@@ -572,7 +572,7 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.clone(),
             [initial_claim],
@@ -697,7 +697,7 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.clone(),
             [initial_claim],
@@ -794,7 +794,7 @@ mod tests {
 
         // Setup a multiclaim builder
         let polys_multiclaim = [p.clone(), q.clone()];
-        let mut multiclaim_builder =
+        let multiclaim_builder =
             MulticlaimBuilder::new(&polys_multiclaim, points, frob_evals.clone());
 
         // Builder the multiclaim prover via folding
@@ -886,7 +886,7 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],
@@ -1072,7 +1072,7 @@ mod tests {
         // - the phase switch parameter (c),
         // - the points at which the AND operation is evaluated,
         // - the Boolean package (AND operation for this test).
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],
@@ -1134,7 +1134,7 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],
@@ -1183,7 +1183,7 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],
@@ -1235,7 +1235,7 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [incorrect_claim],
@@ -1284,7 +1284,7 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],
@@ -1484,7 +1484,7 @@ mod tests {
         let gamma = Point::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
-        let mut boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
+        let boolcheck_builder = BoolCheckBuilder::<_, _, PHASE_SWITCH, _>::new(
             AndPackage,
             points.into(),
             [initial_claim],

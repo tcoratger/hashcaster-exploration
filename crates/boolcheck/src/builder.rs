@@ -306,7 +306,7 @@ where
 {
     type Sumcheck = BoolCheck<N, M, C, A>;
 
-    fn build(&mut self, gamma: &Point) -> Self::Sumcheck {
+    fn build(mut self, gamma: &Point) -> Self::Sumcheck {
         // Compute the folding challenges using the provided gamma.
         self.gammas = BinaryField128b::compute_gammas_folding(gamma);
 
@@ -329,10 +329,10 @@ where
             eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
             claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
             extended_table: self.extend_n_tables(&trit_mapping),
-            polys: self.polys.clone(),
-            points: self.points.clone(),
+            polys: self.polys,
+            points: self.points,
             gammas: self.gammas,
-            algebraic_operations: self.algebraic_operations.clone(),
+            algebraic_operations: self.algebraic_operations,
             ..Default::default()
         }
     }

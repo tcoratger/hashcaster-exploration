@@ -240,8 +240,7 @@ mod tests {
 
         // Setup a multiclaim builder
         let polys = [poly.clone()];
-        let mut prover_builder =
-            MulticlaimBuilder::new(&polys, points, evaluations_inv_orbit.clone());
+        let prover_builder = MulticlaimBuilder::new(&polys, points, evaluations_inv_orbit.clone());
 
         // Generate a random gamma for folding
         let gamma = Point::random(rng);
