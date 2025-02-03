@@ -23,9 +23,9 @@ pub struct MulticlaimBuilder<'a, const N: usize> {
     /// Multilinear Lagrangian polynomials for the claim.
     pub polys: &'a [MultilinearLagrangianPolynomial; N],
     /// Evaluation points for the claim, represented as a `Points` collection.
-    pub points: Points,
+    pub points: &'a Points,
     /// Openings for the polynomials, represented as a flat vector of `BinaryField128b`.
-    pub openings: Evaluations,
+    pub openings: &'a Evaluations,
 }
 
 impl<'a, const N: usize> MulticlaimBuilder<'a, N> {
@@ -41,8 +41,8 @@ impl<'a, const N: usize> MulticlaimBuilder<'a, N> {
     /// - If the length of any polynomial does not match `2^number_of_points`.
     pub fn new(
         polys: &'a [MultilinearLagrangianPolynomial; N],
-        points: Points,
-        openings: Evaluations,
+        points: &'a Points,
+        openings: &'a Evaluations,
     ) -> Self {
         // Check that the number of openings is correct.
         assert_eq!(openings.len(), N * 128, "Invalid number of openings");
@@ -90,7 +90,7 @@ where
         });
 
         // Construct and return the `MultiClaim`.
-        MultiClaim::new(poly.into(), &self.points, &openings, &gamma_pows, self.polys)
+        MultiClaim::new(poly.into(), self.points, &openings, &gamma_pows, self.polys)
     }
 }
 
@@ -106,8 +106,9 @@ mod tests {
     fn test_multiclaim_builder_default() {
         // Create a default MulticlaimBuilder instance with N = 3.
         let polys: [_; 3] = array::from_fn(|_| MultilinearLagrangianPolynomial::default());
-        let builder: MulticlaimBuilder<'_, 3> =
-            MulticlaimBuilder::new(&polys, Points::default(), Default::default());
+        let points = Points::default();
+        let openings = Default::default();
+        let builder: MulticlaimBuilder<'_, 3> = MulticlaimBuilder::new(&polys, &points, &openings);
 
         // Verify that the default polys array is empty.
         for poly in builder.polys {
@@ -136,10 +137,13 @@ mod tests {
         let openings: Evaluations = vec![BinaryField128b::from(0); 2 * 128].into();
 
         // Create a new MulticlaimBuilder instance.
-        let builder = MulticlaimBuilder::new(&polys, points.clone(), openings.clone());
+        let builder = MulticlaimBuilder::new(&polys, &points, &openings);
 
         // Verify that the builder contains the expected fields.
-        assert_eq!(builder, MulticlaimBuilder { polys: &polys, points, openings });
+        assert_eq!(
+            builder,
+            MulticlaimBuilder { polys: &polys, points: &points, openings: &openings }
+        );
     }
 
     #[test]
@@ -158,7 +162,7 @@ mod tests {
         let openings = vec![BinaryField128b::from(0); 100];
 
         // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(&polys, points, openings.into());
+        MulticlaimBuilder::new(&polys, &points, &openings.into());
     }
 
     #[test]
@@ -177,7 +181,7 @@ mod tests {
         let openings = vec![BinaryField128b::from(0); 2 * 128];
 
         // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(&polys, points, openings.into());
+        MulticlaimBuilder::new(&polys, &points, &openings.into());
     }
 
     #[test]
@@ -192,10 +196,13 @@ mod tests {
         let openings: Evaluations = vec![BinaryField128b::from(0); 128].into();
 
         // Create a new MulticlaimBuilder instance.
-        let builder = MulticlaimBuilder::new(&polys, points.clone(), openings.clone());
+        let builder = MulticlaimBuilder::new(&polys, &points, &openings);
 
         // Verify that the builder contains the expected fields.
-        assert_eq!(builder, MulticlaimBuilder { polys: &polys, points, openings });
+        assert_eq!(
+            builder,
+            MulticlaimBuilder { polys: &polys, points: &points, openings: &openings }
+        );
     }
 
     #[test]
@@ -224,7 +231,8 @@ mod tests {
         }
 
         // Create a new MulticlaimBuilder instance
-        let builder = MulticlaimBuilder::new(&polys, points, openings.clone().into());
+        let op = openings.clone().into();
+        let builder = MulticlaimBuilder::new(&polys, &points, &op);
 
         // Define gamma (random point for testing)
         let gamma = Point::from(BinaryField128b::from(2));

@@ -238,12 +238,12 @@ impl<const C: usize> Keccak<C> {
         // Initialize the inverse orbit points
         let points_inv_orbit = self.challenges.to_points_inv_orbit();
 
+        let challenges = self.challenges.clone();
+
         // Initialize the Multiclaim prover builder.
-        let multiclaim_builder = MulticlaimBuilder::new(
-            &self.witness_linear,
-            self.challenges.clone(),
-            self.boolcheck_output.clone().unwrap().frob_evals,
-        );
+        let boolcheck_output = self.boolcheck_output.clone().unwrap();
+        let multiclaim_builder =
+            MulticlaimBuilder::new(&self.witness_linear, &challenges, &boolcheck_output.frob_evals);
 
         // Build the multiclaim prover
         let mut multiclaim_prover = multiclaim_builder.build(&gamma);
