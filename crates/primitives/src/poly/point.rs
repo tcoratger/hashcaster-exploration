@@ -193,8 +193,8 @@ impl Points {
     /// the Boolean hypercube \( \{0, 1\}^n \).
     pub fn to_eq_poly_sequence(&self) -> Vec<MultilinearLagrangianPolynomial> {
         // Start with the base case: eq_0(x) = 1.
-        let mut polynomials =
-            vec![MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE])];
+        let mut polynomials = Vec::with_capacity(self.len() + 1);
+        polynomials.push(MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE]));
 
         // Iterate over the points in reverse order.
         for (i, multiplier) in self.iter().rev().enumerate() {
