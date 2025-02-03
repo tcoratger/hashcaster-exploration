@@ -2,7 +2,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
         compressed::CompressedPoly,
-        evaluation::Evaluations,
+        evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
     },
@@ -41,7 +41,7 @@ impl<const N: usize> Default for ProdCheck<N> {
 }
 
 impl<const N: usize> Sumcheck for ProdCheck<N> {
-    type Output = ProdCheckOutput;
+    type Output = ProdCheckOutput<N>;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
         // Fetch the length of the first polynomial to determine the range of the current variable.
@@ -175,28 +175,23 @@ impl<const N: usize> Sumcheck for ProdCheck<N> {
     }
 
     fn finish(&self) -> Self::Output {
-        ProdCheckOutput {
-            p_evaluations: self
-                .p_polys
-                .iter()
-                .map(|p| {
-                    // Ensure the polynomial is fully reduced (length == 1).
-                    assert_eq!(p.len(), 1, "The protocol is not complete");
-                    // Extract the single value from the polynomial.
-                    p[0]
-                })
-                .collect(),
-            q_evaluations: self
-                .q_polys
-                .iter()
-                .map(|q| {
-                    // Ensure the polynomial is fully reduced (length == 1).
-                    assert_eq!(q.len(), 1, "The protocol is not complete");
-                    // Extract the single value from the polynomial.
-                    q[0]
-                })
-                .collect(),
-        }
+        // Extract the final evaluations from `p_polys`
+        let p_evaluations = FixedEvaluations::new(from_fn(|i| {
+            // Ensure the polynomial is fully reduced (length == 1).
+            assert_eq!(self.p_polys[i].len(), 1, "The protocol is not complete");
+            // Extract the single value from the polynomial.
+            self.p_polys[i][0]
+        }));
+
+        // Extract the final evaluations from `q_polys`
+        let q_evaluations = FixedEvaluations::new(from_fn(|i| {
+            // Ensure the polynomial is fully reduced (length == 1).
+            assert_eq!(self.q_polys[i].len(), 1, "The protocol is not complete");
+            // Extract the single value from the polynomial.
+            self.q_polys[i][0]
+        }));
+
+        ProdCheckOutput { p_evaluations, q_evaluations }
     }
 }
 
@@ -252,24 +247,24 @@ impl<const N: usize> ProdCheck<N> {
 ///   object containing the single values extracted from the reduced `p_polys`.
 /// - `q_evaluations`: The final evaluations of the `q_polys`, represented as an `Evaluations`
 ///   object containing the single values extracted from the reduced `q_polys`.
-#[derive(Clone, Debug, Default)]
-pub struct ProdCheckOutput {
+#[derive(Clone, Debug)]
+pub struct ProdCheckOutput<const N: usize> {
     /// Final evaluations of the `p_polys`.
     ///
     /// Each evaluation corresponds to the single value extracted from a fully reduced
     /// polynomial in the `p_polys` set.
-    pub p_evaluations: Evaluations,
+    pub p_evaluations: FixedEvaluations<N>,
 
     /// Final evaluations of the `q_polys`.
     ///
     /// Each evaluation corresponds to the single value extracted from a fully reduced
     /// polynomial in the `q_polys` set.
-    pub q_evaluations: Evaluations,
+    pub q_evaluations: FixedEvaluations<N>,
 }
 
-impl EvaluationProvider for ProdCheckOutput {
+impl<const N: usize> EvaluationProvider for ProdCheckOutput<N> {
     fn evals(&self) -> Evaluations {
-        self.p_evaluations.clone()
+        self.p_evaluations.0.to_vec().into()
     }
 }
 
@@ -676,8 +671,8 @@ mod tests {
 
         // Call `finish` and validate the output.
         let output = prodcheck.finish();
-        assert_eq!(output.p_evaluations, Evaluations::from(vec![p1; N]));
-        assert_eq!(output.q_evaluations, Evaluations::from(vec![q1; N]));
+        assert_eq!(output.p_evaluations, FixedEvaluations::new([p1; N]));
+        assert_eq!(output.q_evaluations, FixedEvaluations::new([q1; N]));
     }
 
     #[test]
@@ -725,8 +720,8 @@ mod tests {
 
         // Call `finish` and validate the output.
         let output = prodcheck.finish();
-        assert_eq!(output.p_evaluations, Evaluations::from(p_vals.to_vec()));
-        assert_eq!(output.q_evaluations, Evaluations::from(q_vals.to_vec()));
+        assert_eq!(output.p_evaluations, FixedEvaluations::new(p_vals));
+        assert_eq!(output.q_evaluations, FixedEvaluations::new(q_vals));
     }
 
     #[test]
@@ -786,14 +781,13 @@ mod tests {
         // Extract the final evaluations using the `finish` method.
         let output = prodcheck.finish();
 
-        // Verify that the final evaluations of `p_polys` match the expected values.
-        let p_evaluations: Vec<_> =
-            p_polys.iter().map(|p| p.evaluate_at(&prodcheck.challenges)).collect();
-        let q_evaluations: Vec<_> =
-            q_polys.iter().map(|q| q.evaluate_at(&prodcheck.challenges)).collect();
+        // Compute evaluations using `from_fn`, avoiding intermediate Vec allocations.
+        let p_evaluations = std::array::from_fn(|i| p_polys[i].evaluate_at(&prodcheck.challenges));
+        let q_evaluations = std::array::from_fn(|i| q_polys[i].evaluate_at(&prodcheck.challenges));
 
-        assert_eq!(output.p_evaluations, Evaluations::from(p_evaluations.clone()));
-        assert_eq!(output.q_evaluations, Evaluations::from(q_evaluations.clone()));
+        // Verify that the final evaluations match the expected values.
+        assert_eq!(output.p_evaluations, FixedEvaluations::new(p_evaluations));
+        assert_eq!(output.q_evaluations, FixedEvaluations::new(q_evaluations));
 
         // Compute the final claim by multiplying the final evaluations of `p_polys` and `q_polys`.
         let final_claim = p_evaluations
