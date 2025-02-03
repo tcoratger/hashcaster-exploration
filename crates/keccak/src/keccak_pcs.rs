@@ -146,7 +146,7 @@ impl HashcasterKeccak {
             claims = multi_open_proof.evals.clone().0.try_into().unwrap();
 
             (lin_check_proof, points) = self.prove_lin(
-                KeccakLinear::new(),
+                &KeccakLinear::new(),
                 layers_rev.next().unwrap(),
                 &points,
                 &claims,
@@ -259,20 +259,15 @@ impl HashcasterKeccak {
     #[allow(clippy::unused_self)]
     fn prove_lin(
         &self,
-        matrix: impl LinearOperations,
+        matrix: &impl LinearOperations,
         input: &[MultilinearLagrangianPolynomial; 5],
         points: &Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
     ) -> (SumcheckProof, Points) {
         // Perform the sumcheck process for LinCheck using the shared helper function.
-        let lincheck_builder = LinCheckBuilder::new(
-            input.clone(),
-            points.clone(),
-            matrix,
-            LIN_CHECK_NUM_VARS,
-            *claims,
-        );
+        let lincheck_builder =
+            LinCheckBuilder::new(input, points, matrix, LIN_CHECK_NUM_VARS, *claims);
 
         let (sumcheck_proof, mut rs) =
             perform_sumcheck(LIN_CHECK_NUM_VARS, lincheck_builder, challenger, claims);

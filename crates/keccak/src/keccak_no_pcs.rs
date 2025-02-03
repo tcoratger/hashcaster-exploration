@@ -316,10 +316,11 @@ impl<const C: usize> Keccak<C> {
         let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0.try_into().unwrap();
 
         // Initialize the LinCheck prover builder.
+        let matrix = KeccakLinear::new();
         let lincheck_builder = LinCheckBuilder::new(
-            self.polys.clone(),
-            self.challenges.clone(),
-            KeccakLinear::new(),
+            &self.polys,
+            &self.challenges,
+            &matrix,
             self.num_active_vars,
             evaluations,
         );

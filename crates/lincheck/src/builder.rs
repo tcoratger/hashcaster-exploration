@@ -17,13 +17,13 @@ use std::array;
 /// - `N`: Number of input polynomials.
 /// - `M`: Number of output claims.
 #[derive(Clone, Debug)]
-pub struct LinCheckBuilder<const N: usize, const M: usize, L: LinearOperations> {
+pub struct LinCheckBuilder<'a, const N: usize, const M: usize, L: LinearOperations> {
     /// Linear transformation matrix applied to the polynomial coefficients.
-    matrix: L,
+    matrix: &'a L,
     /// Input polynomials to be evaluated.
-    polys: [MultilinearLagrangianPolynomial; N],
+    polys: &'a [MultilinearLagrangianPolynomial; N],
     /// Points for polynomial evaluation.
-    points: Points,
+    points: &'a Points,
     /// Total number of variables in the polynomials.
     num_vars: usize,
     /// Number of "active" variables affecting chunk sizes.
@@ -32,22 +32,7 @@ pub struct LinCheckBuilder<const N: usize, const M: usize, L: LinearOperations> 
     initial_claims: [BinaryField128b; M],
 }
 
-impl<const N: usize, const M: usize, L: LinearOperations + Default> Default
-    for LinCheckBuilder<N, M, L>
-{
-    fn default() -> Self {
-        Self {
-            matrix: Default::default(),
-            polys: core::array::from_fn(|_| Default::default()),
-            points: Default::default(),
-            num_vars: 0,
-            num_active_vars: 0,
-            initial_claims: core::array::from_fn(|_| Default::default()),
-        }
-    }
-}
-
-impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, L> {
+impl<'a, const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<'a, N, M, L> {
     /// Constructs a new `LinCheckBuilder` instance.
     ///
     /// # Parameters
@@ -61,9 +46,9 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
     /// - If matrix dimensions do not match the expected sizes.
     /// - If the number of variables does not match the polynomial sizes.
     pub fn new(
-        polys: [MultilinearLagrangianPolynomial; N],
-        points: Points,
-        matrix: L,
+        polys: &'a [MultilinearLagrangianPolynomial; N],
+        points: &'a Points,
+        matrix: &'a L,
         num_active_vars: usize,
         initial_claims: [BinaryField128b; M],
     ) -> Self {
@@ -76,7 +61,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
         assert!(num_vars >= num_active_vars, "Number of variables must be >= active variables");
 
         // Validate polynomial sizes match the number of variables.
-        for poly in &polys {
+        for poly in polys {
             assert!(poly.len() == 1 << num_vars, "Polynomial size mismatch");
         }
 
@@ -86,7 +71,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<N, M, 
 }
 
 impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder
-    for LinCheckBuilder<N, M, L>
+    for LinCheckBuilder<'_, N, M, L>
 {
     type Sumcheck = ProdCheck<N>;
 
@@ -171,7 +156,15 @@ mod tests {
     #[test]
     fn test_default_lincheck() {
         // Create a default LinCheckBuilder instance
-        let lincheck: LinCheckBuilder<2, 2, MatrixLinear> = LinCheckBuilder::default();
+        let polys = Default::default();
+        let lincheck: LinCheckBuilder<'_, 2, 2, MatrixLinear> = LinCheckBuilder {
+            polys: &polys,
+            points: &Default::default(),
+            matrix: &Default::default(),
+            num_vars: 0,
+            num_active_vars: 0,
+            initial_claims: Default::default(),
+        };
 
         // Verify default values
         assert_eq!(lincheck.num_vars, 0);
@@ -200,8 +193,7 @@ mod tests {
             core::array::from_fn(|_| BinaryField128b::default());
 
         // Create a new LinCheckBuilder instance
-        let lincheck =
-            LinCheckBuilder::new(polys, points.clone(), matrix.clone(), 2, initial_claims);
+        let lincheck = LinCheckBuilder::new(&polys, &points, &matrix, 2, initial_claims);
 
         // Verify the parameters
         // Ensure `num_vars` matches points length
@@ -213,9 +205,9 @@ mod tests {
         // Ensure matrix output size matches expectations
         assert_eq!(lincheck.matrix.n_out(), 4);
         // Ensure points are correctly stored
-        assert_eq!(lincheck.points, points);
+        assert_eq!(lincheck.points, &points);
         // Ensure matrix is correctly stored
-        assert_eq!(lincheck.matrix, matrix);
+        assert_eq!(lincheck.matrix, &matrix);
     }
 
     #[test]
@@ -230,7 +222,7 @@ mod tests {
             core::array::from_fn(|_| BinaryField128b::default());
 
         // This should panic due to matrix dimension mismatch
-        LinCheckBuilder::new(polys, points, matrix, 2, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, 2, initial_claims);
     }
 
     #[test]
@@ -244,7 +236,7 @@ mod tests {
             core::array::from_fn(|_| BinaryField128b::default());
 
         // Force incorrect polynomial length by mismatching points and variables
-        LinCheckBuilder::new(polys, points, matrix, 3, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, 3, initial_claims);
     }
 
     #[test]
@@ -272,19 +264,14 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Construct LinCheckBuilder
-        let lincheck = LinCheckBuilder::new(
-            polys,
-            points.clone(),
-            matrix.clone(),
-            NUM_ACTIVE_VARS,
-            initial_claims,
-        );
+        let lincheck =
+            LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Validate the LinCheckBuilder state
         assert_eq!(lincheck.num_vars, points.len());
         assert_eq!(lincheck.num_active_vars, NUM_ACTIVE_VARS);
-        assert_eq!(lincheck.matrix, matrix);
-        assert_eq!(lincheck.points, points);
+        assert_eq!(lincheck.matrix, &matrix);
+        assert_eq!(lincheck.points, &points);
         assert_eq!(lincheck.initial_claims, initial_claims);
     }
 
@@ -312,7 +299,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Attempt construction (should panic)
-        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
     }
 
     #[test]
@@ -339,7 +326,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Attempt construction (should panic)
-        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
     }
 
     #[test]
@@ -364,7 +351,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Attempt construction (should panic)
-        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
     }
 
     #[test]
@@ -394,7 +381,7 @@ mod tests {
             [BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Attempt construction (should panic)
-        LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+        LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
     }
 
     #[test]
@@ -426,7 +413,7 @@ mod tests {
 
         // Construct LinCheckBuilder
         let lincheck_builder =
-            LinCheckBuilder::new(polys, points, matrix, NUM_ACTIVE_VARS, initial_claims);
+            LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover
         let lincheck_prover = lincheck_builder.build(&Point(BinaryField128b::from(1234)));

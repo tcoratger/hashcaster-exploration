@@ -391,13 +391,8 @@ mod tests {
         let initial_claims: [_; 5] = array::from_fn(|i| m_p[i].evaluate_at(&points));
 
         // Setup the lincheck prover
-        let prover_builder = LinCheckBuilder::new(
-            polys.clone(),
-            points.clone(),
-            keccak_linear,
-            NUM_ACTIVE_VARS,
-            initial_claims,
-        );
+        let prover_builder =
+            LinCheckBuilder::new(&polys, &points, &keccak_linear, NUM_ACTIVE_VARS, initial_claims);
 
         // Setup a random gamma for folding
         let gamma = Point::random(rng);
