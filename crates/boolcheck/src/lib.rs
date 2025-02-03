@@ -237,10 +237,16 @@ where
             (0..half)
                 .into_par_iter()
                 .map(|i| {
-                    self.compute_algebraic(i, 1 << (number_variables - C - 1))
-                        .map(|x| x * eq_poly_round[i])
+                    let mut acc = [BinaryField128b::ZERO; 3];
+                    acc.iter_mut()
+                        .zip(self.compute_algebraic(i, 1 << (number_variables - C - 1)))
+                        .for_each(|(accum, value)| *accum += value * eq_poly_round[i]);
+                    acc
                 })
-                .reduce(|| [BinaryField128b::ZERO; 3], |[a, b, c], [d, e, f]| [a + d, b + e, c + f])
+                .reduce(
+                    || [BinaryField128b::ZERO; 3],
+                    |a, b| [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+                )
         };
 
         // We want to compute:
@@ -593,11 +599,16 @@ mod tests {
         let mut challenges = Points::default();
 
         let mut time_in_bind = 0;
+        let mut time_in_round_polynomial = 0;
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
+            let start = std::time::Instant::now();
+
             // Compute the round polynomial for the current round.
             let compressed_round_polynomial = boolcheck.round_polynomial();
+
+            time_in_round_polynomial += start.elapsed().as_millis();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
             let r = Point::random(rng);
@@ -653,6 +664,7 @@ mod tests {
         println!("Execution time: {:?} ms", start.elapsed().as_millis());
 
         println!("Time in bind: {time_in_bind:?} ms");
+        println!("Time in round polynomial: {time_in_round_polynomial:?} ms");
     }
 
     #[test]
