@@ -20,70 +20,6 @@ impl Evaluations {
     pub const fn new(evaluations: Vec<BinaryField128b>) -> Self {
         Self(evaluations)
     }
-
-    /// Creates a new `Evaluations` instance with random evaluations.
-    pub fn random<RNG: Rng>(n: usize, rng: &mut RNG) -> Self {
-        Self((0..n).map(|_| BinaryField128b::random(rng)).collect())
-    }
-
-    /// Consumes the `Evaluations` instance and returns the inner vector of evaluations.
-    pub fn into_inner(self) -> Vec<BinaryField128b> {
-        self.0
-    }
-
-    /// Computes the evaluation of the `pi` function at a given index `i`.
-    ///
-    /// # Theory
-    /// The `pi` function computes a linear functional in the dual basis representation of a binary
-    /// field. Specifically, it evaluates the linear functional associated with the `i`-th
-    /// cobasis vector on a given set of evaluations. This is mathematically equivalent to
-    /// summing up the products of the cobasis elements and their corresponding evaluation
-    /// points, ensuring an isomorphic mapping to the dual space.
-    ///
-    /// Given:
-    /// - `cobasis_frobenius[j]` as the `j`-th element of the transpose of the Frobenius cobasis
-    ///   matrix.
-    /// - `twist[j]` as the `j`-th evaluation of the polynomial in the Frobenius orbit.
-    ///
-    /// The formula for `pi` is:
-    /// \[
-    /// \pi_i = \sum_{j=0}^{127} c_{ij} \cdot twist[j]
-    /// \]
-    /// Where `c_{ij}` are the elements of the Frobenius cobasis matrix transpose.
-    ///
-    /// This function performs this computation efficiently using an iterator and a fold operation.
-    ///
-    /// # Parameters
-    /// - `i`: The index of the cobasis vector (0 ≤ `i` < 128).
-    ///
-    /// # Returns
-    /// - A `BinaryField128b` instance representing the result of the `pi` function evaluation.
-    pub fn pi(&self, i: usize) -> BinaryField128b {
-        // Retrieve the `i`-th row of the COBASIS_FROBENIUS_TRANSPOSE matrix.
-        // This row corresponds to the coefficients of the linear functional `pi_i`.
-        let cobasis_frobenius = &COBASIS_FROBENIUS_TRANSPOSE[i];
-
-        // Compute the summation:
-        // Iterate over the evaluations and corresponding cobasis coefficients.
-        self.iter().enumerate().fold(BinaryField128b::ZERO, |acc, (j, twist)| {
-            // For each pair,
-            // - multiply the twist by the cobasis coefficient
-            // - add to the accumulator.
-            acc + BinaryField128b::new(cobasis_frobenius[j]) * twist
-        })
-    }
-}
-
-impl From<Vec<BinaryField128b>> for Evaluations {
-    fn from(evaluations: Vec<BinaryField128b>) -> Self {
-        Self(evaluations)
-    }
-}
-
-impl From<&[BinaryField128b]> for Evaluations {
-    fn from(evaluations: &[BinaryField128b]) -> Self {
-        Self(evaluations.to_vec())
-    }
 }
 
 impl Deref for Evaluations {
@@ -97,18 +33,6 @@ impl Deref for Evaluations {
 impl DerefMut for Evaluations {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl FromIterator<BinaryField128b> for Evaluations {
-    fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
-impl AsRef<[BinaryField128b]> for Evaluations {
-    fn as_ref(&self) -> &[BinaryField128b] {
-        &self.0
     }
 }
 
@@ -252,6 +176,48 @@ impl<const N: usize> FixedEvaluations<N> {
             chunk.copy_from_slice(&untwisted_chunk);
         });
     }
+
+    /// Computes the evaluation of the `pi` function at a given index `i`.
+    ///
+    /// # Theory
+    /// The `pi` function computes a linear functional in the dual basis representation of a binary
+    /// field. Specifically, it evaluates the linear functional associated with the `i`-th
+    /// cobasis vector on a given set of evaluations. This is mathematically equivalent to
+    /// summing up the products of the cobasis elements and their corresponding evaluation
+    /// points, ensuring an isomorphic mapping to the dual space.
+    ///
+    /// Given:
+    /// - `cobasis_frobenius[j]` as the `j`-th element of the transpose of the Frobenius cobasis
+    ///   matrix.
+    /// - `twist[j]` as the `j`-th evaluation of the polynomial in the Frobenius orbit.
+    ///
+    /// The formula for `pi` is:
+    /// \[
+    /// \pi_i = \sum_{j=0}^{127} c_{ij} \cdot twist[j]
+    /// \]
+    /// Where `c_{ij}` are the elements of the Frobenius cobasis matrix transpose.
+    ///
+    /// This function performs this computation efficiently using an iterator and a fold operation.
+    ///
+    /// # Parameters
+    /// - `i`: The index of the cobasis vector (0 ≤ `i` < 128).
+    ///
+    /// # Returns
+    /// - A `BinaryField128b` instance representing the result of the `pi` function evaluation.
+    pub fn pi(&self, i: usize) -> BinaryField128b {
+        // Retrieve the `i`-th row of the COBASIS_FROBENIUS_TRANSPOSE matrix.
+        // This row corresponds to the coefficients of the linear functional `pi_i`.
+        let cobasis_frobenius = &COBASIS_FROBENIUS_TRANSPOSE[i];
+
+        // Compute the summation:
+        // Iterate over the evaluations and corresponding cobasis coefficients.
+        self.iter().enumerate().fold(BinaryField128b::ZERO, |acc, (j, twist)| {
+            // For each pair,
+            // - multiply the twist by the cobasis coefficient
+            // - add to the accumulator.
+            acc + BinaryField128b::new(cobasis_frobenius[j]) * twist
+        })
+    }
 }
 
 impl<const N: usize> Deref for FixedEvaluations<N> {
@@ -259,6 +225,12 @@ impl<const N: usize> Deref for FixedEvaluations<N> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<const N: usize> DerefMut for FixedEvaluations<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -286,18 +258,16 @@ mod tests {
         // Generate a random element `r` in the binary field.
         let mut r = BinaryField128b::random(rng);
 
-        // Create an `Evaluations` instance representing the Frobenius orbit of `r`.
+        // Create a `FixedEvaluations` instance representing the Frobenius orbit of `r`.
         // This orbit contains 128 successive squarings of `r`.
-        let orbit: Evaluations = (0..128)
-            .map(|_| {
-                // Save the current value of `r`.
-                let res = r;
-                // Update `r` by squaring it (Frobenius map: r -> r^2).
-                r *= r;
-                // Return the previous value of `r`.
-                res
-            })
-            .collect();
+        let orbit = FixedEvaluations::<128>::new(array::from_fn(|_| {
+            // Save the current value of `r`.
+            let res = r;
+            // Update `r` by squaring it (Frobenius map: r → r²).
+            r *= r;
+            // Return the previous value of `r`.
+            res
+        }));
 
         // Iterate over each index `i` in the range [0, 127].
         (0..128).for_each(|i| {
@@ -322,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_pi_all_zeroes() {
-        let orbit: Evaluations = vec![BinaryField128b::ZERO; 128].into();
+        let orbit = FixedEvaluations::new([BinaryField128b::ZERO; 128]);
 
         for i in 0..128 {
             assert_eq!(orbit.pi(i), BinaryField128b::ZERO, "Failed for index {i}");
@@ -331,10 +301,9 @@ mod tests {
 
     #[test]
     fn test_pi_single_non_zero() {
-        let mut orbit = vec![BinaryField128b::ZERO; 128];
+        let mut orbit = FixedEvaluations::new([BinaryField128b::ZERO; 128]);
         // Set a single non-zero value.
         orbit[5] = BinaryField128b::ONE;
-        let orbit: Evaluations = orbit.into();
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected = BinaryField128b::new(cobasis[5]);
@@ -344,9 +313,13 @@ mod tests {
 
     #[test]
     fn test_pi_alternating() {
-        let orbit: Evaluations = (0..128)
-            .map(|i| if i % 2 == 0 { BinaryField128b::ONE } else { BinaryField128b::ZERO })
-            .collect();
+        let orbit = FixedEvaluations::<128>::new(array::from_fn(|i| {
+            if i % 2 == 0 {
+                BinaryField128b::ONE
+            } else {
+                BinaryField128b::ZERO
+            }
+        }));
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected = cobasis
@@ -364,7 +337,7 @@ mod tests {
     fn test_pi_random_orbit() {
         let rng = &mut OsRng;
 
-        let orbit = Evaluations::random(128, rng);
+        let orbit = FixedEvaluations::<128>::random(rng);
 
         for (i, cobasis) in COBASIS_FROBENIUS_TRANSPOSE.iter().enumerate() {
             let expected: BinaryField128b = (0..128)
