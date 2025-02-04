@@ -3,7 +3,8 @@ use bytemuck::zeroed_vec;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
-        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
+        multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::{to_eq_poly_sequence, Points},
         univariate::UnivariatePolynomial,
     },
     sumcheck::SumcheckBuilder,
@@ -318,13 +319,10 @@ where
         // Generate bit and trit mappings
         let (bit_mapping, trit_mapping) = self.trit_mapping();
 
-        // Prepare the points to be used in the eq sequence
-        let pt_eq_sequence: Points = self.points[1..].into();
-
         // Return the constructed BoolCheck
         BoolCheck {
             bit_mapping,
-            eq_sequence: pt_eq_sequence.to_eq_poly_sequence(),
+            eq_sequence: to_eq_poly_sequence(&self.points[1..]),
             claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
             extended_table: self.extend_n_tables(&trit_mapping),
             polys: self.polys,

@@ -381,9 +381,9 @@ pub fn restrict<const N: usize>(
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::OsRng;
-
     use super::*;
+    use crate::poly::point::to_eq_poly_sequence;
+    use rand::rngs::OsRng;
 
     #[test]
     #[allow(clippy::unreadable_literal)]
@@ -453,7 +453,7 @@ mod tests {
         ]);
 
         // Compute the equality polynomial sequence using the eq_poly_sequence function.
-        let eq_sequence = points.to_eq_poly_sequence();
+        let eq_sequence = to_eq_poly_sequence(&points);
 
         // Assert that the computed equality polynomial sequence matches the expected result.
         // This ensures the function is working as intended.

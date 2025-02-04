@@ -125,65 +125,6 @@ impl Points {
         MultilinearLagrangianPolynomial { coeffs }
     }
 
-    /// Constructs the sequence of equality polynomials for a given set of points.
-    ///
-    /// # Arguments
-    /// * `points` - A slice of `BinaryField128b` elements representing the input points.
-    ///
-    /// # Returns
-    /// A vector of [`MultilinearLagrangianPolynomial`] instances containing the sequence of
-    /// equality polynomials.
-    ///
-    /// # Explanation
-    /// This method generates a sequence of equality polynomials, where each polynomial encodes the
-    /// relationships of subsets of the input points. The sequence starts with a base case
-    /// polynomial `eq_0(x) = 1` and iteratively constructs each subsequent polynomial using
-    /// a recurrence relation.
-    ///
-    /// ## Sequence Construction
-    /// The equality polynomials in the sequence are defined recursively:
-    /// - `eq_0(x) = 1` (base case),
-    /// - `eq_k(x) = eq_{k-1}(x) * (1 + m_k * x)`, where `m_k` is the multiplier for the \(k\)-th
-    ///   point.
-    ///
-    /// ## Utility
-    /// This sequence is useful in efficiently constructing multilinear extensions, where each
-    /// polynomial in the sequence serves as a building block for interpolating functions over
-    /// the Boolean hypercube \( \{0, 1\}^n \).
-    pub fn to_eq_poly_sequence(&self) -> Vec<MultilinearLagrangianPolynomial> {
-        // Start with the base case: eq_0(x) = 1.
-        let mut polynomials = Vec::with_capacity(self.len() + 1);
-        polynomials.push(MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE]));
-
-        // Iterate over the points in reverse order.
-        for (i, multiplier) in self.iter().rev().enumerate() {
-            // Reference the previously computed polynomial in the sequence.
-            let previous = &polynomials[i];
-
-            // Allocate space for the new polynomial coefficients.
-            // The new polynomial will have twice the size of the previous one.
-            let mut new_coeffs = vec![BinaryField128b::ZERO; 1 << (i + 1)];
-
-            // Compute the new polynomial coefficients using the recurrence relation.
-            new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
-                |(chunk, &prev_coeff)| {
-                    // Calculate the updated coefficients.
-                    let multiplied = *multiplier * prev_coeff;
-                    // Update the first coefficient.
-                    chunk[0] = prev_coeff + multiplied;
-                    // Update the second coefficient.
-                    chunk[1] = multiplied;
-                },
-            );
-
-            // Append the new polynomial to the list.
-            polynomials.push(MultilinearLagrangianPolynomial::new(new_coeffs));
-        }
-
-        // Return the constructed sequence of equality polynomials.
-        polynomials
-    }
-
     /// Computes the evaluation of the equality polynomial for two sets of points.
     ///
     /// # Description
@@ -329,6 +270,64 @@ impl FromIterator<BinaryField128b> for Points {
     fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
+}
+
+/// Constructs the sequence of equality polynomials for a given set of points.
+///
+/// # Arguments
+/// * `points` - A slice of `BinaryField128b` elements representing the input points.
+///
+/// # Returns
+/// A vector of [`MultilinearLagrangianPolynomial`] instances containing the sequence of
+/// equality polynomials.
+///
+/// # Explanation
+/// This method generates a sequence of equality polynomials, where each polynomial encodes the
+/// relationships of subsets of the input points. The sequence starts with a base case
+/// polynomial `eq_0(x) = 1` and iteratively constructs each subsequent polynomial using
+/// a recurrence relation.
+///
+/// ## Sequence Construction
+/// The equality polynomials in the sequence are defined recursively:
+/// - `eq_0(x) = 1` (base case),
+/// - `eq_k(x) = eq_{k-1}(x) * (1 + m_k * x)`, where `m_k` is the multiplier for the \(k\)-th point.
+///
+/// ## Utility
+/// This sequence is useful in efficiently constructing multilinear extensions, where each
+/// polynomial in the sequence serves as a building block for interpolating functions over
+/// the Boolean hypercube \( \{0, 1\}^n \).
+pub fn to_eq_poly_sequence(points: &[BinaryField128b]) -> Vec<MultilinearLagrangianPolynomial> {
+    // Start with the base case: eq_0(x) = 1.
+    let mut polynomials = Vec::with_capacity(points.len() + 1);
+    polynomials.push(MultilinearLagrangianPolynomial::new(vec![BinaryField128b::ONE]));
+
+    // Iterate over the points in reverse order.
+    for (i, multiplier) in points.iter().rev().enumerate() {
+        // Reference the previously computed polynomial in the sequence.
+        let previous = &polynomials[i];
+
+        // Allocate space for the new polynomial coefficients.
+        // The new polynomial will have twice the size of the previous one.
+        let mut new_coeffs = vec![BinaryField128b::ZERO; 1 << (i + 1)];
+
+        // Compute the new polynomial coefficients using the recurrence relation.
+        new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
+            |(chunk, &prev_coeff)| {
+                // Calculate the updated coefficients.
+                let multiplied = *multiplier * prev_coeff;
+                // Update the first coefficient.
+                chunk[0] = prev_coeff + multiplied;
+                // Update the second coefficient.
+                chunk[1] = multiplied;
+            },
+        );
+
+        // Append the new polynomial to the list.
+        polynomials.push(MultilinearLagrangianPolynomial::new(new_coeffs));
+    }
+
+    // Return the constructed sequence of equality polynomials.
+    polynomials
 }
 
 #[cfg(test)]
@@ -500,7 +499,7 @@ mod tests {
         let points = Points::random(20, rng);
 
         // Compute the equality polynomial sequence for the points.
-        let eq_sequence = points.to_eq_poly_sequence();
+        let eq_sequence = to_eq_poly_sequence(&points);
 
         // Verify the sequence length matches the expected size (points.len() + 1).
         assert_eq!(eq_sequence.len(), points.len() + 1);
