@@ -357,7 +357,7 @@ where
         }
     }
 
-    fn finish(&self) -> Self::Output {
+    fn finish(self) -> Self::Output {
         // Compute the number of variables in the polynomial.
         let number_variables = self.number_variables();
         // The number of rounds should match the number of variables for the protocol to end.
@@ -381,7 +381,7 @@ where
         frob_evals.twist();
 
         // Return the `BoolCheckOutput`
-        Self::Output { frob_evals, round_polys: round_polys.clone() }
+        Self::Output { frob_evals, round_polys }
     }
 }
 

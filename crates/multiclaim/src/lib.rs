@@ -45,7 +45,7 @@ impl<const N: usize> Sumcheck<N> for MultiClaim<'_, N> {
         self.object.bind(challenge);
     }
 
-    fn finish(&self) -> Self::Output {
+    fn finish(self) -> Self::Output {
         // Compute the folded openings.
         // - The first opening is initialized to zero.
         // - Subsequent openings are evaluated for each polynomial at the challenges derived during

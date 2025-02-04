@@ -172,7 +172,7 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
         self.cached_round_msg = None;
     }
 
-    fn finish(&self) -> Self::Output {
+    fn finish(self) -> Self::Output {
         // Extract the final evaluations from `p_polys`
         let p_evaluations = FixedEvaluations::new(from_fn(|i| {
             // Ensure the polynomial is fully reduced (length == 1).
@@ -776,7 +776,7 @@ mod tests {
         assert!(prodcheck.q_polys.iter().all(|q| q.len() == 1));
 
         // Extract the final evaluations using the `finish` method.
-        let output = prodcheck.finish();
+        let output = prodcheck.clone().finish();
 
         // Compute evaluations using `from_fn`, avoiding intermediate Vec allocations.
         let p_evaluations = std::array::from_fn(|i| p_polys[i].evaluate_at(&prodcheck.challenges));

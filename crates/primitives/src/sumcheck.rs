@@ -24,7 +24,7 @@ pub trait Sumcheck<const N: usize> {
     fn bind(&mut self, challenge: &BinaryField128b);
 
     /// Returns the output of the sumcheck protocol.
-    fn finish(&self) -> Self::Output;
+    fn finish(self) -> Self::Output;
 }
 
 pub trait EvaluationProvider<const N: usize> {
