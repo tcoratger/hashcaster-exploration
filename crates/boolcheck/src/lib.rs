@@ -369,8 +369,9 @@ where
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - C - 1);
         let frob_evals_array = std::array::from_fn(|idx| {
-            let poly_idx = idx / 128;
-            let frob_idx = idx % 128;
+            // Extract poly index and Frobenius index efficiently
+            let (poly_idx, frob_idx) = (idx >> 7, idx & 127);
+            // Compute the correct evaluation index
             poly_coords[(poly_idx * 128 + frob_idx) * base_index]
         });
 
