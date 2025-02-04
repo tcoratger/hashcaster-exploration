@@ -107,17 +107,24 @@ impl AlgebraicOps<5, 5> for ChiPackage {
                 let next = (j + 1) % 5;
                 let next_next = (j + 2) % 5;
 
+                let data_j = data.get(idxs[j]).copied().unwrap_or(BinaryField128b::ZERO);
+                let data_next = data.get(idxs[next]).copied().unwrap_or(BinaryField128b::ZERO);
+                let data_next_next =
+                    data.get(idxs[next_next]).copied().unwrap_or(BinaryField128b::ZERO);
+
+                let data_j_next = data.get(idxs[j] + 1).copied().unwrap_or(BinaryField128b::ZERO);
+                let data_next_next_1 =
+                    data.get(idxs[next] + 1).copied().unwrap_or(BinaryField128b::ZERO);
+                let data_next_next_2 =
+                    data.get(idxs[next_next] + 1).copied().unwrap_or(BinaryField128b::ZERO);
+
                 // Linear terms for ret[0] and ret[1]
-                ret[0][j] +=
-                    basis * (data[idxs[j]] + (one + data[idxs[next]]) * data[idxs[next_next]]);
-                ret[1][j] += basis *
-                    (data[idxs[j] + 1] +
-                        (one + data[idxs[next] + 1]) * data[idxs[next_next] + 1]);
+                ret[0][j] += basis * (data_j + (one + data_next) * data_next_next);
+                ret[1][j] += basis * (data_j_next + (one + data_next_next_1) * data_next_next_2);
 
                 // Quadratic terms for ret[2]
-                ret[2][j] += basis *
-                    ((data[idxs[next]] + data[idxs[next] + 1]) *
-                        (data[idxs[next_next]] + data[idxs[next_next] + 1]));
+                ret[2][j] +=
+                    basis * ((data_next + data_next_next_1) * (data_next_next + data_next_next_2));
             });
 
             // Update indices for the next iteration
@@ -174,8 +181,8 @@ mod tests {
     use hashcaster_boolcheck::{builder::BoolCheckBuilder, BoolCheckOutput};
     use hashcaster_primitives::{
         poly::{
-            evaluation::Evaluations, multinear_lagrangian::MultilinearLagrangianPolynomial,
-            point::Points, univariate::FixedUnivariatePolynomial,
+            multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
+            univariate::FixedUnivariatePolynomial,
         },
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
@@ -311,9 +318,7 @@ mod tests {
         }
 
         // Finalize the protocol and fetch the result
-        let BoolCheckOutput { frob_evals, .. } = prover.finish();
-
-        let mut frob_evals = Evaluations(frob_evals.to_vec());
+        let BoolCheckOutput { mut frob_evals, .. } = prover.finish();
 
         let end = std::time::Instant::now();
 
@@ -321,14 +326,7 @@ mod tests {
         assert_eq!(frob_evals.len(), 128 * 5, "Frobenius evaluations length mismatch");
 
         // Untwist the Frobenius evaluations
-        frob_evals.as_mut_slice().chunks_mut(128).for_each(|chunk| {
-            let mut tmp = Evaluations::from(chunk.to_vec());
-            tmp.untwist();
-
-            for (i, val) in tmp.iter().enumerate() {
-                chunk[i] = *val;
-            }
-        });
+        frob_evals.untwist();
 
         // Compute the expected coordinate evaluations
         let expected_coord_evals: Vec<_> = polys
@@ -346,14 +344,11 @@ mod tests {
             .collect();
 
         // Validate the Frobenius evaluations
-        assert_eq!(frob_evals.0, expected_coord_evals, "Frobenius evaluations mismatch");
-
-        // Trick for padding
-        frob_evals.push(BinaryField128b::ZERO);
+        assert_eq!(frob_evals.to_vec(), expected_coord_evals, "Frobenius evaluations mismatch");
 
         // Compute the claimed evaluations and fold them
         let claimed_evaluations =
-            FixedUnivariatePolynomial::new(chi.algebraic(&frob_evals, 0, 1)[0]);
+            FixedUnivariatePolynomial::new(chi.algebraic(frob_evals.as_ref(), 0, 1)[0]);
         let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
         // Validate the final claim

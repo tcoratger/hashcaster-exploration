@@ -27,8 +27,8 @@ impl<const I: usize, const O: usize> AlgebraicOps<I, O> for AndPackage<I, O> {
             // Extract the elements from the data slices.
             let a = data[idx_a];
             let b = data[idx_b];
-            let a_next = data[idx_a + 1];
-            let b_next = data[idx_b + 1];
+            let a_next = data.get(idx_a + 1).copied().unwrap_or(BinaryField128b::ZERO);
+            let b_next = data.get(idx_b + 1).copied().unwrap_or(BinaryField128b::ZERO);
 
             // `Σ (ϕ_i * a * b)`
             ret[0][0] += basis * a * b;
@@ -84,12 +84,10 @@ mod tests {
         // - Transform each binary field element into 128 components, representing the bitwise
         //   values of the element.
         // - Flatten the resulting array of arrays into a single array.
-        let mut input_coords = a
+        let input_coords = a
             .iter()
             .flat_map(|x| (0..128).map(|i| BinaryField128b::from((x.into_inner() >> i) & 1 != 0)))
             .collect::<Vec<_>>();
-
-        input_coords.push(BinaryField128b::ZERO);
 
         let rhs = and_package.algebraic(&input_coords, 0, 1);
 

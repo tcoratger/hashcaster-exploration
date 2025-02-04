@@ -669,19 +669,13 @@ mod tests {
         }
 
         // Finish the protocol and obtain the output.
-        let BoolCheckOutput { frob_evals, .. } = boolcheck.finish();
-
-        let mut frob_evals = Evaluations(frob_evals.to_vec());
+        let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
 
         // Untwist the Frobenius evaluations to obtain the expected claim.
         frob_evals.untwist();
 
-        // Add a zero element to the end of the evaluations for padding.
-        // TODO: hack to be removed in the future
-        frob_evals.push(BinaryField128b::ZERO);
-
         // Compute algebraic AND
-        let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
+        let and_algebraic = AndPackage::<2, 1>.algebraic(frob_evals.as_ref(), 0, 1);
 
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges);
@@ -795,19 +789,15 @@ mod tests {
 
         // Clone the Frobenius evaluations to untwist them (we will need the original evaluations
         // untouched for the multiclaim part of the test).
-        let mut untwisted_evals = Evaluations(frob_evals.to_vec());
+        let mut untwisted_evals = frob_evals.clone();
 
         assert_eq!(frob_evals.len(), 256, "Invalid number of Frobenius evaluations.");
 
         // Untwist the Frobenius evaluations to obtain the expected claim.
         untwisted_evals.untwist();
 
-        // Add a zero element to the end of the evaluations for padding.
-        // TODO: hack to be removed in the future
-        untwisted_evals.push(BinaryField128b::ZERO);
-
         // Compute algebraic AND
-        let and_algebraic = AndPackage::<2, 1>.algebraic(&untwisted_evals, 0, 1);
+        let and_algebraic = AndPackage::<2, 1>.algebraic(untwisted_evals.as_ref(), 0, 1);
 
         // Get the expected claim
         let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges);

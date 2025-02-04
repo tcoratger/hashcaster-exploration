@@ -9,7 +9,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
-        evaluation::{Evaluations, FixedEvaluations},
+        evaluation::FixedEvaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::Points,
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
@@ -190,17 +190,14 @@ impl<const C: usize> Keccak<C> {
         );
 
         // Clone the Frobenius evaluations
-        let mut coord_evals = Evaluations::new(output.frob_evals.to_vec());
+        let mut coord_evals = output.frob_evals.clone();
 
         // Untwist the Frobenius evaluations
         coord_evals.untwist();
 
-        // Trick for padding
-        coord_evals.push(BinaryField128b::ZERO);
-
         // Compute the claimed evaluations and fold them
         let claimed_evaluations =
-            FixedUnivariatePolynomial::new(self.chi.algebraic(&coord_evals, 0, 1)[0]);
+            FixedUnivariatePolynomial::new(self.chi.algebraic(coord_evals.as_ref(), 0, 1)[0]);
         let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
         // Validate the final claim

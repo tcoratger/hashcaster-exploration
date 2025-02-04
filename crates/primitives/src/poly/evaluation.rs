@@ -72,86 +72,6 @@ impl Evaluations {
             acc + BinaryField128b::new(cobasis_frobenius[j]) * twist
         })
     }
-
-    /// Applies the "twist" transformation to the evaluations.
-    ///
-    /// # Theory
-    /// The twist transformation maps the evaluations of a polynomial into
-    /// an inverse Frobenius orbit. This involves applying successive squarings
-    /// (Frobenius map: \( x \mapsto x^2 \)) and reconstructing the evaluations
-    /// using a weighted sum with a fixed basis.
-    ///
-    /// ## Steps
-    /// 1. Perform successive squarings of all evaluations.
-    /// 2. Use a basis to compute weighted sums of the squared values to form the twisted
-    ///    evaluations.
-    /// 3. Reverse the order of the twisted evaluations to align them with the inverse Frobenius
-    ///    orbit.
-    /// 4. Replace the original evaluations with the twisted evaluations.
-    pub fn twist(&mut self) {
-        // Ensure the evaluations can be chunked into 128-element groups.
-        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
-
-        // Process each chunk of 128 elements separately.
-        self.par_chunks_exact_mut(128).for_each(|chunk| {
-            // Create the twisted evaluations for this chunk.
-            let mut twisted_evals: [_; 128] = array::from_fn(|_| {
-                // Apply the Frobenius map (squaring) to all elements in the chunk.
-                chunk.iter_mut().for_each(|x| *x *= *x);
-
-                // Compute the twisted evaluation for the i-th basis index.
-                (0..128).fold(BinaryField128b::ZERO, |acc, j| {
-                    BinaryField128b::basis(j).mul_add(chunk[j], acc)
-                })
-            });
-
-            // Reverse the twisted evaluations to align with the inverse Frobenius orbit.
-            twisted_evals.reverse();
-
-            // Replace the original chunk with the twisted evaluations.
-            chunk.copy_from_slice(&twisted_evals);
-        });
-    }
-
-    /// Reverts the "twist" transformation by applying the inverse.
-    ///
-    /// # Theory
-    /// The untwist transformation reverts the evaluations back to their
-    /// original space by:
-    /// 1. Applying the Frobenius transformation to each element.
-    /// 2. Using the `pi` function to reconstruct the original evaluations based on a dual basis
-    ///    representation.
-    ///
-    /// ## Steps
-    /// 1. Apply the Frobenius map \( x \mapsto x^{2^i} \) to align the elements.
-    /// 2. Use the `pi` function to reconstruct the evaluations from the twisted form.
-    pub fn untwist(&mut self) {
-        // Ensure the evaluations can be chunked into 128-element groups.
-        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
-
-        // Process each chunk of 128 elements separately.
-        self.par_chunks_exact_mut(128).for_each(|chunk| {
-            // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
-            // Each element in the chunk is updated to its Frobenius-transformed value.
-            #[allow(clippy::cast_possible_wrap)]
-            chunk.iter_mut().enumerate().for_each(|(i, val)| {
-                *val = val.frobenius(i as i32);
-            });
-
-            // Compute the untwisted evaluations
-            let untwisted_chunk: [_; 128] = array::from_fn(|i| {
-                COBASIS_FROBENIUS_TRANSPOSE[i]
-                    .iter()
-                    .enumerate()
-                    .fold(BinaryField128b::ZERO, |acc, (j, coeff)| {
-                        BinaryField128b::new(*coeff).mul_add(chunk[j], acc)
-                    })
-            });
-
-            // Replace the current chunk with the untwisted values.
-            chunk.copy_from_slice(&untwisted_chunk);
-        });
-    }
 }
 
 impl From<Vec<BinaryField128b>> for Evaluations {
@@ -246,6 +166,11 @@ impl<const N: usize> FixedEvaluations<N> {
     /// A `FixedEvaluations<N>` instance storing the provided evaluations.
     pub const fn new(evaluations: [BinaryField128b; N]) -> Self {
         Self(evaluations)
+    }
+
+    /// Creates a new `FixedEvaluations` instance with random evaluations.
+    pub fn random<RNG: Rng>(rng: &mut RNG) -> Self {
+        Self(array::from_fn(|_| BinaryField128b::random(rng)))
     }
 
     /// Applies the "twist" transformation to the evaluations.
@@ -455,7 +380,7 @@ mod tests {
         let rng = &mut OsRng;
 
         // Generate a random set of 128 evaluations.
-        let lhs = Evaluations::random(128, rng);
+        let lhs = FixedEvaluations::<128>::random(rng);
 
         // Clone `lhs` to create an independent copy for transformation.
         let mut rhs = lhs.clone();
@@ -478,7 +403,7 @@ mod tests {
     #[test]
     fn test_twist_all_zeros() {
         // All evaluations are initially zero.
-        let mut evaluations: Evaluations = vec![BinaryField128b::ZERO; 128].into();
+        let mut evaluations = FixedEvaluations::new([BinaryField128b::ZERO; 128]);
 
         // Apply the `twist` transformation.
         evaluations.twist();
@@ -492,7 +417,7 @@ mod tests {
     #[test]
     fn test_untwist_all_zeros() {
         // All evaluations are initially zero.
-        let mut evaluations: Evaluations = vec![BinaryField128b::ZERO; 128].into();
+        let mut evaluations = FixedEvaluations::new([BinaryField128b::ZERO; 128]);
 
         // Apply the `untwist` transformation.
         evaluations.untwist();
