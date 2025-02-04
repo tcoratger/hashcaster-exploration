@@ -56,11 +56,9 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
             return cache_round_msg.clone();
         }
 
-        // Initialize a parallel iterator to compute contributions for each index in the first half.
-        let iter = (0..half).into_par_iter();
-
         // Compute `pq_zero`, `pq_one`, and `pq_inf` for each index in parallel.
-        let mut poly = iter
+        let mut poly = (0..half)
+            .into_par_iter()
             .map(|i| {
                 // Contribution for `X_i = 0`
                 let mut pq_zero = BinaryField128b::ZERO;

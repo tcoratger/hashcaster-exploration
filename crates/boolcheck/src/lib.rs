@@ -822,7 +822,7 @@ mod tests {
         let start = std::time::Instant::now();
 
         // Setup the new points to be the challenges of the boolcheck.
-        let points = challenges.clone();
+        let points = challenges;
 
         // Map the points to the inverse Frobenius orbit
         let points_inv_orbit: Vec<Points> =

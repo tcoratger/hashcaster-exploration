@@ -107,6 +107,7 @@ fn routine<RNG: Rng>(snark: &HashcasterKeccak, rng: &mut RNG) -> (Duration, usiz
 
 fn warm_up<RNG: Rng>(snark: &HashcasterKeccak, rng: &mut RNG) {
     let mut total_elapsed = Duration::default();
+    #[allow(clippy::while_float)]
     while total_elapsed.as_secs_f64() < 3.0 {
         total_elapsed += routine(snark, rng).0;
     }
