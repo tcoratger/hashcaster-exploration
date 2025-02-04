@@ -5,7 +5,7 @@ use crate::{
 use num_traits::MulAdd;
 use rand::Rng;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     array,
     ops::{Deref, DerefMut},
@@ -186,9 +186,9 @@ impl FromIterator<BinaryField128b> for Evaluations {
     }
 }
 
-impl EvaluationProvider for Evaluations {
-    fn evals(&self) -> Evaluations {
-        self.clone()
+impl AsRef<[BinaryField128b]> for Evaluations {
+    fn as_ref(&self) -> &[BinaryField128b] {
+        &self.0
     }
 }
 
@@ -202,6 +202,40 @@ impl EvaluationProvider for Evaluations {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FixedEvaluations<const N: usize>(pub [BinaryField128b; N]);
 
+impl<const N: usize> Serialize for FixedEvaluations<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_seq(self.0.iter())
+    }
+}
+
+impl<'de, const N: usize> Deserialize<'de> for FixedEvaluations<N> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize into a Vec first
+        let vec = Vec::<BinaryField128b>::deserialize(deserializer)?;
+
+        // Ensure the vector has the correct length
+        if vec.len() != N {
+            return Err(serde::de::Error::invalid_length(
+                vec.len(),
+                &format!("Expected length {N}").as_str(),
+            ));
+        }
+
+        // Convert Vec into a fixed-size array
+        let array: [BinaryField128b; N] = vec
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("Failed to convert Vec to fixed-size array"))?;
+
+        Ok(Self(array))
+    }
+}
+
 impl<const N: usize> FixedEvaluations<N> {
     /// Creates a new `FixedEvaluations` instance from an array of evaluations.
     ///
@@ -213,6 +247,86 @@ impl<const N: usize> FixedEvaluations<N> {
     pub const fn new(evaluations: [BinaryField128b; N]) -> Self {
         Self(evaluations)
     }
+
+    /// Applies the "twist" transformation to the evaluations.
+    ///
+    /// # Theory
+    /// The twist transformation maps the evaluations of a polynomial into
+    /// an inverse Frobenius orbit. This involves applying successive squarings
+    /// (Frobenius map: \( x \mapsto x^2 \)) and reconstructing the evaluations
+    /// using a weighted sum with a fixed basis.
+    ///
+    /// ## Steps
+    /// 1. Perform successive squarings of all evaluations.
+    /// 2. Use a basis to compute weighted sums of the squared values to form the twisted
+    ///    evaluations.
+    /// 3. Reverse the order of the twisted evaluations to align them with the inverse Frobenius
+    ///    orbit.
+    /// 4. Replace the original evaluations with the twisted evaluations.
+    pub fn twist(&mut self) {
+        // Ensure the evaluations can be chunked into 128-element groups.
+        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
+
+        // Process each chunk of 128 elements separately.
+        self.0.par_chunks_exact_mut(128).for_each(|chunk| {
+            // Create the twisted evaluations for this chunk.
+            let mut twisted_evals: [_; 128] = array::from_fn(|_| {
+                // Apply the Frobenius map (squaring) to all elements in the chunk.
+                chunk.iter_mut().for_each(|x| *x *= *x);
+
+                // Compute the twisted evaluation for the i-th basis index.
+                (0..128).fold(BinaryField128b::ZERO, |acc, j| {
+                    BinaryField128b::basis(j).mul_add(chunk[j], acc)
+                })
+            });
+
+            // Reverse the twisted evaluations to align with the inverse Frobenius orbit.
+            twisted_evals.reverse();
+
+            // Replace the original chunk with the twisted evaluations.
+            chunk.copy_from_slice(&twisted_evals);
+        });
+    }
+
+    /// Reverts the "twist" transformation by applying the inverse.
+    ///
+    /// # Theory
+    /// The untwist transformation reverts the evaluations back to their
+    /// original space by:
+    /// 1. Applying the Frobenius transformation to each element.
+    /// 2. Using the `pi` function to reconstruct the original evaluations based on a dual basis
+    ///    representation.
+    ///
+    /// ## Steps
+    /// 1. Apply the Frobenius map \( x \mapsto x^{2^i} \) to align the elements.
+    /// 2. Use the `pi` function to reconstruct the evaluations from the twisted form.
+    pub fn untwist(&mut self) {
+        // Ensure the evaluations can be chunked into 128-element groups.
+        assert_eq!(self.len() % 128, 0, "Evaluations must be a multiple of 128.");
+
+        // Process each chunk of 128 elements separately.
+        self.0.par_chunks_exact_mut(128).for_each(|chunk| {
+            // Apply the Frobenius transformation \( x \mapsto x^{2^i} \) for alignment.
+            // Each element in the chunk is updated to its Frobenius-transformed value.
+            #[allow(clippy::cast_possible_wrap)]
+            chunk.iter_mut().enumerate().for_each(|(i, val)| {
+                *val = val.frobenius(i as i32);
+            });
+
+            // Compute the untwisted evaluations
+            let untwisted_chunk: [_; 128] = array::from_fn(|i| {
+                COBASIS_FROBENIUS_TRANSPOSE[i]
+                    .iter()
+                    .enumerate()
+                    .fold(BinaryField128b::ZERO, |acc, (j, coeff)| {
+                        BinaryField128b::new(*coeff).mul_add(chunk[j], acc)
+                    })
+            });
+
+            // Replace the current chunk with the untwisted values.
+            chunk.copy_from_slice(&untwisted_chunk);
+        });
+    }
 }
 
 impl<const N: usize> Deref for FixedEvaluations<N> {
@@ -223,9 +337,15 @@ impl<const N: usize> Deref for FixedEvaluations<N> {
     }
 }
 
-impl<const N: usize> EvaluationProvider for FixedEvaluations<N> {
-    fn evals(&self) -> Evaluations {
-        self.0.to_vec().into()
+impl<const N: usize> AsRef<[BinaryField128b]> for FixedEvaluations<N> {
+    fn as_ref(&self) -> &[BinaryField128b] {
+        &self.0
+    }
+}
+
+impl<const N: usize> EvaluationProvider<N> for FixedEvaluations<N> {
+    fn evals(self) -> Self {
+        self
     }
 }
 

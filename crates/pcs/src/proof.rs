@@ -1,12 +1,12 @@
-use hashcaster_primitives::poly::{compressed::CompressedPoly, evaluation::Evaluations};
+use hashcaster_primitives::poly::{compressed::CompressedPoly, evaluation::FixedEvaluations};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct SumcheckProof {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SumcheckProof<const N: usize> {
     /// Round polynomials of the sumcheck protocol
     pub round_polys: Vec<CompressedPoly>,
     /// Evaluations
-    pub evals: Evaluations,
+    pub evals: FixedEvaluations<N>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

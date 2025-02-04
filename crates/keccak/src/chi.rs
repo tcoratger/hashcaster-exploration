@@ -313,7 +313,9 @@ mod tests {
         }
 
         // Finalize the protocol and fetch the result
-        let BoolCheckOutput { mut frob_evals, .. } = prover.finish();
+        let BoolCheckOutput { frob_evals, .. } = prover.finish();
+
+        let mut frob_evals = Evaluations(frob_evals.to_vec());
 
         let end = std::time::Instant::now();
 

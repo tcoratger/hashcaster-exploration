@@ -20,6 +20,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
+        evaluation::Evaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
@@ -41,11 +42,11 @@ const SECURITY_BITS: usize = 100;
 const BATCH_SIZE: usize = 5;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HashcasterKeccakProof {
+pub struct HashcasterKeccakProof<const EB: usize, const EM: usize, const EL: usize> {
     #[serde(serialize_with = "serialize_packed", deserialize_with = "deserialize_packed")]
     commitment: GroestlDigest<<Tower as TowerFamily>::B8>,
     initial_claims: [BinaryField128b; 5],
-    rounds: [(SumcheckProof, SumcheckProof, SumcheckProof); 24],
+    rounds: Box<[(SumcheckProof<EB>, SumcheckProof<EM>, SumcheckProof<EL>); 24]>,
     input_open_proof: FriPcsProof,
 }
 
@@ -106,7 +107,10 @@ impl HashcasterKeccak {
         array::from_fn(|_| MultilinearLagrangianPolynomial::random(1 << self.num_vars(), rng))
     }
 
-    pub fn prove(&self, input: [MultilinearLagrangianPolynomial; 5]) -> HashcasterKeccakProof {
+    pub fn prove(
+        &self,
+        input: [MultilinearLagrangianPolynomial; 5],
+    ) -> Box<HashcasterKeccakProof<640, 5, 5>> {
         let mut challenger = F128Challenger::new_keccak256();
 
         let mut layers = vec![input];
@@ -137,13 +141,13 @@ impl HashcasterKeccak {
         let mut layers_rev = layers.iter().rev().skip(1);
         let mut claims = initial_claims;
 
-        let rounds: [_; 24] = array::from_fn(|_| {
+        let rounds: Box<[_; 24]> = Box::new(array::from_fn(|_| {
             let (bool_check_proof, multi_open_proof, lin_check_proof);
 
             (bool_check_proof, multi_open_proof) =
                 self.prove_chi(layers_rev.next().unwrap(), &mut points, &claims, &mut challenger);
 
-            claims = multi_open_proof.evals.clone().0.try_into().unwrap();
+            claims = multi_open_proof.evals.0;
 
             (lin_check_proof, points) = self.prove_lin(
                 &KeccakLinear::new(),
@@ -153,17 +157,17 @@ impl HashcasterKeccak {
                 &mut challenger,
             );
 
-            claims = lin_check_proof.evals.clone().0.try_into().unwrap();
+            claims = lin_check_proof.evals.0;
 
             (bool_check_proof, multi_open_proof, lin_check_proof)
-        });
+        }));
 
         let input_open_proof = self.pcs.open(&input_packed, &committed, &points);
 
-        HashcasterKeccakProof { commitment, initial_claims, rounds, input_open_proof }
+        Box::new(HashcasterKeccakProof { commitment, initial_claims, rounds, input_open_proof })
     }
 
-    pub fn verify(&self, proof: &HashcasterKeccakProof) -> Result<(), PcsError> {
+    pub fn verify(&self, proof: &HashcasterKeccakProof<640, 5, 5>) -> Result<(), PcsError> {
         // Setup the challenger
         let mut challenger = F128Challenger::new_keccak256();
 
@@ -179,7 +183,7 @@ impl HashcasterKeccak {
         // Setup a mutable claims array
         let mut claims = proof.initial_claims;
 
-        for (bool_check_proof, multi_open_proof, lin_check_proof) in &proof.rounds {
+        for (bool_check_proof, multi_open_proof, lin_check_proof) in &*proof.rounds {
             self.verify_chi(
                 &mut points,
                 &claims,
@@ -188,7 +192,7 @@ impl HashcasterKeccak {
                 &mut challenger,
             )?;
 
-            claims = multi_open_proof.evals.clone().0.try_into().unwrap();
+            claims = multi_open_proof.evals.0;
 
             points = self.verify_lin(
                 &KeccakLinear::new(),
@@ -197,7 +201,7 @@ impl HashcasterKeccak {
                 lin_check_proof,
                 &mut challenger,
             )?;
-            claims = lin_check_proof.evals.clone().0.try_into().unwrap();
+            claims = lin_check_proof.evals.0;
         }
 
         self.pcs.verify(&proof.commitment, &proof.input_open_proof, &points, &claims)
@@ -209,7 +213,7 @@ impl HashcasterKeccak {
         points: &mut Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
-    ) -> (SumcheckProof, SumcheckProof) {
+    ) -> (SumcheckProof<640>, SumcheckProof<5>) {
         let (bool_check_proof, multi_open_proof);
 
         // Determine the number of variables in the polynomials.
@@ -242,7 +246,8 @@ impl HashcasterKeccak {
             let builder = MulticlaimBuilder::new(input, points, claims);
 
             // Perform the Multiclaim sumcheck using the helper function.
-            let (proof, new_points) = perform_sumcheck(num_vars, builder, challenger, claims);
+            let (proof, new_points) =
+                perform_sumcheck(num_vars, builder, challenger, claims.as_ref());
 
             // Update points in place with the result from Multiclaim
             *points = new_points;
@@ -264,7 +269,7 @@ impl HashcasterKeccak {
         points: &Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
-    ) -> (SumcheckProof, Points) {
+    ) -> (SumcheckProof<5>, Points) {
         // Perform the sumcheck process for LinCheck using the shared helper function.
         let lincheck_builder =
             LinCheckBuilder::new(input, points, matrix, LIN_CHECK_NUM_VARS, *claims);
@@ -282,7 +287,7 @@ impl HashcasterKeccak {
         matrix: &impl LinearOperations,
         points: &Points,
         claims: &[BinaryField128b; 5],
-        lin_check_proof: &SumcheckProof,
+        lin_check_proof: &SumcheckProof<5>,
         challenger: &mut F128Challenger,
     ) -> Result<Points, SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
@@ -360,8 +365,8 @@ impl HashcasterKeccak {
         &self,
         points: &mut Points,
         claims: &[BinaryField128b; 5],
-        bool_check_proof: &SumcheckProof,
-        multi_open_proof: &SumcheckProof,
+        bool_check_proof: &SumcheckProof<640>,
+        multi_open_proof: &SumcheckProof<5>,
         challenger: &mut F128Challenger,
     ) -> Result<(), SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
@@ -391,7 +396,7 @@ impl HashcasterKeccak {
             let frob_evals = &bool_check_proof.evals;
 
             // Clone and store the frobenius evaluations
-            let mut coord_evals = frob_evals.clone();
+            let mut coord_evals = Evaluations::new(frob_evals.to_vec());
 
             // Untwist the frobenius evaluations
             coord_evals.untwist();
@@ -415,7 +420,7 @@ impl HashcasterKeccak {
             let (claim, rs, gamma) = perform_verification(
                 challenger,
                 multi_open_proof,
-                &UnivariatePolynomial::new(bool_check_proof.evals.0.clone()),
+                &UnivariatePolynomial::new(bool_check_proof.evals.0.to_vec()),
             );
 
             // Fetch the evaluations from the proof.
@@ -435,7 +440,7 @@ impl HashcasterKeccak {
             let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
             // Validate the claim
-            (UnivariatePolynomial::new(evals.clone().0).evaluate_at(&Point(gamma128)) *
+            (UnivariatePolynomial::new(evals.0.to_vec()).evaluate_at(&Point(gamma128)) *
                 eq_evaluation ==
                 claim)
                 .then_some(rs)
@@ -445,24 +450,24 @@ impl HashcasterKeccak {
         Ok(())
     }
 
-    pub fn serialize_proof(proof: &HashcasterKeccakProof) -> Vec<u8> {
+    pub fn serialize_proof(proof: &HashcasterKeccakProof<640, 5, 5>) -> Vec<u8> {
         bincode::serialize(proof).unwrap()
     }
 
-    fn deserialize_proof(bytes: &[u8]) -> HashcasterKeccakProof {
+    fn deserialize_proof(bytes: &[u8]) -> HashcasterKeccakProof<640, 5, 5> {
         bincode::deserialize(bytes).unwrap()
     }
 }
 
 // Helper function to perform a sumcheck round.
-fn perform_sumcheck<B>(
+fn perform_sumcheck<const N: usize, B>(
     num_vars: usize,
     builder: B,
     challenger: &mut F128Challenger,
     claims: &[BinaryField128b],
-) -> (SumcheckProof, Points)
+) -> (SumcheckProof<N>, Points)
 where
-    B: SumcheckBuilder,
+    B: SumcheckBuilder<N>,
 {
     // Sample the initial folding challenge.
     let gamma = Point(challenger.sample());
@@ -504,15 +509,15 @@ where
     let evals = prover.finish().evals();
 
     // Challenger observes the extracted evaluations.
-    challenger.observe_slice(&evals);
+    challenger.observe_slice(evals.as_ref());
 
     // Return the proof and updated points (challenges).
     (SumcheckProof { round_polys, evals }, rs)
 }
 
-fn perform_verification(
+fn perform_verification<const N: usize>(
     challenger: &mut F128Challenger,
-    proof: &SumcheckProof,
+    proof: &SumcheckProof<N>,
     initial_claim_poly: &UnivariatePolynomial,
 ) -> (BinaryField128b, Points, Point) {
     // Sample a gamma
@@ -540,7 +545,7 @@ fn perform_verification(
     }
 
     // Fetch and observe the proof's evaluations
-    challenger.observe_slice(&proof.evals);
+    challenger.observe_slice(proof.evals.as_ref());
 
     (claim, rs, gamma)
 }

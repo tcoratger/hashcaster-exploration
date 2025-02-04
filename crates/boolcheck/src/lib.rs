@@ -7,7 +7,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
         compressed::CompressedPoly,
-        evaluation::Evaluations,
+        evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::{restrict, MultilinearLagrangianPolynomial},
         point::{Point, Points},
         univariate::UnivariatePolynomial,
@@ -69,11 +69,13 @@ pub struct BoolCheck<'a, const N: usize, const M: usize, const C: usize, A: Alge
     pub algebraic_operations: &'a A,
 }
 
-impl<const N: usize, const M: usize, const C: usize, A> Sumcheck for BoolCheck<'_, N, M, C, A>
+impl<const N: usize, const M: usize, const C: usize, A> Sumcheck<{ 128 * N }>
+    for BoolCheck<'_, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Send + Sync,
+    [(); 128 * N]:,
 {
-    type Output = BoolCheckOutput;
+    type Output = BoolCheckOutput<{ 128 * N }>;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
         // Compute the current round of the protocol.
@@ -364,15 +366,32 @@ where
         // Decompose the `BoolCheck` instance to extract the required fields.
         let Self { poly_coords, round_polys, .. } = self;
 
+        // // Compute the evaluations on the Frobenius subdomain.
+        // let base_index = 1 << (number_variables - C - 1);
+        // let mut frob_evals: Evaluations = (0..128 * self.polys.len())
+        //     .map(|idx| {
+        //         let poly_idx = idx / 128;
+        //         let frob_idx = idx % 128;
+        //         poly_coords[(poly_idx * 128 + frob_idx) * base_index]
+        //     })
+        //     .collect();
+
+        // // Apply the twist operation to each chunk of 128 evaluations.
+        // frob_evals.twist();
+
+        // // Return the `BoolCheckOutput`
+        // Self::Output { frob_evals, round_polys: round_polys.clone() }
+
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - C - 1);
-        let mut frob_evals: Evaluations = (0..128 * self.polys.len())
-            .map(|idx| {
-                let poly_idx = idx / 128;
-                let frob_idx = idx % 128;
-                poly_coords[(poly_idx * 128 + frob_idx) * base_index]
-            })
-            .collect();
+        let frob_evals_array = std::array::from_fn(|idx| {
+            let poly_idx = idx / 128;
+            let frob_idx = idx % 128;
+            poly_coords[(poly_idx * 128 + frob_idx) * base_index]
+        });
+
+        // Wrap it in `FixedEvaluations`
+        let mut frob_evals = FixedEvaluations::new(frob_evals_array);
 
         // Apply the twist operation to each chunk of 128 evaluations.
         frob_evals.twist();
@@ -432,18 +451,18 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct BoolCheckOutput {
+#[derive(Clone, Debug)]
+pub struct BoolCheckOutput<const N: usize> {
     /// Evaluations of the polynomials on a Frobenius subdomain.
-    pub frob_evals: Evaluations,
+    pub frob_evals: FixedEvaluations<N>,
 
     /// A vector of compressed polynomials computed during the protocol's rounds.
     pub round_polys: Vec<CompressedPoly>,
 }
 
-impl EvaluationProvider for BoolCheckOutput {
-    fn evals(&self) -> Evaluations {
-        self.frob_evals.clone()
+impl<const N: usize> EvaluationProvider<N> for BoolCheckOutput<N> {
+    fn evals(self) -> FixedEvaluations<N> {
+        self.frob_evals
     }
 }
 
@@ -666,7 +685,9 @@ mod tests {
         }
 
         // Finish the protocol and obtain the output.
-        let BoolCheckOutput { mut frob_evals, .. } = boolcheck.finish();
+        let BoolCheckOutput { frob_evals, .. } = boolcheck.finish();
+
+        let mut frob_evals = Evaluations(frob_evals.to_vec());
 
         // Untwist the Frobenius evaluations to obtain the expected claim.
         frob_evals.untwist();
@@ -790,7 +811,7 @@ mod tests {
 
         // Clone the Frobenius evaluations to untwist them (we will need the original evaluations
         // untouched for the multiclaim part of the test).
-        let mut untwisted_evals = frob_evals.clone();
+        let mut untwisted_evals = Evaluations(frob_evals.to_vec());
 
         assert_eq!(frob_evals.len(), 256, "Invalid number of Frobenius evaluations.");
 
@@ -831,14 +852,13 @@ mod tests {
 
         // Setup a multiclaim builder
         let polys_multiclaim = [p.clone(), q.clone()];
-        let f_evals = frob_evals.clone();
-        let multiclaim_builder = MulticlaimBuilder::new(&polys_multiclaim, &points, &f_evals);
+        let multiclaim_builder = MulticlaimBuilder::new(&polys_multiclaim, &points, &frob_evals);
 
         // Builder the multiclaim prover via folding
         let mut multiclaim_prover = multiclaim_builder.build(&gamma);
 
         // Compute the claim
-        let mut claim = UnivariatePolynomial::new(frob_evals.0).evaluate_at(&gamma);
+        let mut claim = FixedUnivariatePolynomial::new(frob_evals.0).evaluate_at(&gamma);
 
         // Setup an empty vector to store the challanges in the main loop
         let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars));

@@ -297,10 +297,11 @@ where
     }
 }
 
-impl<'a, const N: usize, const M: usize, const C: usize, A> SumcheckBuilder
+impl<'a, const N: usize, const M: usize, const C: usize, A> SumcheckBuilder<{ 128 * N }>
     for BoolCheckBuilder<'a, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Default + Clone + Send + Sync,
+    [(); 128 * N]:,
 {
     type Sumcheck = BoolCheck<'a, N, M, C, A>;
 

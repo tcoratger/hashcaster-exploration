@@ -2,7 +2,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
         compressed::CompressedPoly,
-        evaluation::{Evaluations, FixedEvaluations},
+        evaluation::FixedEvaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
     },
@@ -40,7 +40,7 @@ impl<const N: usize> Default for ProdCheck<N> {
     }
 }
 
-impl<const N: usize> Sumcheck for ProdCheck<N> {
+impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
     type Output = ProdCheckOutput<N>;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
@@ -262,9 +262,9 @@ pub struct ProdCheckOutput<const N: usize> {
     pub q_evaluations: FixedEvaluations<N>,
 }
 
-impl<const N: usize> EvaluationProvider for ProdCheckOutput<N> {
-    fn evals(&self) -> Evaluations {
-        self.p_evaluations.0.to_vec().into()
+impl<const N: usize> EvaluationProvider<N> for ProdCheckOutput<N> {
+    fn evals(self) -> FixedEvaluations<N> {
+        self.p_evaluations
     }
 }
 

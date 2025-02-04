@@ -9,7 +9,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
-        evaluation::FixedEvaluations,
+        evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
@@ -37,7 +37,7 @@ pub struct Keccak<const C: usize> {
     /// Optional vector of challenges for the protocol.
     challenges: Points,
     /// Optional output from the BoolCheck protocol.
-    boolcheck_output: Option<BoolCheckOutput>,
+    boolcheck_output: Option<BoolCheckOutput<{ 128 * 5 }>>,
     /// Optional output from the Multiclaim protocol.
     multiclaim_output: Option<FixedEvaluations<5>>,
     /// Linear witness for the protocol.
@@ -190,7 +190,7 @@ impl<const C: usize> Keccak<C> {
         );
 
         // Clone the Frobenius evaluations
-        let mut coord_evals = output.frob_evals.clone();
+        let mut coord_evals = Evaluations::new(output.frob_evals.to_vec());
 
         // Untwist the Frobenius evaluations
         coord_evals.untwist();
@@ -249,7 +249,7 @@ impl<const C: usize> Keccak<C> {
 
         // Initialize the claim.
         let mut claim =
-            UnivariatePolynomial::new(self.boolcheck_output.clone().unwrap().frob_evals.0)
+            FixedUnivariatePolynomial::new(self.boolcheck_output.clone().unwrap().frob_evals.0)
                 .evaluate_at(&gamma);
 
         // Reset the challenges

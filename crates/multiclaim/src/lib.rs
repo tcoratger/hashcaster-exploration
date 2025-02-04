@@ -36,7 +36,7 @@ pub struct MultiClaim<'a, const N: usize> {
     pub object: ProdCheck<1>,
 }
 
-impl<const N: usize> Sumcheck for MultiClaim<'_, N> {
+impl<const N: usize> Sumcheck<N> for MultiClaim<'_, N> {
     type Output = FixedEvaluations<N>;
 
     fn round_polynomial(&mut self) -> CompressedPoly {
@@ -131,10 +131,7 @@ impl<'a, const N: usize> MultiClaim<'a, N> {
 mod tests {
     use super::*;
     use builder::MulticlaimBuilder;
-    use hashcaster_primitives::{
-        poly::{evaluation::Evaluations, point::Point},
-        sumcheck::SumcheckBuilder,
-    };
+    use hashcaster_primitives::{poly::point::Point, sumcheck::SumcheckBuilder};
     use num_traits::MulAdd;
     use rand::rngs::OsRng;
     use std::array;
@@ -241,8 +238,9 @@ mod tests {
             (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
 
         // Evaluate the polynomial at the points on the inverse Frobenius orbit
-        let evaluations_inv_orbit: Evaluations =
-            (0..128).map(|i| poly.evaluate_at(&points_inv_orbit[i])).collect();
+        let evaluations_inv_orbit = FixedEvaluations::<128>::new(std::array::from_fn(|i| {
+            poly.evaluate_at(&points_inv_orbit[i])
+        }));
 
         // Setup a multiclaim builder
         let polys = [poly.clone()];

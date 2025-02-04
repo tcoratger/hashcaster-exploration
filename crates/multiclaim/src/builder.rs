@@ -2,7 +2,7 @@ use crate::MultiClaim;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
-        evaluation::Evaluations,
+        evaluation::FixedEvaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{Point, Points},
     },
@@ -19,16 +19,22 @@ use std::array;
 /// The builder helps manage and validate inputs like polynomials, evaluation points, and openings.
 /// It supports creating a `MultiClaim` by combining the inputs using a gamma parameter.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MulticlaimBuilder<'a, const N: usize> {
+pub struct MulticlaimBuilder<'a, const N: usize>
+where
+    [(); N * 128]:,
+{
     /// Multilinear Lagrangian polynomials for the claim.
     pub polys: &'a [MultilinearLagrangianPolynomial; N],
     /// Evaluation points for the claim, represented as a `Points` collection.
     pub points: &'a Points,
     /// Openings for the polynomials, represented as a flat vector of `BinaryField128b`.
-    pub openings: &'a Evaluations,
+    pub openings: &'a FixedEvaluations<{ N * 128 }>,
 }
 
-impl<'a, const N: usize> MulticlaimBuilder<'a, N> {
+impl<'a, const N: usize> MulticlaimBuilder<'a, N>
+where
+    [(); N * 128]:,
+{
     /// Creates a new `MulticlaimBuilder` with the provided inputs.
     ///
     /// # Parameters
@@ -42,11 +48,8 @@ impl<'a, const N: usize> MulticlaimBuilder<'a, N> {
     pub fn new(
         polys: &'a [MultilinearLagrangianPolynomial; N],
         points: &'a Points,
-        openings: &'a Evaluations,
+        openings: &'a FixedEvaluations<{ N * 128 }>,
     ) -> Self {
-        // Check that the number of openings is correct.
-        assert_eq!(openings.len(), N * 128, "Invalid number of openings");
-
         // Check that the length of each polynomial is 2^{number of points}.
         let expected_poly_len = 1 << points.len();
         assert!(
@@ -58,9 +61,10 @@ impl<'a, const N: usize> MulticlaimBuilder<'a, N> {
     }
 }
 
-impl<'a, const N: usize> SumcheckBuilder for MulticlaimBuilder<'a, N>
+impl<'a, const N: usize> SumcheckBuilder<N> for MulticlaimBuilder<'a, N>
 where
     [(); 128 * N]:,
+    [(); N * 128]:,
 {
     type Sumcheck = MultiClaim<'a, N>;
 
@@ -107,7 +111,7 @@ mod tests {
         // Create a default MulticlaimBuilder instance with N = 3.
         let polys: [_; 3] = array::from_fn(|_| MultilinearLagrangianPolynomial::default());
         let points = Points::default();
-        let openings = Default::default();
+        let openings = FixedEvaluations::new([BinaryField128b::ZERO; 3 * 128]);
         let builder: MulticlaimBuilder<'_, 3> = MulticlaimBuilder::new(&polys, &points, &openings);
 
         // Verify that the default polys array is empty.
@@ -134,7 +138,7 @@ mod tests {
         let points = Points::from(vec![Point::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
-        let openings: Evaluations = vec![BinaryField128b::from(0); 2 * 128].into();
+        let openings = FixedEvaluations::new([BinaryField128b::ZERO; 2 * 128]);
 
         // Create a new MulticlaimBuilder instance.
         let builder = MulticlaimBuilder::new(&polys, &points, &openings);
@@ -144,25 +148,6 @@ mod tests {
             builder,
             MulticlaimBuilder { polys: &polys, points: &points, openings: &openings }
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid number of openings")]
-    fn test_multiclaim_builder_new_invalid_openings() {
-        // Define valid polynomials for N = 2.
-        let polys: [MultilinearLagrangianPolynomial; 2] = [
-            vec![BinaryField128b::from(1), BinaryField128b::from(2)].into(),
-            vec![BinaryField128b::from(3), BinaryField128b::from(4)].into(),
-        ];
-
-        // Define valid points.
-        let points = Points::from(vec![Point::from(1)]);
-
-        // Define an invalid number of openings (not N * 128).
-        let openings = vec![BinaryField128b::from(0); 100];
-
-        // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(&polys, &points, &openings.into());
     }
 
     #[test]
@@ -178,10 +163,10 @@ mod tests {
         let points = Points::from(vec![Point::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
-        let openings = vec![BinaryField128b::from(0); 2 * 128];
+        let openings = FixedEvaluations::new([BinaryField128b::ZERO; 2 * 128]);
 
         // Attempt to create a new MulticlaimBuilder instance (should panic).
-        MulticlaimBuilder::new(&polys, &points, &openings.into());
+        MulticlaimBuilder::new(&polys, &points, &openings);
     }
 
     #[test]
@@ -193,7 +178,7 @@ mod tests {
         let points = Points::default();
 
         // Define valid openings for N = 1 with 128 * N elements.
-        let openings: Evaluations = vec![BinaryField128b::from(0); 128].into();
+        let openings = FixedEvaluations::new([BinaryField128b::ZERO; 128]);
 
         // Create a new MulticlaimBuilder instance.
         let builder = MulticlaimBuilder::new(&polys, &points, &openings);
@@ -223,15 +208,11 @@ mod tests {
         // Wrap the point into the Points structure
         let points = Points::from(vec![p1]);
 
-        // Define openings for N = 2 with 128 * N elements
-        let mut openings = vec![];
-        for i in 0..2 * 128 {
-            // Populate openings with incremental values
-            openings.push(BinaryField128b::from(i));
-        }
+        // Define openings as an array with 128 * 2 elements (N = 2)
+        let openings: [_; 2 * 128] = std::array::from_fn(|i| BinaryField128b::from(i as u128));
 
         // Create a new MulticlaimBuilder instance
-        let op = openings.clone().into();
+        let op = FixedEvaluations::new(openings);
         let builder = MulticlaimBuilder::new(&polys, &points, &op);
 
         // Define gamma (random point for testing)
