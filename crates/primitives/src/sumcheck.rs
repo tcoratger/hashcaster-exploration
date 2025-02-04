@@ -1,4 +1,7 @@
-use crate::poly::{compressed::CompressedPoly, evaluation::FixedEvaluations, point::Point};
+use crate::{
+    binary_field::BinaryField128b,
+    poly::{compressed::CompressedPoly, evaluation::FixedEvaluations},
+};
 
 /// A trait that abstracts the sumcheck protocol builder.
 pub trait SumcheckBuilder<const N: usize> {
@@ -6,7 +9,7 @@ pub trait SumcheckBuilder<const N: usize> {
     type Sumcheck: Sumcheck<N>;
 
     /// Builds a new sumcheck instance.
-    fn build(self, gamma: &Point) -> Self::Sumcheck;
+    fn build(self, gamma: &BinaryField128b) -> Self::Sumcheck;
 }
 
 /// A trait that abstracts the sumcheck protocol methods.
@@ -18,7 +21,7 @@ pub trait Sumcheck<const N: usize> {
     fn round_polynomial(&mut self) -> CompressedPoly;
 
     /// Updates the state of the sumcheck instance by binding a new challenge.
-    fn bind(&mut self, challenge: &Point);
+    fn bind(&mut self, challenge: &BinaryField128b);
 
     /// Returns the output of the sumcheck protocol.
     fn finish(&self) -> Self::Output;

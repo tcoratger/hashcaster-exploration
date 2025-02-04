@@ -3,8 +3,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
         univariate::FixedUnivariatePolynomial,
     },
     sumcheck::SumcheckBuilder,
@@ -75,7 +74,7 @@ impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder<N>
 {
     type Sumcheck = ProdCheck<N>;
 
-    fn build(self, gamma: &Point) -> ProdCheck<N> {
+    fn build(self, gamma: &BinaryField128b) -> ProdCheck<N> {
         // Compute chunk size based on active variables.
         // Each polynomial is divided into chunks of size `2^num_active_vars`.
         let chunk_size = 1 << self.num_active_vars;
@@ -416,7 +415,7 @@ mod tests {
             LinCheckBuilder::new(&polys, &points, &matrix, NUM_ACTIVE_VARS, initial_claims);
 
         // Build the LinCheck prover
-        let lincheck_prover = lincheck_builder.build(&Point(BinaryField128b::from(1234)));
+        let lincheck_prover = lincheck_builder.build(&BinaryField128b::from(1234));
 
         // Expected ProdCheck prover
         let expected_prover = ProdCheck {

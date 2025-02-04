@@ -247,10 +247,7 @@ mod tests {
     use super::*;
     use hashcaster_lincheck::{builder::LinCheckBuilder, prodcheck::ProdCheckOutput};
     use hashcaster_primitives::{
-        poly::{
-            point::{Point, Points},
-            univariate::FixedUnivariatePolynomial,
-        },
+        poly::{point::Points, univariate::FixedUnivariatePolynomial},
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
     use num_traits::MulAdd;
@@ -395,7 +392,7 @@ mod tests {
             LinCheckBuilder::new(&polys, &points, &keccak_linear, NUM_ACTIVE_VARS, initial_claims);
 
         // Setup a random gamma for folding
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Build the prover
         let mut prover = prover_builder.build(&gamma);
@@ -412,12 +409,11 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Update the claim
-            claim = round_poly[0] +
-                round_poly[1] * *challenge +
-                round_poly[2] * *challenge * *challenge;
+            claim =
+                round_poly[0] + round_poly[1] * challenge + round_poly[2] * challenge * challenge;
 
             // Bind the challenge
             prover.bind(&challenge);
@@ -440,7 +436,7 @@ mod tests {
         assert_eq!(claim, expected_claim);
 
         // Extend the challenges with points beyond the active variables
-        challenges.extend(points[NUM_ACTIVE_VARS..].iter().cloned());
+        challenges.extend(points[NUM_ACTIVE_VARS..].iter().copied());
 
         for i in 0..5 {
             assert_eq!(p_evaluations[i], polys[i].evaluate_at(&challenges));

@@ -22,7 +22,7 @@ use hashcaster_primitives::{
     poly::{
         evaluation::Evaluations,
         multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        point::Points,
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
     },
     sumcheck::{EvaluationProvider, Sumcheck, SumcheckBuilder},
@@ -315,7 +315,7 @@ impl HashcasterKeccak {
                 // Store the current value of the multiplier.
                 let current_mult = *mult;
                 // Update the multiplier by multiplying it with gamma for the next iteration.
-                *mult *= *gamma;
+                *mult *= gamma;
                 // Map over the equality polynomials, scaling each one by the current multiplier.
                 Some(eq_active_vars.iter().map(move |x| *x * current_mult))
             })
@@ -410,7 +410,7 @@ impl HashcasterKeccak {
             let folded_claimed_evaluations = claimed_evaluations.evaluate_at(&gamma);
 
             // Validate the final claim
-            (folded_claimed_evaluations * *(points.eq_eval(&rs)) == claim)
+            (folded_claimed_evaluations * (points.eq_eval(&rs)) == claim)
                 .then_some(rs)
                 .ok_or_else(|| SumcheckError::UnmatchedSubclaim("BoolCheck".to_string()))?
         };
@@ -430,18 +430,17 @@ impl HashcasterKeccak {
             let points_inv_orbit = points.to_points_inv_orbit();
 
             // Compute gamma^128 for evaluation.
-            let gamma128 = gamma.0.pow(128);
+            let gamma128 = gamma.pow(128);
 
             // Compute the equality evaluations at the challenges
             let eq_evaluations: UnivariatePolynomial =
-                points_inv_orbit.iter().map(|pts| pts.eq_eval(&rs).0).collect();
+                points_inv_orbit.iter().map(|pts| pts.eq_eval(&rs)).collect();
 
             // Compute the equality evaluation at gamma
             let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
             // Validate the claim
-            (UnivariatePolynomial::new(evals.0.to_vec()).evaluate_at(&Point(gamma128)) *
-                eq_evaluation ==
+            (UnivariatePolynomial::new(evals.0.to_vec()).evaluate_at(&gamma128) * eq_evaluation ==
                 claim)
                 .then_some(rs)
                 .ok_or_else(|| SumcheckError::UnmatchedSubclaim("MulticlaimCheck".to_string()))?
@@ -470,7 +469,7 @@ where
     B: SumcheckBuilder<N>,
 {
     // Sample the initial folding challenge.
-    let gamma = Point(challenger.sample());
+    let gamma = challenger.sample();
 
     // Build the prover for the sumcheck protocol.
     let mut prover = builder.build(&gamma);
@@ -490,7 +489,7 @@ where
         challenger.observe_slice(&round_poly.0);
 
         // Challenger samples a new random challenge for this round.
-        let r = Point(challenger.sample());
+        let r = challenger.sample();
 
         // Update the claim by evaluating the round polynomial at the sampled challenge.
         claim = round_poly.coeffs(claim).evaluate_at(&r);
@@ -519,9 +518,9 @@ fn perform_verification<const N: usize>(
     challenger: &mut F128Challenger,
     proof: &SumcheckProof<N>,
     initial_claim_poly: &UnivariatePolynomial,
-) -> (BinaryField128b, Points, Point) {
+) -> (BinaryField128b, Points, BinaryField128b) {
     // Sample a gamma
-    let gamma = Point(challenger.sample());
+    let gamma = challenger.sample();
 
     // Evaluate the initial claim at gamma
     let mut claim = initial_claim_poly.evaluate_at(&gamma);
@@ -535,7 +534,7 @@ fn perform_verification<const N: usize>(
         challenger.observe_slice(&round_poly.0);
 
         // Challenger samples a new challenge for this round
-        let r = Point(challenger.sample());
+        let r = challenger.sample();
 
         // Update the claim by evaluating the round polynomial at the sampled challenge
         claim = round_poly.coeffs(claim).evaluate_at(&r);

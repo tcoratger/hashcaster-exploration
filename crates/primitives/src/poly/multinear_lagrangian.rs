@@ -536,9 +536,9 @@ mod tests {
                 let mut term = result[i];
                 for (bit, point) in binary_combination.iter().zip(&points.0) {
                     term *= if *bit {
-                        **point // Include the point if the bit is 1.
+                        *point // Include the point if the bit is 1.
                     } else {
-                        BinaryField128b::ONE - **point // Complement if the bit is 0.
+                        BinaryField128b::ONE - *point // Complement if the bit is 0.
                     };
                 }
                 expected_eq_poly += term;
@@ -577,10 +577,10 @@ mod tests {
         //        + p(1, 0) * pt1 * (1 - pt0)
         //        + p(1, 1) * pt1 * pt0
         let expected_result =
-            coeff0 * (BinaryField128b::ONE - *points[0]) * (BinaryField128b::ONE - *points[1]) +
-                coeff2 * (BinaryField128b::ONE - *points[0]) * *points[1] +
-                coeff1 * *points[0] * (BinaryField128b::ONE - *points[1]) +
-                coeff3 * *points[0] * *points[1];
+            coeff0 * (BinaryField128b::ONE - points[0]) * (BinaryField128b::ONE - points[1]) +
+                coeff2 * (BinaryField128b::ONE - points[0]) * points[1] +
+                coeff1 * points[0] * (BinaryField128b::ONE - points[1]) +
+                coeff3 * points[0] * points[1];
 
         // Assert the result matches the expectation.
         assert_eq!(result, expected_result);

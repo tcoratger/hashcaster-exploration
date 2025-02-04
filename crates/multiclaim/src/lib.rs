@@ -7,10 +7,8 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     matrix_efficient::EfficientMatrix,
     poly::{
-        compressed::CompressedPoly,
-        evaluation::FixedEvaluations,
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        compressed::CompressedPoly, evaluation::FixedEvaluations,
+        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
         univariate::FixedUnivariatePolynomial,
     },
     sumcheck::Sumcheck,
@@ -30,7 +28,7 @@ pub struct MultiClaim<'a, const N: usize> {
     pub polys: &'a [MultilinearLagrangianPolynomial; N],
 
     /// The gamma value used for Frobenius transformations.
-    pub gamma: Point,
+    pub gamma: BinaryField128b,
 
     /// The underlying product check object that manages the folding and evaluations.
     pub object: ProdCheck<1>,
@@ -43,7 +41,7 @@ impl<const N: usize> Sumcheck<N> for MultiClaim<'_, N> {
         self.object.round_polynomial()
     }
 
-    fn bind(&mut self, challenge: &Point) {
+    fn bind(&mut self, challenge: &BinaryField128b) {
         self.object.bind(challenge);
     }
 
@@ -122,7 +120,7 @@ impl<'a, const N: usize> MultiClaim<'a, N> {
         Self {
             object: ProdCheck::new([poly], [eq], claim, false),
             polys,
-            gamma: gamma_pows.get(128).map_or_else(Default::default, |g| (*g).into()),
+            gamma: gamma_pows.get(128).map_or_else(Default::default, |g| (*g)),
         }
     }
 }
@@ -131,7 +129,7 @@ impl<'a, const N: usize> MultiClaim<'a, N> {
 mod tests {
     use super::*;
     use builder::MulticlaimBuilder;
-    use hashcaster_primitives::{poly::point::Point, sumcheck::SumcheckBuilder};
+    use hashcaster_primitives::sumcheck::SumcheckBuilder;
     use num_traits::MulAdd;
     use rand::rngs::OsRng;
     use std::array;
@@ -144,7 +142,7 @@ mod tests {
         };
 
         // Create points for evaluation
-        let points = Points::from(vec![Point::default()]);
+        let points = Points::from(vec![BinaryField128b::default()]);
 
         // Create openings (all zeros)
         let openings = vec![BinaryField128b::ZERO; 128];
@@ -166,7 +164,7 @@ mod tests {
         assert_eq!(claim.polys, &polys, "Polynomials should match the input polys.");
         assert_eq!(
             claim.gamma,
-            Point(BinaryField128b::from(0)),
+            BinaryField128b::from(0),
             "Gamma should match the precomputed value of gamma^128."
         );
         assert_eq!(
@@ -184,7 +182,7 @@ mod tests {
         };
 
         // Create points for evaluation
-        let points = Points::from(vec![Point::default()]);
+        let points = Points::from(vec![BinaryField128b::default()]);
 
         // Create openings with some non-zero values
         let openings = vec![BinaryField128b::from(5); 128];
@@ -211,7 +209,7 @@ mod tests {
         assert_eq!(claim.polys, &polys, "Polynomials should match the input polys.");
         assert_eq!(
             claim.gamma,
-            Point(BinaryField128b::from(128)),
+            BinaryField128b::from(128),
             "Gamma should match the precomputed value of gamma^128."
         );
         assert_eq!(
@@ -247,7 +245,7 @@ mod tests {
         let prover_builder = MulticlaimBuilder::new(&polys, &points, &evaluations_inv_orbit);
 
         // Generate a random gamma for folding
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Builder the prover via folding
         let mut prover = prover_builder.build(&gamma);
@@ -262,7 +260,7 @@ mod tests {
             .fold(BinaryField128b::ZERO, |acc, (x, y)| x.mul_add(*y, acc));
 
         // Setup an empty vector to store the challanges in the main loop
-        let mut challenges = Points::from(Vec::<Point>::with_capacity(NUM_VARS));
+        let mut challenges = Points::from(Vec::<BinaryField128b>::with_capacity(NUM_VARS));
 
         // Principal loop of the prover
         for _ in 0..NUM_VARS {
@@ -273,13 +271,13 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial.evaluate_at(&challenge);
 
             // Push the challenge to the vector
-            challenges.push(challenge.clone());
+            challenges.push(challenge);
 
             // Bind the prover to the challenge
             prover.bind(&challenge);
@@ -290,7 +288,7 @@ mod tests {
             .iter()
             .zip(points_inv_orbit.iter())
             .fold(BinaryField128b::ZERO, |acc, (gamma, pts)| {
-                gamma.mul_add(*pts.eq_eval(&challenges), acc)
+                gamma.mul_add(pts.eq_eval(&challenges), acc)
             });
 
         // Verify the final claim

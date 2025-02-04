@@ -1,10 +1,8 @@
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
-        compressed::CompressedPoly,
-        evaluation::FixedEvaluations,
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        compressed::CompressedPoly, evaluation::FixedEvaluations,
+        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
     },
     sumcheck::{EvaluationProvider, Sumcheck},
 };
@@ -119,7 +117,7 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
         compressed_poly
     }
 
-    fn bind(&mut self, r: &Point) {
+    fn bind(&mut self, r: &BinaryField128b) {
         // Validate that the protocol is not complete.
         // Get the length of the first polynomial.
         let p0_len = self.p_polys[0].len();
@@ -135,7 +133,7 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
         self.claim = round_poly.evaluate_at(r);
 
         // Add the new challenge to the list of challenges.
-        self.challenges.push(r.clone());
+        self.challenges.push(*r);
 
         // Prepare new (halved) polynomials for `P` and `Q`.
         let mut p_new: [MultilinearLagrangianPolynomial; N] =
@@ -155,8 +153,8 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
                 .into_par_iter()
                 .map(|j| {
                     (
-                        p[2 * j] + (p[2 * j + 1] + p[2 * j]) * **r,
-                        q[2 * j] + (q[2 * j + 1] + q[2 * j]) * **r,
+                        p[2 * j] + (p[2 * j + 1] + p[2 * j]) * r,
+                        q[2 * j] + (q[2 * j + 1] + q[2 * j]) * r,
                     )
                 })
                 .unzip();
@@ -271,7 +269,6 @@ impl<const N: usize> EvaluationProvider<N> for ProdCheckOutput<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_primitives::poly::point::Point;
     use rand::rngs::OsRng;
     use std::array;
 
@@ -578,7 +575,7 @@ mod tests {
 
         // Perform binding with a valid challenge.
         let challenge = BinaryField128b::from(3);
-        prodcheck.bind(&Point(challenge));
+        prodcheck.bind(&challenge);
 
         // Manually compute the expected compressed polynomial.
         // - `pq_zero` is the sum of products of lower halves for all polynomials.
@@ -625,7 +622,7 @@ mod tests {
         assert_eq!(prodcheck.q_polys[0].len(), 2);
 
         // Assert that the challenge is added to the list of challenges.
-        assert_eq!(prodcheck.challenges, Points::from(vec![Point::from(challenge)]));
+        assert_eq!(prodcheck.challenges, Points::from(vec![challenge]));
 
         // Assert the cached round message is cleared.
         assert!(prodcheck.cached_round_msg.is_none());
@@ -650,7 +647,7 @@ mod tests {
 
         // Attempt to bind with a new challenge (should panic).
         let challenge = BinaryField128b::from(3);
-        prodcheck.bind(&Point(challenge));
+        prodcheck.bind(&challenge);
     }
 
     #[test]
@@ -756,7 +753,7 @@ mod tests {
             let compressed_round_polynomial = prodcheck.round_polynomial();
 
             // Generate a random challenge `r` for the current round.
-            let r = Point::random(rng);
+            let r = BinaryField128b::random(rng);
 
             // Decompress the round polynomial to obtain its coefficients.
             // The round polynomial is represented as a univariate polynomial in `r`.
@@ -768,7 +765,7 @@ mod tests {
             // current_claim = c_0 + r * c_1 + r ^ 2 * c_2
             // ```
             current_claim =
-                round_polynomial[0] + *r * round_polynomial[1] + *r * *r * round_polynomial[2];
+                round_polynomial[0] + r * round_polynomial[1] + r * r * round_polynomial[2];
 
             // Bind the challenge `r` to the `ProdCheck` instance, updating its state.
             prodcheck.bind(&r);

@@ -174,10 +174,8 @@ mod tests {
     use hashcaster_boolcheck::{builder::BoolCheckBuilder, BoolCheckOutput};
     use hashcaster_primitives::{
         poly::{
-            evaluation::Evaluations,
-            multinear_lagrangian::MultilinearLagrangianPolynomial,
-            point::{Point, Points},
-            univariate::FixedUnivariatePolynomial,
+            evaluation::Evaluations, multinear_lagrangian::MultilinearLagrangianPolynomial,
+            point::Points, univariate::FixedUnivariatePolynomial,
         },
         sumcheck::{Sumcheck, SumcheckBuilder},
     };
@@ -270,7 +268,7 @@ mod tests {
         let chi = ChiPackage;
 
         // Generate a random gamma for folding
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         let start = std::time::Instant::now();
 
@@ -294,7 +292,7 @@ mod tests {
             let round_poly = prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");
@@ -360,7 +358,7 @@ mod tests {
 
         // Validate the final claim
         assert_eq!(
-            folded_claimed_evaluations * *(points.eq_eval(&challenges)),
+            folded_claimed_evaluations * (points.eq_eval(&challenges)),
             claim,
             "Final claim mismatch"
         );

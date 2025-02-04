@@ -1,4 +1,4 @@
-use crate::{binary_field::BinaryField128b, poly::point::Point};
+use crate::binary_field::BinaryField128b;
 use num_traits::MulAddAssign;
 use std::ops::{Deref, DerefMut, Mul, MulAssign};
 
@@ -49,11 +49,11 @@ impl UnivariatePolynomial {
     /// # Methodology
     /// This method employs Horner's method for efficient polynomial evaluation:
     /// `P(x) = (((a_n \cdot x + a_{n-1}) \cdot x + a_{n-2}) \cdot x + ... + a_0)`
-    pub fn evaluate_at(&self, at: &Point) -> BinaryField128b {
+    pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
         // Start with an accumulator initialized to zero.
         self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
             // Multiply the accumulator by `at` and add the current coefficient.
-            acc.mul_add_assign(**at, coeff);
+            acc.mul_add_assign(at, coeff);
             // Return the updated accumulator for the next iteration.
             acc
         })
@@ -152,34 +152,34 @@ impl UnivariatePolynomial {
     }
 }
 
-impl Mul<Point> for UnivariatePolynomial {
+impl Mul<BinaryField128b> for UnivariatePolynomial {
     type Output = Self;
 
-    fn mul(self, point: Point) -> Self::Output {
-        self.iter().map(|&c| c * *point).collect()
+    fn mul(self, point: BinaryField128b) -> Self::Output {
+        self.iter().map(|&c| c * point).collect()
     }
 }
 
-impl Mul<&Point> for UnivariatePolynomial {
+impl Mul<&BinaryField128b> for UnivariatePolynomial {
     type Output = Self;
 
-    fn mul(self, point: &Point) -> Self::Output {
-        self.iter().map(|&c| c * **point).collect()
+    fn mul(self, point: &BinaryField128b) -> Self::Output {
+        self.iter().map(|&c| c * point).collect()
     }
 }
 
-impl MulAssign<Point> for UnivariatePolynomial {
-    fn mul_assign(&mut self, point: Point) {
+impl MulAssign<BinaryField128b> for UnivariatePolynomial {
+    fn mul_assign(&mut self, point: BinaryField128b) {
         for c in self.iter_mut() {
-            *c *= *point;
+            *c *= point;
         }
     }
 }
 
-impl MulAssign<&Point> for UnivariatePolynomial {
-    fn mul_assign(&mut self, point: &Point) {
+impl MulAssign<&BinaryField128b> for UnivariatePolynomial {
+    fn mul_assign(&mut self, point: &BinaryField128b) {
         for c in self.iter_mut() {
-            *c *= **point;
+            *c *= point;
         }
     }
 }
@@ -250,9 +250,9 @@ impl<const N: usize> FixedUnivariatePolynomial<N> {
     /// # Methodology
     /// This method employs Horner's method for efficient polynomial evaluation:
     /// `P(x) = (((a_n * x + a_{n-1}) * x + a_{n-2}) * x + ... + a_0)`
-    pub fn evaluate_at(&self, at: &Point) -> BinaryField128b {
+    pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
         self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
-            acc.mul_add_assign(**at, coeff);
+            acc.mul_add_assign(at, coeff);
             acc
         })
     }
@@ -275,7 +275,7 @@ mod tests {
         let poly = UnivariatePolynomial::new(coeffs);
 
         // Define the point to evaluate the polynomial at
-        let x = Point(BinaryField128b::from(2));
+        let x = BinaryField128b::from(2);
 
         // Manually compute the expected value
         // P(2) = 3 + 2 * 2 + 1 * (2^2)
@@ -316,8 +316,8 @@ mod tests {
         assert_eq!(poly.coeffs, expected_coeffs, "Incorrect polynomial coefficients.");
 
         // Verify evaluation of the polynomial matches the input evaluations.
-        let at_0 = Point(BinaryField128b::ZERO);
-        let at_1 = Point(BinaryField128b::ONE);
+        let at_0 = BinaryField128b::ZERO;
+        let at_1 = BinaryField128b::ONE;
         assert_eq!(poly.evaluate_at(&at_0), evals[0], "Evaluation at t = 0 failed.");
         assert_eq!(poly.evaluate_at(&at_1), evals[1], "Evaluation at t = 1 failed.");
     }
@@ -333,7 +333,7 @@ mod tests {
         let poly = UnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point
-        let point = Point::from(BinaryField128b::from(2));
+        let point = BinaryField128b::from(2);
 
         // Multiply the polynomial by the point
         let result_poly = poly * point;
@@ -360,10 +360,10 @@ mod tests {
         let poly = UnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point as a reference
-        let point = Point::from(BinaryField128b::from(3));
+        let point = BinaryField128b::from(3);
 
         // Multiply the polynomial by a reference to the point
-        let result_poly = poly * &point;
+        let result_poly = poly * point;
 
         // Expected coefficients after multiplication
         let expected_coeffs = vec![
@@ -390,7 +390,7 @@ mod tests {
         let mut poly = UnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point
-        let point = Point::from(BinaryField128b::from(4));
+        let point = BinaryField128b::from(4);
 
         // Multiply the polynomial by the point in place
         poly *= point;
@@ -417,7 +417,7 @@ mod tests {
         let mut poly = UnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point as a reference
-        let point = Point::from(BinaryField128b::from(5));
+        let point = BinaryField128b::from(5);
 
         // Multiply the polynomial by a reference to the point in place
         poly *= &point;

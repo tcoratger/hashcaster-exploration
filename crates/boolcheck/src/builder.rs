@@ -3,8 +3,7 @@ use bytemuck::zeroed_vec;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        multinear_lagrangian::MultilinearLagrangianPolynomial, point::Points,
         univariate::UnivariatePolynomial,
     },
     sumcheck::SumcheckBuilder,
@@ -305,7 +304,7 @@ where
 {
     type Sumcheck = BoolCheck<'a, N, M, C, A>;
 
-    fn build(mut self, gamma: &Point) -> Self::Sumcheck {
+    fn build(mut self, gamma: &BinaryField128b) -> Self::Sumcheck {
         // Compute the folding challenges using the provided gamma.
         self.gammas = BinaryField128b::compute_gammas_folding(gamma);
 

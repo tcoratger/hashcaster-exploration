@@ -12,47 +12,6 @@ use rayon::{
 };
 use std::ops::{Deref, DerefMut};
 
-/// A point represented as a field element in a binary field.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Point(pub BinaryField128b);
-
-impl Point {
-    /// Generates a random [`Point`] element.
-    ///
-    /// # Returns
-    /// - A random `Point` instance, with the internal `u128` value generated uniformly across the
-    ///   entire range of 128 bits.
-    pub fn random<RNG: Rng>(rng: &mut RNG) -> Self {
-        Self(BinaryField128b::random(rng))
-    }
-}
-
-impl From<u128> for Point {
-    fn from(val: u128) -> Self {
-        Self(BinaryField128b::new(val))
-    }
-}
-
-impl From<BinaryField128b> for Point {
-    fn from(field_element: BinaryField128b) -> Self {
-        Self(field_element)
-    }
-}
-
-impl Deref for Point {
-    type Target = BinaryField128b;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Point {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 /// A collection of points represented as field elements in a binary field.
 ///
 /// # Description
@@ -75,7 +34,7 @@ impl DerefMut for Point {
 /// - Performing operations on points, such as equality polynomial evaluations.
 /// - Interfacing with mathematical constructs that require points.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Points(pub Vec<Point>);
+pub struct Points(pub Vec<BinaryField128b>);
 
 impl Points {
     /// Generates a random collection of `n` points.
@@ -156,7 +115,7 @@ impl Points {
             left.par_iter_mut().zip(right.par_iter_mut()).for_each(|(left_val, right_val)| {
                 // Compute the new coefficient in `right` as the product of `left_val` and the
                 // current point.
-                *right_val = *left_val * **point;
+                *right_val = *left_val * point;
                 // Update the existing coefficient in `left` by adding the computed `right_val`.
                 *left_val += *right_val;
             });
@@ -209,7 +168,7 @@ impl Points {
             new_coeffs.par_chunks_exact_mut(2).zip(previous.par_iter()).for_each(
                 |(chunk, &prev_coeff)| {
                     // Calculate the updated coefficients.
-                    let multiplied = **multiplier * prev_coeff;
+                    let multiplied = *multiplier * prev_coeff;
                     // Update the first coefficient.
                     chunk[0] = prev_coeff + multiplied;
                     // Update the second coefficient.
@@ -259,11 +218,10 @@ impl Points {
     ///   panic.
     /// - The operation is defined for binary field elements and assumes valid binary field
     ///   arithmetic.
-    pub fn eq_eval(&self, other: &Self) -> Point {
+    pub fn eq_eval(&self, other: &Self) -> BinaryField128b {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + **x + **y))
-            .into()
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + *x + *y))
     }
 
     /// Computes the evaluation of the equality polynomial for a set of points and a slice of
@@ -292,11 +250,10 @@ impl Points {
     ///
     /// # Panics
     /// - Panics if the length of `other` exceeds the length of `self`.
-    pub fn eq_eval_slice(&self, other: &[Point]) -> Point {
+    pub fn eq_eval_slice(&self, other: &[BinaryField128b]) -> BinaryField128b {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + **x + **y))
-            .into()
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + *x + *y))
     }
 
     /// Computes the inverse orbit of points by iteratively squaring their values
@@ -319,7 +276,7 @@ impl Points {
         // Perform 128 iterations of squaring and store the results.
         for _ in 0..128 {
             // Square each challenge point.
-            tmp.iter_mut().for_each(|x| **x = **x * **x);
+            tmp.iter_mut().for_each(|x| *x = *x * *x);
             // Store the current state of the challenges.
             points_inv_orbit.push(tmp.clone());
         }
@@ -344,24 +301,18 @@ impl Points {
 
 impl From<Vec<BinaryField128b>> for Points {
     fn from(points: Vec<BinaryField128b>) -> Self {
-        Self(points.into_iter().map(Point).collect())
-    }
-}
-
-impl From<Vec<Point>> for Points {
-    fn from(points: Vec<Point>) -> Self {
         Self(points)
     }
 }
 
-impl From<&[Point]> for Points {
-    fn from(points: &[Point]) -> Self {
+impl From<&[BinaryField128b]> for Points {
+    fn from(points: &[BinaryField128b]) -> Self {
         Self(points.to_vec())
     }
 }
 
 impl Deref for Points {
-    type Target = Vec<Point>;
+    type Target = Vec<BinaryField128b>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -374,15 +325,9 @@ impl DerefMut for Points {
     }
 }
 
-impl FromIterator<Point> for Points {
-    fn from_iter<T: IntoIterator<Item = Point>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
 impl FromIterator<BinaryField128b> for Points {
     fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
-        Self(iter.into_iter().map(Point::from).collect())
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -418,7 +363,7 @@ mod tests {
             (BinaryField128b::ONE + BinaryField128b::from(3) + BinaryField128b::from(6));
 
         // Assert that the computed result matches the expected result.
-        assert_eq!(result, Point::from(expected));
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -436,7 +381,7 @@ mod tests {
         // Assert that the result is consistent with identical inputs.
         //
         // The expected output is One since the operation is commutative and associative.
-        assert_eq!(result, Point::from(BinaryField128b::ONE));
+        assert_eq!(result, BinaryField128b::ONE);
     }
 
     #[test]
@@ -449,7 +394,7 @@ mod tests {
         let result = points_a.eq_eval(&points_b);
 
         // The expected result for empty inputs is BinaryField128b::ONE.
-        assert_eq!(result, Point::from(BinaryField128b::ONE));
+        assert_eq!(result, BinaryField128b::ONE);
     }
 
     #[test]
@@ -461,11 +406,8 @@ mod tests {
             BinaryField128b::from(3),
         ]);
 
-        let points_b = vec![
-            Point::from(BinaryField128b::from(4)),
-            Point::from(BinaryField128b::from(5)),
-            Point::from(BinaryField128b::from(6)),
-        ];
+        let points_b =
+            vec![BinaryField128b::from(4), BinaryField128b::from(5), BinaryField128b::from(6)];
 
         // Perform the eq_eval_slice operation.
         let result = points_a.eq_eval_slice(&points_b);
@@ -477,7 +419,7 @@ mod tests {
             (BinaryField128b::ONE + BinaryField128b::from(3) + BinaryField128b::from(6));
 
         // Assert that the computed result matches the expected result.
-        assert_eq!(result, Point::from(expected));
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -487,10 +429,10 @@ mod tests {
 
         // Define a smaller slice of points.
         let points_b = [
-            Point::from(BinaryField128b::from(3)),
-            Point::from(BinaryField128b::from(4)),
-            Point::from(BinaryField128b::from(5)),
-            Point::from(BinaryField128b::from(6)),
+            BinaryField128b::from(3),
+            BinaryField128b::from(4),
+            BinaryField128b::from(5),
+            BinaryField128b::from(6),
         ];
 
         // Perform the eq_eval_slice operation.
@@ -502,7 +444,7 @@ mod tests {
             (BinaryField128b::ONE + BinaryField128b::from(2) + BinaryField128b::from(4));
 
         // Assert that the computed result matches the expected result.
-        assert_eq!(result, Point::from(expected));
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -511,14 +453,13 @@ mod tests {
         let points_a = Points::from(vec![BinaryField128b::from(7), BinaryField128b::from(8)]);
 
         // Define an identical slice of points.
-        let points_b =
-            vec![Point::from(BinaryField128b::from(7)), Point::from(BinaryField128b::from(8))];
+        let points_b = vec![BinaryField128b::from(7), BinaryField128b::from(8)];
 
         // Perform the eq_eval_slice operation.
         let result = points_a.eq_eval_slice(&points_b);
 
         // Assert that the result is consistent with identical inputs.
-        assert_eq!(result, Point::from(BinaryField128b::ONE));
+        assert_eq!(result, BinaryField128b::ONE);
     }
 
     #[test]
@@ -527,17 +468,14 @@ mod tests {
         let points_a = Points::default();
 
         // Define an empty slice of points.
-        let points_b: Vec<Point> = vec![
-            Point(BinaryField128b::from(1)),
-            Point(BinaryField128b::from(2)),
-            Point(BinaryField128b::from(3)),
-        ];
+        let points_b: Vec<_> =
+            vec![BinaryField128b::from(1), BinaryField128b::from(2), BinaryField128b::from(3)];
 
         // Perform the eq_eval_slice operation.
         let result = points_a.eq_eval_slice(&points_b[..0]);
 
         // The expected result for an empty slice is BinaryField128b::ONE.
-        assert_eq!(result, Point::from(BinaryField128b::ONE));
+        assert_eq!(result, BinaryField128b::ONE);
     }
 
     #[test]
@@ -547,11 +485,8 @@ mod tests {
         let points_a = Points::from(vec![BinaryField128b::from(1), BinaryField128b::from(2)]);
 
         // Define a longer slice of points.
-        let points_b = vec![
-            Point::from(BinaryField128b::from(3)),
-            Point::from(BinaryField128b::from(4)),
-            Point::from(BinaryField128b::from(5)),
-        ];
+        let points_b =
+            vec![BinaryField128b::from(3), BinaryField128b::from(4), BinaryField128b::from(5)];
 
         // Attempt to perform the eq_eval_slice operation (should panic).
         points_a.eq_eval_slice(&points_b);
@@ -586,7 +521,7 @@ mod tests {
     #[test]
     fn test_to_points_inv_orbit_ones() {
         // Generate a random set of 5 points.
-        let initial_points = Points(vec![Point(BinaryField128b::ONE); 5]);
+        let initial_points = Points(vec![BinaryField128b::ONE; 5]);
 
         // Compute the inverse orbit.
         let points_inv_orbit = initial_points.to_points_inv_orbit();
@@ -599,7 +534,7 @@ mod tests {
             for j in 0..5 {
                 assert_eq!(
                     point_inv_orbit[j],
-                    Point(BinaryField128b::ONE),
+                    BinaryField128b::ONE,
                     "The inverse orbit should contain all ones."
                 );
             }
@@ -614,7 +549,7 @@ mod tests {
 
         // Create the initial `Points` instance containing the two points.
         // This represents the starting state of the inverse orbit computation.
-        let initial_points = Points(vec![Point(pt1), Point(pt2)]);
+        let initial_points = Points(vec![pt1, pt2]);
 
         // Call the `to_points_inv_orbit` function to compute the inverse orbit.
         let points_inv_orbit = initial_points.to_points_inv_orbit();
@@ -629,7 +564,7 @@ mod tests {
             pt2 *= pt2;
 
             // Store the current state of the points in the expected results vector.
-            expected_points.push(Points(vec![Point(pt1), Point(pt2)]));
+            expected_points.push(Points(vec![pt1, pt2]));
         }
 
         // Reverse the order of the expected points to match the behavior of the function.
@@ -646,9 +581,9 @@ mod tests {
     fn test_as_binary_field_slice_basic() {
         // Create a `Points` instance with three points.
         let points = Points(vec![
-            Point(BinaryField128b::from(1)),
-            Point(BinaryField128b::from(2)),
-            Point(BinaryField128b::from(3)),
+            BinaryField128b::from(1),
+            BinaryField128b::from(2),
+            BinaryField128b::from(3),
         ]);
 
         // Get the slice of `BinaryField128b` values.
@@ -680,9 +615,9 @@ mod tests {
     fn test_as_binary_field_slice_mutation_safe() {
         // Create a `Points` instance with predefined values.
         let mut points = Points(vec![
-            Point(BinaryField128b::from(4)),
-            Point(BinaryField128b::from(5)),
-            Point(BinaryField128b::from(6)),
+            BinaryField128b::from(4),
+            BinaryField128b::from(5),
+            BinaryField128b::from(6),
         ]);
 
         // Get the slice of `BinaryField128b` values.
@@ -695,7 +630,7 @@ mod tests {
         );
 
         // Mutate the original `Points`.
-        points[0] = Point(BinaryField128b::from(7));
+        points[0] = BinaryField128b::from(7);
 
         // Verify that the slice reflects the updated value.
         let updated_slice = points.as_binary_field_slice();
@@ -708,7 +643,7 @@ mod tests {
     #[test]
     fn test_as_binary_field_slice_large_input() {
         // Create a `Points` instance with a large number of values.
-        let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).map(Point).collect();
+        let large_points: Vec<_> = (0..1000).map(BinaryField128b::from).collect();
         let points = Points(large_points);
 
         // Get the slice of `BinaryField128b` values.

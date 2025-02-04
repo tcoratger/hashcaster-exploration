@@ -11,7 +11,7 @@ use hashcaster_primitives::{
     poly::{
         evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        point::Points,
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
     },
     sumcheck::{Sumcheck, SumcheckBuilder},
@@ -106,7 +106,7 @@ impl<const C: usize> Keccak<C> {
         let start = Instant::now();
 
         // Generate a random gamma value for folding.
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Initialize the BoolCheck prover builder.
         let boolcheck_builder = BoolCheckBuilder::<_, _, C, _>::new(
@@ -151,7 +151,7 @@ impl<const C: usize> Keccak<C> {
             let round_poly = boolcheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 4, "Round polynomial length mismatch");
@@ -205,7 +205,7 @@ impl<const C: usize> Keccak<C> {
 
         // Validate the final claim
         assert_eq!(
-            folded_claimed_evaluations * *(self.points.eq_eval(&self.challenges)),
+            folded_claimed_evaluations * (self.points.eq_eval(&self.challenges)),
             claim,
             "Final claim mismatch"
         );
@@ -229,10 +229,10 @@ impl<const C: usize> Keccak<C> {
         let start = Instant::now();
 
         // Generate a random gamma for folding.
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Compute gamma^128 for evaluation.
-        let gamma128 = gamma.0.pow(128);
+        let gamma128 = gamma.pow(128);
 
         // Initialize the inverse orbit points
         let points_inv_orbit = self.challenges.to_points_inv_orbit();
@@ -261,7 +261,7 @@ impl<const C: usize> Keccak<C> {
             let round_poly = multiclaim_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge.
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");
@@ -281,14 +281,14 @@ impl<const C: usize> Keccak<C> {
 
         // Compute the equality evaluations at the challenges
         let eq_evaluations: UnivariatePolynomial =
-            points_inv_orbit.iter().map(|pts| pts.eq_eval(&self.challenges).0).collect();
+            points_inv_orbit.iter().map(|pts| pts.eq_eval(&self.challenges)).collect();
 
         // Compute the equality evaluation at gamma
         let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
         // Validate the claim
         assert_eq!(
-            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&Point(gamma128)) *
+            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&gamma128) *
                 eq_evaluation,
             claim
         );
@@ -310,7 +310,7 @@ impl<const C: usize> Keccak<C> {
         let points = self.challenges.clone();
 
         // Generate a random gamma for folding.
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         let evaluations: [_; 5] = self.multiclaim_output.clone().unwrap().0;
 
@@ -346,7 +346,7 @@ impl<const C: usize> Keccak<C> {
             let round_poly = lincheck_prover.round_polynomial().coeffs(claim);
 
             // Generate a random challenge
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Validate the length of the round polynomial
             assert_eq!(round_poly.len(), 3, "Round polynomial length mismatch");
@@ -379,7 +379,7 @@ impl<const C: usize> Keccak<C> {
                 // Store the current value of the multiplier.
                 let current_mult = *mult;
                 // Update the multiplier by multiplying it with gamma for the next iteration.
-                *mult *= *gamma;
+                *mult *= gamma;
                 // Map over the equality polynomials, scaling each one by the current multiplier.
                 Some(eq_active_vars.iter().map(move |x| *x * current_mult))
             })
@@ -425,7 +425,7 @@ impl<const C: usize> Keccak<C> {
         let end = Instant::now();
 
         // Extend the list of challenges with additional points beyond the active variables.
-        self.challenges.extend(points[self.num_active_vars..].iter().cloned());
+        self.challenges.extend(points[self.num_active_vars..].iter().copied());
 
         // Verify that each polynomial evaluates correctly at the updated challenge points.
         for i in 0..5 {

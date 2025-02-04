@@ -2,9 +2,8 @@ use crate::MultiClaim;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
-        evaluation::FixedEvaluations,
-        multinear_lagrangian::MultilinearLagrangianPolynomial,
-        point::{Point, Points},
+        evaluation::FixedEvaluations, multinear_lagrangian::MultilinearLagrangianPolynomial,
+        point::Points,
     },
     sumcheck::SumcheckBuilder,
 };
@@ -68,7 +67,7 @@ where
 {
     type Sumcheck = MultiClaim<'a, N>;
 
-    fn build(self, gamma: &Point) -> Self::Sumcheck {
+    fn build(self, gamma: &BinaryField128b) -> Self::Sumcheck {
         // Compute the powers of gamma for the folding process.
         let gamma_pows: [_; 128 * N] = BinaryField128b::compute_gammas_folding(gamma);
 
@@ -101,10 +100,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashcaster_primitives::{
-        binary_field::BinaryField128b,
-        poly::point::{Point, Points},
-    };
+    use hashcaster_primitives::{binary_field::BinaryField128b, poly::point::Points};
 
     #[test]
     fn test_multiclaim_builder_default() {
@@ -135,7 +131,7 @@ mod tests {
         ];
 
         // Define valid points.
-        let points = Points::from(vec![Point::from(1)]);
+        let points = Points::from(vec![BinaryField128b::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
         let openings = FixedEvaluations::new([BinaryField128b::ZERO; 2 * 128]);
@@ -160,7 +156,7 @@ mod tests {
         ];
 
         // Define valid points (1 point, so polynomials should have length 2).
-        let points = Points::from(vec![Point::from(1)]);
+        let points = Points::from(vec![BinaryField128b::from(1)]);
 
         // Define valid openings for N = 2 with 128 * N elements.
         let openings = FixedEvaluations::new([BinaryField128b::ZERO; 2 * 128]);
@@ -204,7 +200,7 @@ mod tests {
 
         // Define points (1 point, so polynomials should have length 2)
         // First point in the point set
-        let p1 = Point::from(1);
+        let p1 = BinaryField128b::from(1);
         // Wrap the point into the Points structure
         let points = Points::from(vec![p1]);
 
@@ -216,7 +212,7 @@ mod tests {
         let builder = MulticlaimBuilder::new(&polys, &points, &op);
 
         // Define gamma (random point for testing)
-        let gamma = Point::from(BinaryField128b::from(2));
+        let gamma = BinaryField128b::from(2);
 
         // Build the MultiClaim
         let claim = builder.build(&gamma);

@@ -9,7 +9,7 @@ use hashcaster_primitives::{
         compressed::CompressedPoly,
         evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::{restrict, MultilinearLagrangianPolynomial},
-        point::{Point, Points},
+        point::Points,
         univariate::UnivariatePolynomial,
     },
     sumcheck::{EvaluationProvider, Sumcheck},
@@ -251,7 +251,7 @@ where
         // This is the equality polynomial for the current round (degree-1 univariate
         // polynomial).
         let eq_t = UnivariatePolynomial::new(vec![
-            *self.points[round] + BinaryField128b::ONE,
+            self.points[round] + BinaryField128b::ONE,
             BinaryField128b::ONE,
         ]);
 
@@ -284,7 +284,7 @@ where
         ret
     }
 
-    fn bind(&mut self, r: &Point) {
+    fn bind(&mut self, r: &BinaryField128b) {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -304,18 +304,18 @@ where
         self.claim = round_poly.evaluate_at(r);
 
         // Add the random value sent by the verifier to the list of gammas.
-        self.challenges.push(r.clone());
+        self.challenges.push(*r);
 
         if round <= C {
             // Compute `r^2` for future usage in the protocol.
-            let r2 = **r * **r;
+            let r2 = *r * r;
 
             // We compute, by chunk of 3, the new values for the extended table:
             // ```
             // P(0, r) = P(0, r) + (P(0, r) + P(1, r) + P(∞, r)) * r + P(∞, r) * r^2
             // ```
             self.extended_table.par_chunks_mut(3).for_each(|chunk| {
-                chunk[0] = chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * **r + chunk[2] * r2;
+                chunk[0] = chunk[0] + (chunk[0] + chunk[1] + chunk[2]) * r + chunk[2] * r2;
             });
 
             // We want to avoid a new allocation:
@@ -336,7 +336,7 @@ where
             // Compute the new values for the poly coordinates:
             self.poly_coords.par_chunks_mut(1 << (number_variables - C - 1)).for_each(|chunk| {
                 for j in 0..half {
-                    chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * **r;
+                    chunk[j] = chunk[2 * j] + (chunk[2 * j + 1] + chunk[2 * j]) * r;
                 }
             });
         }
@@ -458,7 +458,7 @@ mod tests {
     use hashcaster_multiclaim::builder::MulticlaimBuilder;
     use hashcaster_primitives::{
         poly::{
-            multinear_lagrangian::MultilinearLagrangianPolynomial, point::Point,
+            multinear_lagrangian::MultilinearLagrangianPolynomial,
             univariate::FixedUnivariatePolynomial,
         },
         sumcheck::SumcheckBuilder,
@@ -490,19 +490,19 @@ mod tests {
         assert_eq!(bool_check.current_round(), 0);
 
         // Add a challenge and test the round count.
-        bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
+        bool_check.challenges.push(BinaryField128b::from(10));
         assert_eq!(bool_check.current_round(), 1);
 
         // Add more challenges and test the updated round count.
         bool_check.challenges.extend(vec![
-            Point::from(BinaryField128b::from(20)),
-            Point::from(BinaryField128b::from(30)),
-            Point::from(BinaryField128b::from(40)),
+            BinaryField128b::from(20),
+            BinaryField128b::from(30),
+            BinaryField128b::from(40),
         ]);
         assert_eq!(bool_check.current_round(), 4);
 
         // Add another challenge and verify the round count again.
-        bool_check.challenges.push(BinaryField128b::from(50).into());
+        bool_check.challenges.push(BinaryField128b::from(50));
         assert_eq!(bool_check.current_round(), 5);
     }
 
@@ -598,7 +598,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points);
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -638,7 +638,7 @@ mod tests {
             time_in_round_polynomial += start.elapsed().as_millis();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point::random(rng);
+            let r = BinaryField128b::random(rng);
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -684,7 +684,7 @@ mod tests {
         let and_algebraic = AndPackage::<2, 1>.algebraic(&frob_evals, 0, 1);
 
         // Get the expected claim
-        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
+        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges);
 
         // Validate the expected claim against the current claim
         assert_eq!(current_claim, expected_claim);
@@ -732,7 +732,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points);
 
         // Generate a random folding challenge `gamma` in `BinaryField128b`.
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -757,7 +757,7 @@ mod tests {
         let mut current_claim = initial_claim;
 
         // Setup an empty vector to store the challanges in the main loop
-        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars));
+        let mut challenges = Points::from(Vec::<BinaryField128b>::with_capacity(num_vars));
 
         // The loop iterates over the number of variables to perform the rounds of the protocol.
         for _ in 0..num_vars {
@@ -765,7 +765,7 @@ mod tests {
             let compressed_round_polynomial = boolcheck.round_polynomial();
 
             // Generate a random value in `BinaryField128b` and store it in the dedicated vector.
-            let r = Point::random(rng);
+            let r = BinaryField128b::random(rng);
 
             // Decompress the round polynomial to obtain the coefficients of the univariate round
             // polynomial.
@@ -810,7 +810,7 @@ mod tests {
         let and_algebraic = AndPackage::<2, 1>.algebraic(&untwisted_evals, 0, 1);
 
         // Get the expected claim
-        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges).0;
+        let expected_claim = and_algebraic[0][0] * points.eq_eval(&challenges);
 
         // Validate the expected claim against the current claim
         assert_eq!(current_claim, expected_claim);
@@ -829,10 +829,10 @@ mod tests {
             (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
 
         // Generate a random gamma for folding
-        let gamma = Point::random(rng);
+        let gamma = BinaryField128b::random(rng);
 
         // Generate `gamma^128` for final evaluation
-        let gamma128 = gamma.0.pow(128);
+        let gamma128 = gamma.pow(128);
 
         // Setup a multiclaim builder
         let polys_multiclaim = [p.clone(), q.clone()];
@@ -845,7 +845,7 @@ mod tests {
         let mut claim = FixedUnivariatePolynomial::new(frob_evals.0).evaluate_at(&gamma);
 
         // Setup an empty vector to store the challanges in the main loop
-        let mut challenges = Points::from(Vec::<Point>::with_capacity(num_vars));
+        let mut challenges = Points::from(Vec::<BinaryField128b>::with_capacity(num_vars));
 
         // Empty vector to store the challenges
         for _ in 0..num_vars {
@@ -856,13 +856,13 @@ mod tests {
             assert_eq!(round_polynomial.len(), 3, "Round polynomial should have degree 2.");
 
             // Random challenge
-            let challenge = Point::random(rng);
+            let challenge = BinaryField128b::random(rng);
 
             // Update the claim with the round polynomial and the challenge
             claim = round_polynomial.evaluate_at(&challenge);
 
             // Push the challenge to the vector
-            challenges.push(challenge.clone());
+            challenges.push(challenge);
 
             // Bind the prover to the challenge
             multiclaim_prover.bind(&challenge);
@@ -873,14 +873,14 @@ mod tests {
 
         // Compute the equality evaluations at the challenges
         let eq_evaluations: UnivariatePolynomial =
-            points_inv_orbit.iter().map(|pts| pts.eq_eval(&challenges).0).collect();
+            points_inv_orbit.iter().map(|pts| pts.eq_eval(&challenges)).collect();
 
         // Compute the equality evaluation at gamma
         let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
         // Validate the claim
         assert_eq!(
-            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&Point(gamma128)) *
+            FixedUnivariatePolynomial::new(multiclaim_output.0).evaluate_at(&gamma128) *
                 eq_evaluation,
             claim
         );
@@ -921,7 +921,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Generate a folding challenge `gamma`
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -1004,7 +1004,7 @@ mod tests {
         );
 
         // Generate an imaginary random challenge (fixed for testing purposes).
-        let r = Point::from(5678);
+        let r = BinaryField128b::from(5678);
 
         // Update the current claim using the round polynomial and the random value.
         let current_claim = round_polynomial.evaluate_at(&r);
@@ -1035,10 +1035,7 @@ mod tests {
         assert_eq!(boolcheck.claim, BinaryField128b::new(284181495769767592368287233794578256034));
 
         // Verify that the challenge has been integrated inside the boolcheck.
-        assert_eq!(
-            boolcheck.challenges,
-            Points::from(vec![Point::from(BinaryField128b::new(5678))])
-        );
+        assert_eq!(boolcheck.challenges, Points(vec![BinaryField128b::new(5678)]));
 
         // Verify the correctness of the round polynomial cache.
         assert_eq!(boolcheck.round_polys, vec![compressed_round_polynomial]);
@@ -1109,7 +1106,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Generate a folding challenge `gamma`
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance with:
         // - the phase switch parameter (c),
@@ -1176,7 +1173,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let pts = points.into();
@@ -1227,7 +1224,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let pts = points.into();
@@ -1244,7 +1241,7 @@ mod tests {
 
         // Simulate adding challenges equal to the number of variables.
         for i in 0..bool_check.number_variables() {
-            bool_check.challenges.push(Point::from(i as u128));
+            bool_check.challenges.push(BinaryField128b::from(i as u128));
         }
 
         // Attempt to compute a round polynomial beyond the round limit.
@@ -1281,7 +1278,7 @@ mod tests {
         let incorrect_claim = BinaryField128b::new(999);
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let pts = points.into();
@@ -1332,7 +1329,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&points.clone().into());
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let pts = points.into();
@@ -1354,7 +1351,7 @@ mod tests {
         let coeffs = round_poly.coeffs(initial_claim);
 
         // Generate a random challenge value.
-        let challenge = Point::from(3);
+        let challenge = BinaryField128b::from(3);
 
         // Compute the round polynomial.
         bool_check.bind(&challenge);
@@ -1364,9 +1361,9 @@ mod tests {
 
         // Compute the updated claim using the polynomial coefficients.
         let updated_claim = coeffs[0] +
-            coeffs[1] * *challenge +
-            coeffs[2] * *challenge * *challenge +
-            coeffs[3] * *challenge * *challenge * *challenge;
+            coeffs[1] * challenge +
+            coeffs[2] * challenge * challenge +
+            coeffs[3] * challenge * challenge * challenge;
 
         // Verify that the updated claim matches the computed result.
         assert_eq!(updated_claim, bool_check.claim);
@@ -1413,7 +1410,7 @@ mod tests {
         };
 
         // Add one challenge to the challenges vector.
-        bool_check.challenges.push(Point::from(BinaryField128b::from(10)));
+        bool_check.challenges.push(BinaryField128b::from(10));
 
         // Assert that the current round is now 1.
         assert_eq!(bool_check.current_round(), 1);
@@ -1439,9 +1436,9 @@ mod tests {
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
-            Point::from(BinaryField128b::from(10)),
-            Point::from(BinaryField128b::from(20)),
-            Point::from(BinaryField128b::from(30)),
+            BinaryField128b::from(10),
+            BinaryField128b::from(20),
+            BinaryField128b::from(30),
         ]);
 
         // Assert that the current round reflects the number of challenges added (3).
@@ -1468,9 +1465,9 @@ mod tests {
 
         // Add multiple challenges to the challenges vector.
         bool_check.challenges.extend(vec![
-            Point::from(BinaryField128b::from(10)),
-            Point::from(BinaryField128b::from(20)),
-            Point::from(BinaryField128b::from(30)),
+            BinaryField128b::from(10),
+            BinaryField128b::from(20),
+            BinaryField128b::from(30),
         ]);
 
         // Remove one challenge (simulating a removal operation, if valid in the context).
@@ -1499,10 +1496,7 @@ mod tests {
         };
 
         // Add multiple challenges to the challenges vector.
-        bool_check.challenges.extend(vec![
-            Point::from(BinaryField128b::from(10)),
-            Point::from(BinaryField128b::from(20)),
-        ]);
+        bool_check.challenges.extend(vec![BinaryField128b::from(10), BinaryField128b::from(20)]);
 
         // Clear all challenges.
         bool_check.challenges.clear();
@@ -1649,7 +1643,7 @@ mod tests {
         let initial_claim = p_and_q.evaluate_at(&Points::from(points.clone()));
 
         // Generate a folding challenge `gamma`.
-        let gamma = Point::from(1234);
+        let gamma = BinaryField128b::from(1234);
 
         // Create a new `BoolCheckBuilder` instance.
         let pts = points.into();
@@ -1665,7 +1659,7 @@ mod tests {
         let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Bind a random challenge `r` to the BoolCheck instance.
-        let r = Point::from(BinaryField128b::from(42));
+        let r = BinaryField128b::from(42);
         bool_check.bind(&r);
 
         // Verify that the challenge has been added.
