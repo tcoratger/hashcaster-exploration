@@ -366,22 +366,6 @@ where
         // Decompose the `BoolCheck` instance to extract the required fields.
         let Self { poly_coords, round_polys, .. } = self;
 
-        // // Compute the evaluations on the Frobenius subdomain.
-        // let base_index = 1 << (number_variables - C - 1);
-        // let mut frob_evals: Evaluations = (0..128 * self.polys.len())
-        //     .map(|idx| {
-        //         let poly_idx = idx / 128;
-        //         let frob_idx = idx % 128;
-        //         poly_coords[(poly_idx * 128 + frob_idx) * base_index]
-        //     })
-        //     .collect();
-
-        // // Apply the twist operation to each chunk of 128 evaluations.
-        // frob_evals.twist();
-
-        // // Return the `BoolCheckOutput`
-        // Self::Output { frob_evals, round_polys: round_polys.clone() }
-
         // Compute the evaluations on the Frobenius subdomain.
         let base_index = 1 << (number_variables - C - 1);
         let frob_evals_array = std::array::from_fn(|idx| {
