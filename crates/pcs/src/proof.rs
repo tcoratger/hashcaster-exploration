@@ -2,9 +2,9 @@ use hashcaster_primitives::poly::{compressed::CompressedPoly, evaluation::FixedE
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SumcheckProof<const N: usize> {
+pub struct SumcheckProof<const N: usize, const M: usize> {
     /// Round polynomials of the sumcheck protocol
-    pub round_polys: Vec<CompressedPoly>,
+    pub round_polys: Vec<CompressedPoly<M>>,
     /// Evaluations
     pub evals: FixedEvaluations<N>,
 }

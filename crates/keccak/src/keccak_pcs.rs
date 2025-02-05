@@ -20,6 +20,7 @@ use hashcaster_primitives::{
     binary_field::BinaryField128b,
     linear_trait::LinearOperations,
     poly::{
+        compressed::{Assert, IsTrue},
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::Points,
         univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
@@ -45,7 +46,7 @@ pub struct HashcasterKeccakProof<const EB: usize, const EM: usize, const EL: usi
     #[serde(serialize_with = "serialize_packed", deserialize_with = "deserialize_packed")]
     commitment: GroestlDigest<<Tower as TowerFamily>::B8>,
     initial_claims: [BinaryField128b; 5],
-    rounds: Box<[(SumcheckProof<EB>, SumcheckProof<EM>, SumcheckProof<EL>); 24]>,
+    rounds: Box<[(SumcheckProof<EB, 3>, SumcheckProof<EM, 2>, SumcheckProof<EL, 2>); 24]>,
     input_open_proof: FriPcsProof,
 }
 
@@ -212,7 +213,7 @@ impl HashcasterKeccak {
         points: &mut Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
-    ) -> (SumcheckProof<640>, SumcheckProof<5>) {
+    ) -> (SumcheckProof<640, 3>, SumcheckProof<5, 2>) {
         let (bool_check_proof, multi_open_proof);
 
         // Determine the number of variables in the polynomials.
@@ -268,7 +269,7 @@ impl HashcasterKeccak {
         points: &Points,
         claims: &[BinaryField128b; 5],
         challenger: &mut F128Challenger,
-    ) -> (SumcheckProof<5>, Points) {
+    ) -> (SumcheckProof<5, 2>, Points) {
         // Perform the sumcheck process for LinCheck using the shared helper function.
         let lincheck_builder =
             LinCheckBuilder::new(input, points, matrix, LIN_CHECK_NUM_VARS, *claims);
@@ -286,7 +287,7 @@ impl HashcasterKeccak {
         matrix: &impl LinearOperations,
         points: &Points,
         claims: &[BinaryField128b; 5],
-        lin_check_proof: &SumcheckProof<5>,
+        lin_check_proof: &SumcheckProof<5, 2>,
         challenger: &mut F128Challenger,
     ) -> Result<Points, SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
@@ -364,8 +365,8 @@ impl HashcasterKeccak {
         &self,
         points: &mut Points,
         claims: &[BinaryField128b; 5],
-        bool_check_proof: &SumcheckProof<640>,
-        multi_open_proof: &SumcheckProof<5>,
+        bool_check_proof: &SumcheckProof<640, 3>,
+        multi_open_proof: &SumcheckProof<5, 2>,
         challenger: &mut F128Challenger,
     ) -> Result<(), SumcheckError> {
         // Verify the number of round polynomials in the LinCheck proof.
@@ -452,14 +453,15 @@ impl HashcasterKeccak {
 }
 
 // Helper function to perform a sumcheck round.
-fn perform_sumcheck<const N: usize, B>(
+fn perform_sumcheck<const N: usize, const M: usize, B>(
     num_vars: usize,
     builder: B,
     challenger: &mut F128Challenger,
     claims: &[BinaryField128b],
-) -> (SumcheckProof<N>, Points)
+) -> (SumcheckProof<N, M>, Points)
 where
-    B: SumcheckBuilder<N>,
+    B: SumcheckBuilder<N, M>,
+    Assert<{ M > 1 }>: IsTrue,
 {
     // Sample the initial folding challenge.
     let gamma = challenger.sample();
@@ -507,11 +509,14 @@ where
     (SumcheckProof { round_polys, evals }, rs)
 }
 
-fn perform_verification<const N: usize, const M: usize>(
+fn perform_verification<const N: usize, const M: usize, const P: usize>(
     challenger: &mut F128Challenger,
-    proof: &SumcheckProof<N>,
+    proof: &SumcheckProof<N, P>,
     initial_claim_poly: &FixedUnivariatePolynomial<M>,
-) -> (BinaryField128b, Points, BinaryField128b) {
+) -> (BinaryField128b, Points, BinaryField128b)
+where
+    Assert<{ P > 1 }>: IsTrue,
+{
     // Sample a gamma
     let gamma = challenger.sample();
 

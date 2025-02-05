@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
+
 pub mod backend;
 pub mod binary_field;
 pub mod bit_iterator;

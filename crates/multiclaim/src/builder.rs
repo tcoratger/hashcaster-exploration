@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<'a, const N: usize> SumcheckBuilder<N> for MulticlaimBuilder<'a, N>
+impl<'a, const N: usize> SumcheckBuilder<N, 2> for MulticlaimBuilder<'a, N>
 where
     [(); 128 * N]:,
     [(); N * 128]:,

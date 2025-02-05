@@ -22,7 +22,7 @@ pub struct ProdCheck<const N: usize> {
     /// The number of variables in the polynomials (`log2(size of each polynomial)`).
     pub num_vars: usize,
     /// Cached result of the round message polynomial, used for optimization.
-    pub cached_round_msg: Option<CompressedPoly>,
+    pub cached_round_msg: Option<CompressedPoly<2>>,
 }
 
 impl<const N: usize> Default for ProdCheck<N> {
@@ -38,10 +38,10 @@ impl<const N: usize> Default for ProdCheck<N> {
     }
 }
 
-impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
+impl<const N: usize> Sumcheck<N, 2> for ProdCheck<N> {
     type Output = ProdCheckOutput<N>;
 
-    fn round_polynomial(&mut self) -> CompressedPoly {
+    fn round_polynomial(&mut self) -> CompressedPoly<2> {
         // Fetch the length of the first polynomial to determine the range of the current variable.
         let p0_len = self.p_polys[0].len();
 
@@ -57,7 +57,7 @@ impl<const N: usize> Sumcheck<N> for ProdCheck<N> {
         }
 
         // Compute `pq_zero`, `pq_one`, and `pq_inf` for each index in parallel.
-        let mut poly = (0..half)
+        let mut poly: [BinaryField128b; 3] = (0..half)
             .into_par_iter()
             .map(|i| {
                 // Contribution for `X_i = 0`

@@ -37,7 +37,7 @@ pub struct Keccak<const C: usize> {
     /// Optional vector of challenges for the protocol.
     challenges: Points,
     /// Optional output from the BoolCheck protocol.
-    boolcheck_output: Option<BoolCheckOutput<{ 128 * 5 }>>,
+    boolcheck_output: Option<BoolCheckOutput<{ 128 * 5 }, 3>>,
     /// Optional output from the Multiclaim protocol.
     multiclaim_output: Option<FixedEvaluations<5>>,
     /// Linear witness for the protocol.

@@ -69,7 +69,7 @@ impl<'a, const N: usize, const M: usize, L: LinearOperations> LinCheckBuilder<'a
     }
 }
 
-impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder<N>
+impl<const N: usize, const M: usize, L: LinearOperations> SumcheckBuilder<N, 2>
     for LinCheckBuilder<'_, N, M, L>
 {
     type Sumcheck = ProdCheck<N>;

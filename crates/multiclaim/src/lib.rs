@@ -34,10 +34,10 @@ pub struct MultiClaim<'a, const N: usize> {
     pub object: ProdCheck<1>,
 }
 
-impl<const N: usize> Sumcheck<N> for MultiClaim<'_, N> {
+impl<const N: usize> Sumcheck<N, 2> for MultiClaim<'_, N> {
     type Output = FixedEvaluations<N>;
 
-    fn round_polynomial(&mut self) -> CompressedPoly {
+    fn round_polynomial(&mut self) -> CompressedPoly<2> {
         self.object.round_polynomial()
     }
 

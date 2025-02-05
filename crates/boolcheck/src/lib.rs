@@ -2,6 +2,8 @@
 #![feature(generic_const_exprs)]
 #![feature(generic_arg_infer)]
 
+use std::array;
+
 use algebraic::AlgebraicOps;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
@@ -57,7 +59,7 @@ pub struct BoolCheck<'a, const N: usize, const M: usize, const C: usize, A: Alge
     pub eq_sequence: Vec<MultilinearLagrangianPolynomial>,
 
     /// A vector of compressed polynomials computed at each round.
-    pub round_polys: Vec<CompressedPoly>,
+    pub round_polys: Vec<CompressedPoly<3>>,
 
     /// The current claim being verified in the protocol.
     pub claim: BinaryField128b,
@@ -69,15 +71,15 @@ pub struct BoolCheck<'a, const N: usize, const M: usize, const C: usize, A: Alge
     pub algebraic_operations: &'a A,
 }
 
-impl<const N: usize, const M: usize, const C: usize, A> Sumcheck<{ 128 * N }>
+impl<const N: usize, const M: usize, const C: usize, A> Sumcheck<{ 128 * N }, 3>
     for BoolCheck<'_, N, M, C, A>
 where
     A: AlgebraicOps<N, M> + Send + Sync,
     [(); 128 * N]:,
 {
-    type Output = BoolCheckOutput<{ 128 * N }>;
+    type Output = BoolCheckOutput<{ 128 * N }, 3>;
 
-    fn round_polynomial(&mut self) -> CompressedPoly {
+    fn round_polynomial(&mut self) -> CompressedPoly<3> {
         // Compute the current round of the protocol.
         let round = self.current_round();
 
@@ -96,7 +98,7 @@ where
                 return poly.clone();
             }
             // This situation should never happen.
-            return CompressedPoly::default();
+            return CompressedPoly(array::from_fn(|_| BinaryField128b::ZERO));
         }
 
         // The protocol is defined in two phases:
@@ -437,15 +439,15 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct BoolCheckOutput<const N: usize> {
+pub struct BoolCheckOutput<const N: usize, const M: usize> {
     /// Evaluations of the polynomials on a Frobenius subdomain.
     pub frob_evals: FixedEvaluations<N>,
 
     /// A vector of compressed polynomials computed during the protocol's rounds.
-    pub round_polys: Vec<CompressedPoly>,
+    pub round_polys: Vec<CompressedPoly<M>>,
 }
 
-impl<const N: usize> EvaluationProvider<N> for BoolCheckOutput<N> {
+impl<const N: usize, const M: usize> EvaluationProvider<N> for BoolCheckOutput<N, M> {
     fn evals(self) -> FixedEvaluations<N> {
         self.frob_evals
     }
@@ -973,7 +975,7 @@ mod tests {
         // Verify the compressed round polynomial.
         assert_eq!(
             compressed_round_polynomial,
-            CompressedPoly::new(vec![
+            CompressedPoly([
                 BinaryField128b::new(332514690820570361331092984923254947853),
                 BinaryField128b::new(1),
                 BinaryField128b::new(1)
@@ -1119,7 +1121,11 @@ mod tests {
         let mut bool_check = boolcheck_builder.build(&gamma);
 
         // Add a precomputed round polynomial to the cache.
-        let cached_poly = CompressedPoly::new(vec![BinaryField128b::from(1)]);
+        let cached_poly = CompressedPoly([
+            BinaryField128b::from(1),
+            BinaryField128b::from(2),
+            BinaryField128b::from(3),
+        ]);
         bool_check.round_polys.push(cached_poly.clone());
 
         // Compute the round polynomial for the cached round.
