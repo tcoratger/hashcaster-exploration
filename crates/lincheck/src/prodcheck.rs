@@ -728,6 +728,8 @@ mod tests {
 
         let rng = &mut OsRng;
 
+        let start = std::time::Instant::now();
+
         // Generate random polynomials for `p_polys` and `q_polys`.
         // Each polynomial has `2^NUM_VARS` evaluations.
         let p_polys: [_; N] =
@@ -793,5 +795,7 @@ mod tests {
 
         // Ensure the final computed claim matches the current claim in the protocol.
         assert_eq!(final_claim, current_claim);
+
+        println!("total time {:?}", start.elapsed().as_millis());
     }
 }

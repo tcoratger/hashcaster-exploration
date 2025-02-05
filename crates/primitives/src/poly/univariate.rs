@@ -50,13 +50,7 @@ impl UnivariatePolynomial {
     /// This method employs Horner's method for efficient polynomial evaluation:
     /// `P(x) = (((a_n \cdot x + a_{n-1}) \cdot x + a_{n-2}) \cdot x + ... + a_0)`
     pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
-        // Start with an accumulator initialized to zero.
-        self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
-            // Multiply the accumulator by `at` and add the current coefficient.
-            acc.mul_add_assign(at, coeff);
-            // Return the updated accumulator for the next iteration.
-            acc
-        })
+        self.coeffs.iter().rfold(BinaryField128b::ZERO, |eval, &coeff| eval * at + coeff)
     }
 
     /// Constructs a univariate polynomial from its evaluations at three points:
