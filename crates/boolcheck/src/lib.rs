@@ -462,7 +462,7 @@ mod tests {
     use hashcaster_primitives::{
         poly::{
             multinear_lagrangian::MultilinearLagrangianPolynomial,
-            univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
+            univariate::FixedUnivariatePolynomial,
         },
         sumcheck::SumcheckBuilder,
     };
@@ -817,9 +817,10 @@ mod tests {
         // Setup the new points to be the challenges of the boolcheck.
         let points = challenges;
 
-        // Map the points to the inverse Frobenius orbit
-        let points_inv_orbit: Vec<Points> =
-            (0..128).map(|i| points.iter().map(|x| x.frobenius(-i)).collect()).collect();
+        // Map the points to the inverse Frobenius orbit using a fixed-size array
+        #[allow(clippy::cast_possible_wrap)]
+        let points_inv_orbit: [Points; 128] =
+            std::array::from_fn(|i| points.iter().map(|x| x.frobenius(-(i as i32))).collect());
 
         // Generate a random gamma for folding
         let gamma = BinaryField128b::random(rng);
@@ -864,9 +865,10 @@ mod tests {
         // Finish the protocol
         let multiclaim_output = multiclaim_prover.finish();
 
-        // Compute the equality evaluations at the challenges
-        let eq_evaluations: UnivariatePolynomial =
-            points_inv_orbit.iter().map(|pts| pts.eq_eval(&challenges)).collect();
+        // Compute the equality evaluations at the challenges into a fixed-size array
+        let eq_evaluations: FixedUnivariatePolynomial<128> = FixedUnivariatePolynomial {
+            coeffs: std::array::from_fn(|i| points_inv_orbit[i].eq_eval(&challenges)),
+        };
 
         // Compute the equality evaluation at gamma
         let eq_evaluation = eq_evaluations.evaluate_at(&gamma);

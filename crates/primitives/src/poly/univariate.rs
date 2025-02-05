@@ -53,42 +53,6 @@ impl UnivariatePolynomial {
     }
 }
 
-impl MulAssign<BinaryField128b> for UnivariatePolynomial {
-    fn mul_assign(&mut self, point: BinaryField128b) {
-        for c in self.iter_mut() {
-            *c *= point;
-        }
-    }
-}
-
-impl MulAssign<&BinaryField128b> for UnivariatePolynomial {
-    fn mul_assign(&mut self, point: &BinaryField128b) {
-        for c in self.iter_mut() {
-            *c *= point;
-        }
-    }
-}
-
-impl From<Vec<BinaryField128b>> for UnivariatePolynomial {
-    fn from(coeffs: Vec<BinaryField128b>) -> Self {
-        Self::new(coeffs)
-    }
-}
-
-impl Deref for UnivariatePolynomial {
-    type Target = Vec<BinaryField128b>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.coeffs
-    }
-}
-
-impl DerefMut for UnivariatePolynomial {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.coeffs
-    }
-}
-
 impl FromIterator<BinaryField128b> for UnivariatePolynomial {
     fn from_iter<T: IntoIterator<Item = BinaryField128b>>(iter: T) -> Self {
         Self { coeffs: iter.into_iter().collect() }
@@ -403,12 +367,12 @@ mod tests {
     #[test]
     fn test_mul_assign_univariate_poly_by_point() {
         // Define the coefficients for the polynomial P(x) = 7 + 6x + 2x^2
-        let coeffs = vec![
+        let coeffs = [
             BinaryField128b::from(7), // a_0
             BinaryField128b::from(6), // a_1
             BinaryField128b::from(2), // a_2
         ];
-        let mut poly = UnivariatePolynomial::new(coeffs);
+        let mut poly = FixedUnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point
         let point = BinaryField128b::from(4);
@@ -417,7 +381,7 @@ mod tests {
         poly *= point;
 
         // Expected coefficients after multiplication
-        let expected_coeffs = vec![
+        let expected_coeffs = [
             BinaryField128b::from(7) * BinaryField128b::from(4),
             BinaryField128b::from(6) * BinaryField128b::from(4),
             BinaryField128b::from(2) * BinaryField128b::from(4),
