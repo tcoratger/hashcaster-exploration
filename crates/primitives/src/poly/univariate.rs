@@ -51,114 +51,6 @@ impl UnivariatePolynomial {
     pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
         self.coeffs.iter().rfold(BinaryField128b::ZERO, |eval, &coeff| eval * at + coeff)
     }
-
-    /// Constructs a univariate polynomial from its evaluations at three points:
-    /// - t = 0, t = 1, and t = ∞.
-    ///
-    /// The polynomial is assumed to be of degree 2:
-    /// `P(t) = c_0 + c_1 * t + c_2 * t^2`.
-    ///
-    /// We have:
-    /// - `W(0) = P(0) = c_0`,
-    /// - `W(1) = P(1) = c_0 + c_1 + c_2`,
-    /// - `W(∞) = P(∞) = c_2`.
-    ///
-    /// # Parameters
-    /// - `evaluations`: An array of three evaluations:
-    ///   - `evaluations[0]` is the evaluation at t = 0 (`W(0) = c_0`).
-    ///   - `evaluations[1]` is the evaluation at t = 1 (`W(1) = c_0 + c_1 + c_2`).
-    ///   - `evaluations[2]` is the evaluation at t = ∞ (`W(∞) = c_2`).
-    ///
-    /// # Returns
-    /// A `UnivariatePolynomial` instance with coefficients `[c_0, c_1, c_2]`, where:
-    /// - `c_0 = W(0)` (constant coefficient),
-    /// - `c_1 = W(1) - W(0) - W(∞)` (linear coefficient),
-    /// - `c_2 = W(∞)` (quadratic coefficient).
-    pub fn from_evaluations_deg2(evaluations: [BinaryField128b; 3]) -> Self {
-        Self {
-            coeffs: vec![
-                evaluations[0],
-                evaluations[1] - evaluations[0] - evaluations[2],
-                evaluations[2],
-            ],
-        }
-    }
-
-    /// Multiplies a degree-2 polynomial (`self`) with a degree-1 polynomial (`other`).
-    ///
-    /// This is not a general-purpose multiplication method, but a specific for multiple reasons:
-    /// - The protocol is expected to deal explicitly with degree-2 and degree-1 polynomials.
-    /// - A general-purpose multiplication method would be more complex and can be implemented in
-    ///   the future.
-    ///
-    /// # Parameters
-    /// - `other`: A reference to another `UnivariatePolynomial` of degree 1.
-    ///
-    /// # Returns
-    /// A new `UnivariatePolynomial` of degree 3 that represents the product of the two input
-    /// polynomials.
-    ///
-    /// # Assumptions
-    /// - `self` must be a degree-2 polynomial (length 3).
-    /// - `other` must be a degree-1 polynomial (length 2).
-    ///
-    /// # Formula
-    /// Given:
-    /// - `self` = `c_0 + c_1 \cdot x + c_2 \cdot x^2`
-    /// - `other` = `d_0 + d_1 \cdot x`,
-    ///
-    /// The result is:
-    /// ```text
-    /// \text{result} = (c_0 + c_1 \cdot x + c_2 \cdot x^2) \cdot (d_0 + d_1 \cdot x)
-    /// ```
-    ///
-    /// Expanding:
-    /// ```text
-    /// \text{result} = c_0 \cdot d_0
-    ///              + (c_0 \cdot d_1 + c_1 \cdot d_0) \cdot x
-    ///              + (c_1 \cdot d_1 + c_2 \cdot d_0) \cdot x^2
-    ///              + c_2 \cdot d_1 \cdot x^3
-    /// ```
-    ///
-    /// # Panics
-    /// - If `self` is not a degree-2 polynomial.
-    /// - If `other` is not a degree-1 polynomial.
-    #[must_use]
-    pub fn multiply_degree2_by_degree1(&self, other: &Self) -> Self {
-        // Ensure the input polynomials are of the expected degrees.
-        assert_eq!(self.len(), 3, "Expected lhs to be a degree 2 polynomial");
-        assert_eq!(other.len(), 2, "Expected rhs to be a degree 1 polynomial");
-
-        // Compute the coefficients of the resulting degree-3 polynomial.
-        Self {
-            coeffs: vec![
-                // Degree 0 coefficient: c0 * d0
-                other[0] * self[0],
-                // Degree 1 coefficient: c0 * d1 + c1 * d0
-                other[0] * self[1] + other[1] * self[0],
-                // Degree 2 coefficient: c1 * d1 + c2 * d0
-                other[0] * self[2] + other[1] * self[1],
-                // Degree 3 coefficient: c2 * d1
-                other[1] * self[2],
-            ],
-        }
-    }
-}
-
-impl Mul<BinaryField128b> for UnivariatePolynomial {
-    type Output = Self;
-
-    fn mul(self, point: BinaryField128b) -> Self::Output {
-        self.iter().map(|&c| c * point).collect()
-    }
-}
-
-impl Mul<&BinaryField128b> for UnivariatePolynomial {
-    type Output = Self;
-
-    fn mul(self, point: &BinaryField128b) -> Self::Output {
-        self.iter().map(|&c| c * point).collect()
-    }
 }
 
 impl MulAssign<BinaryField128b> for UnivariatePolynomial {
@@ -248,6 +140,115 @@ impl<const N: usize> FixedUnivariatePolynomial<N> {
     }
 }
 
+impl FixedUnivariatePolynomial<3> {
+    /// Constructs a univariate polynomial from its evaluations at three points:
+    /// - t = 0, t = 1, and t = ∞.
+    ///
+    /// The polynomial is assumed to be of degree 2:
+    /// `P(t) = c_0 + c_1 * t + c_2 * t^2`.
+    ///
+    /// We have:
+    /// - `W(0) = P(0) = c_0`,
+    /// - `W(1) = P(1) = c_0 + c_1 + c_2`,
+    /// - `W(∞) = P(∞) = c_2`.
+    ///
+    /// # Parameters
+    /// - `evaluations`: An array of three evaluations:
+    ///   - `evaluations[0]` is the evaluation at t = 0 (`W(0) = c_0`).
+    ///   - `evaluations[1]` is the evaluation at t = 1 (`W(1) = c_0 + c_1 + c_2`).
+    ///   - `evaluations[2]` is the evaluation at t = ∞ (`W(∞) = c_2`).
+    ///
+    /// # Returns
+    /// A `UnivariatePolynomial` instance with coefficients `[c_0, c_1, c_2]`, where:
+    /// - `c_0 = W(0)` (constant coefficient),
+    /// - `c_1 = W(1) - W(0) - W(∞)` (linear coefficient),
+    /// - `c_2 = W(∞)` (quadratic coefficient).
+    pub fn from_evaluations_deg2(evaluations: [BinaryField128b; 3]) -> Self {
+        Self {
+            coeffs: [
+                evaluations[0],
+                evaluations[1] - evaluations[0] - evaluations[2],
+                evaluations[2],
+            ],
+        }
+    }
+
+    /// Multiplies a degree-2 polynomial (`self`) with a degree-1 polynomial (`other`).
+    ///
+    /// This is not a general-purpose multiplication method, but a specific for multiple reasons:
+    /// - The protocol is expected to deal explicitly with degree-2 and degree-1 polynomials.
+    /// - A general-purpose multiplication method would be more complex and can be implemented in
+    ///   the future.
+    ///
+    /// # Parameters
+    /// - `other`: A reference to another `UnivariatePolynomial` of degree 1.
+    ///
+    /// # Returns
+    /// A new `UnivariatePolynomial` of degree 3 that represents the product of the two input
+    /// polynomials.
+    ///
+    /// # Assumptions
+    /// - `self` must be a degree-2 polynomial (length 3).
+    /// - `other` must be a degree-1 polynomial (length 2).
+    ///
+    /// # Formula
+    /// Given:
+    /// - `self` = `c_0 + c_1 \cdot x + c_2 \cdot x^2`
+    /// - `other` = `d_0 + d_1 \cdot x`,
+    ///
+    /// The result is:
+    /// ```text
+    /// \text{result} = (c_0 + c_1 \cdot x + c_2 \cdot x^2) \cdot (d_0 + d_1 \cdot x)
+    /// ```
+    ///
+    /// Expanding:
+    /// ```text
+    /// \text{result} = c_0 \cdot d_0
+    ///              + (c_0 \cdot d_1 + c_1 \cdot d_0) \cdot x
+    ///              + (c_1 \cdot d_1 + c_2 \cdot d_0) \cdot x^2
+    ///              + c_2 \cdot d_1 \cdot x^3
+    /// ```
+    ///
+    /// # Panics
+    /// - If `self` is not a degree-2 polynomial.
+    /// - If `other` is not a degree-1 polynomial.
+    #[must_use]
+    pub fn multiply_degree2_by_degree1(
+        &self,
+        other: &FixedUnivariatePolynomial<2>,
+    ) -> FixedUnivariatePolynomial<4> {
+        // Compute the coefficients of the resulting degree-3 polynomial.
+        FixedUnivariatePolynomial {
+            coeffs: [
+                // Degree 0 coefficient: c0 * d0
+                other.coeffs[0] * self.coeffs[0],
+                // Degree 1 coefficient: c0 * d1 + c1 * d0
+                other.coeffs[0] * self.coeffs[1] + other.coeffs[1] * self.coeffs[0],
+                // Degree 2 coefficient: c1 * d1 + c2 * d0
+                other.coeffs[0] * self.coeffs[2] + other.coeffs[1] * self.coeffs[1],
+                // Degree 3 coefficient: c2 * d1
+                other.coeffs[1] * self.coeffs[2],
+            ],
+        }
+    }
+}
+
+impl Mul<BinaryField128b> for FixedUnivariatePolynomial<3> {
+    type Output = Self;
+
+    fn mul(self, point: BinaryField128b) -> Self::Output {
+        Self { coeffs: [self.coeffs[0] * point, self.coeffs[1] * point, self.coeffs[2] * point] }
+    }
+}
+
+impl Mul<&BinaryField128b> for FixedUnivariatePolynomial<3> {
+    type Output = Self;
+
+    fn mul(self, point: &BinaryField128b) -> Self::Output {
+        Self { coeffs: [self.coeffs[0] * point, self.coeffs[1] * point, self.coeffs[2] * point] }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,13 +291,13 @@ mod tests {
         ];
 
         // Construct the polynomial.
-        let poly = UnivariatePolynomial::from_evaluations_deg2(evals);
+        let poly = FixedUnivariatePolynomial::from_evaluations_deg2(evals);
 
         // Expected coefficients:
         // c_0 = W(0) = 3
         // c_1 = W(1) - W(0) - W(∞) = 9 - 3 - 5 = 1
         // c_2 = W(∞) = 5
-        let expected_coeffs = vec![
+        let expected_coeffs = [
             BinaryField128b::from(3),
             BinaryField128b::from(9) - BinaryField128b::from(3) - BinaryField128b::from(5),
             BinaryField128b::from(5),
@@ -315,12 +316,12 @@ mod tests {
     #[test]
     fn test_mul_univariate_poly_by_point() {
         // Define the coefficients for the polynomial P(x) = 3 + 2x + x^2
-        let coeffs = vec![
+        let coeffs = [
             BinaryField128b::from(3), // a_0
             BinaryField128b::from(2), // a_1
             BinaryField128b::from(1), // a_2
         ];
-        let poly = UnivariatePolynomial::new(coeffs);
+        let poly = FixedUnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point
         let point = BinaryField128b::from(2);
@@ -329,7 +330,7 @@ mod tests {
         let result_poly = poly * point;
 
         // Expected coefficients after multiplication
-        let expected_coeffs = vec![
+        let expected_coeffs = [
             BinaryField128b::from(3) * BinaryField128b::from(2),
             BinaryField128b::from(2) * BinaryField128b::from(2),
             BinaryField128b::from(1) * BinaryField128b::from(2),
@@ -342,12 +343,12 @@ mod tests {
     #[test]
     fn test_mul_univariate_poly_by_reference_to_point() {
         // Define the coefficients for the polynomial P(x) = 5 + 4x + 3x^2
-        let coeffs = vec![
+        let coeffs = [
             BinaryField128b::from(5), // a_0
             BinaryField128b::from(4), // a_1
             BinaryField128b::from(3), // a_2
         ];
-        let poly = UnivariatePolynomial::new(coeffs);
+        let poly = FixedUnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point as a reference
         let point = BinaryField128b::from(3);
@@ -356,7 +357,7 @@ mod tests {
         let result_poly = poly * point;
 
         // Expected coefficients after multiplication
-        let expected_coeffs = vec![
+        let expected_coeffs = [
             BinaryField128b::from(5) * BinaryField128b::from(3),
             BinaryField128b::from(4) * BinaryField128b::from(3),
             BinaryField128b::from(3) * BinaryField128b::from(3),
@@ -432,19 +433,19 @@ mod tests {
         let c0 = BinaryField128b::from(3);
         let c1 = BinaryField128b::from(2);
         let c2 = BinaryField128b::from(1);
-        let poly_deg2 = UnivariatePolynomial::new(vec![c0, c1, c2]);
+        let poly_deg2 = FixedUnivariatePolynomial::new([c0, c1, c2]);
 
         // Define a degree-1 polynomial: Q(x) = 4 + 5x
         let d0 = BinaryField128b::from(4);
         let d1 = BinaryField128b::from(5);
-        let poly_deg1 = UnivariatePolynomial::new(vec![d0, d1]);
+        let poly_deg1 = FixedUnivariatePolynomial::new([d0, d1]);
 
         // Multiply the polynomials
         let result = poly_deg2.multiply_degree2_by_degree1(&poly_deg1);
 
         // Expected coefficients of the result:
         // R(x) = (3 + 2x + x^2) * (4 + 5x)
-        let expected_poly = UnivariatePolynomial::new(vec![
+        let expected_poly = FixedUnivariatePolynomial::new([
             c0 * d0,           // c0 * d0
             c0 * d1 + c1 * d0, // c0 * d1 + c1 * d0
             c1 * d1 + c2 * d0, // c1 * d1 + c2 * d0

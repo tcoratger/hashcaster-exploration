@@ -10,7 +10,7 @@ use hashcaster_primitives::{
         evaluation::{Evaluations, FixedEvaluations},
         multinear_lagrangian::{restrict, MultilinearLagrangianPolynomial},
         point::Points,
-        univariate::UnivariatePolynomial,
+        univariate::FixedUnivariatePolynomial,
     },
     sumcheck::{EvaluationProvider, Sumcheck},
 };
@@ -244,13 +244,13 @@ where
         // 2. We multiply the polynomial by the equality polynomial to obtain:
         // - `V(t) = eq(r_{<i}; q) W(t)`.
         let univariate_poly_deg2 =
-            UnivariatePolynomial::from_evaluations_deg2(poly_deg2) * eq_y_multiplier;
+            FixedUnivariatePolynomial::from_evaluations_deg2(poly_deg2) * eq_y_multiplier;
 
         // We then need to compute the equality polynomial `eq(t; q)`.
         //
         // This is the equality polynomial for the current round (degree-1 univariate
         // polynomial).
-        let eq_t = UnivariatePolynomial::new(vec![
+        let eq_t = FixedUnivariatePolynomial::new([
             self.points[round] + BinaryField128b::ONE,
             BinaryField128b::ONE,
         ]);
@@ -264,7 +264,7 @@ where
         // Compress the polynomial to obtain:
         // - The compressed round polynomial.
         // - The computed claim.
-        let (ret, computed_claim) = CompressedPoly::compress(&u);
+        let (ret, computed_claim) = CompressedPoly::compress(&u.coeffs);
 
         // Check that the computed claim matches the expected value.
         assert_eq!(computed_claim, self.claim, "Claim does not match expected value.");
@@ -460,7 +460,7 @@ mod tests {
     use hashcaster_primitives::{
         poly::{
             multinear_lagrangian::MultilinearLagrangianPolynomial,
-            univariate::FixedUnivariatePolynomial,
+            univariate::{FixedUnivariatePolynomial, UnivariatePolynomial},
         },
         sumcheck::SumcheckBuilder,
     };
