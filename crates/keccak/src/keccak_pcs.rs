@@ -246,8 +246,7 @@ impl HashcasterKeccak {
             let builder = MulticlaimBuilder::new(input, points, claims);
 
             // Perform the Multiclaim sumcheck using the helper function.
-            let (proof, new_points) =
-                perform_sumcheck(num_vars, builder, challenger, claims.as_ref());
+            let (proof, new_points) = perform_sumcheck(num_vars, builder, challenger, &claims.0);
 
             // Update points in place with the result from Multiclaim
             *points = new_points;
@@ -453,11 +452,11 @@ impl HashcasterKeccak {
 }
 
 // Helper function to perform a sumcheck round.
-fn perform_sumcheck<const N: usize, const CP: usize, B>(
+fn perform_sumcheck<const N: usize, const CP: usize, const CL: usize, B>(
     num_vars: usize,
     builder: B,
     challenger: &mut F128Challenger,
-    claims: &[BinaryField128b],
+    claims: &[BinaryField128b; CL],
 ) -> (SumcheckProof<N, CP>, Points)
 where
     B: SumcheckBuilder<N, CP>,
@@ -471,7 +470,7 @@ where
     let mut prover = builder.build(&gamma);
 
     // Initialize the claim by evaluating the claims at the initial challenge.
-    let mut claim = UnivariatePolynomial::new(claims.to_vec()).evaluate_at(&gamma);
+    let mut claim = FixedUnivariatePolynomial::new(*claims).evaluate_at(&gamma);
 
     // Initialize vectors to store round polynomials and challenges.
     let mut round_polys = Vec::new();
