@@ -5,7 +5,7 @@ use hashcaster_primitives::{
     poly::{
         multinear_lagrangian::MultilinearLagrangianPolynomial,
         point::{to_eq_poly_sequence, Points},
-        univariate::UnivariatePolynomial,
+        univariate::FixedUnivariatePolynomial,
     },
     sumcheck::SumcheckBuilder,
 };
@@ -323,7 +323,7 @@ where
         BoolCheck {
             bit_mapping,
             eq_sequence: to_eq_poly_sequence(&self.points[1..]),
-            claim: UnivariatePolynomial::new(self.claims.into()).evaluate_at(gamma),
+            claim: FixedUnivariatePolynomial::new(self.claims).evaluate_at(gamma),
             extended_table: self.extend_n_tables(&trit_mapping),
             polys: self.polys,
             points: self.points,

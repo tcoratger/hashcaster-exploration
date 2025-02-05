@@ -433,7 +433,7 @@ impl HashcasterKeccak {
             let eq_evaluation = eq_evaluations.evaluate_at(&gamma);
 
             // Validate the claim
-            (UnivariatePolynomial::new(evals.0.to_vec()).evaluate_at(&gamma128) * eq_evaluation ==
+            (FixedUnivariatePolynomial::new(evals.0).evaluate_at(&gamma128) * eq_evaluation ==
                 claim)
                 .then_some(rs)
                 .ok_or_else(|| SumcheckError::UnmatchedSubclaim("MulticlaimCheck".to_string()))?

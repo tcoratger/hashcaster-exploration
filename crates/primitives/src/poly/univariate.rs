@@ -1,5 +1,4 @@
 use crate::binary_field::BinaryField128b;
-use num_traits::MulAddAssign;
 use std::ops::{Deref, DerefMut, Mul, MulAssign};
 
 /// Represents a univariate polynomial with coefficients over a binary field.
@@ -245,10 +244,7 @@ impl<const N: usize> FixedUnivariatePolynomial<N> {
     /// This method employs Horner's method for efficient polynomial evaluation:
     /// `P(x) = (((a_n * x + a_{n-1}) * x + a_{n-2}) * x + ... + a_0)`
     pub fn evaluate_at(&self, at: &BinaryField128b) -> BinaryField128b {
-        self.coeffs.iter().rev().fold(BinaryField128b::ZERO, |mut acc, &coeff| {
-            acc.mul_add_assign(at, coeff);
-            acc
-        })
+        self.coeffs.iter().rfold(BinaryField128b::ZERO, |eval, &coeff| eval * at + coeff)
     }
 }
 
