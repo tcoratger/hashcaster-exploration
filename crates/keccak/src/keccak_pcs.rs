@@ -299,7 +299,7 @@ impl HashcasterKeccak {
         let (claim, mut rs, gamma) = perform_verification(
             challenger,
             lin_check_proof,
-            &UnivariatePolynomial::new(claims.to_vec()),
+            &FixedUnivariatePolynomial::new(*claims),
         );
 
         // Equality polynomial corresponding to the active variables
@@ -388,7 +388,7 @@ impl HashcasterKeccak {
             let (claim, rs, gamma) = perform_verification(
                 challenger,
                 bool_check_proof,
-                &UnivariatePolynomial::new(claims.to_vec()),
+                &FixedUnivariatePolynomial::new(*claims),
             );
 
             // Fetch the frobenius evaluations from the proof.
@@ -413,7 +413,7 @@ impl HashcasterKeccak {
             let (claim, rs, gamma) = perform_verification(
                 challenger,
                 multi_open_proof,
-                &UnivariatePolynomial::new(bool_check_proof.evals.0.to_vec()),
+                &FixedUnivariatePolynomial::new(bool_check_proof.evals.0),
             );
 
             // Fetch the evaluations from the proof.
@@ -507,10 +507,10 @@ where
     (SumcheckProof { round_polys, evals }, rs)
 }
 
-fn perform_verification<const N: usize>(
+fn perform_verification<const N: usize, const M: usize>(
     challenger: &mut F128Challenger,
     proof: &SumcheckProof<N>,
-    initial_claim_poly: &UnivariatePolynomial,
+    initial_claim_poly: &FixedUnivariatePolynomial<M>,
 ) -> (BinaryField128b, Points, BinaryField128b) {
     // Sample a gamma
     let gamma = challenger.sample();
