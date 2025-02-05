@@ -4,21 +4,21 @@ use crate::{
 };
 
 /// A trait that abstracts the sumcheck protocol builder.
-pub trait SumcheckBuilder<const N: usize, const M: usize> {
+pub trait SumcheckBuilder<const N: usize, const CP: usize> {
     /// The sumcheck protocol type.
-    type Sumcheck: Sumcheck<N, M>;
+    type Sumcheck: Sumcheck<N, CP>;
 
     /// Builds a new sumcheck instance.
     fn build(self, gamma: &BinaryField128b) -> Self::Sumcheck;
 }
 
 /// A trait that abstracts the sumcheck protocol methods.
-pub trait Sumcheck<const N: usize, const M: usize> {
+pub trait Sumcheck<const N: usize, const CP: usize> {
     /// The output type of the sumcheck protocol.
     type Output: EvaluationProvider<N>;
 
     /// Computes the polynomial for the current round of the sumcheck protocol.
-    fn round_polynomial(&mut self) -> CompressedPoly<M>;
+    fn round_polynomial(&mut self) -> CompressedPoly<CP>;
 
     /// Updates the state of the sumcheck instance by binding a new challenge.
     fn bind(&mut self, challenge: &BinaryField128b);

@@ -249,6 +249,14 @@ impl Mul<&BinaryField128b> for FixedUnivariatePolynomial<3> {
     }
 }
 
+impl<const N: usize> Deref for FixedUnivariatePolynomial<N> {
+    type Target = [BinaryField128b; N];
+
+    fn deref(&self) -> &Self::Target {
+        &self.coeffs
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

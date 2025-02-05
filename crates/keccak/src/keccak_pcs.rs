@@ -453,15 +453,16 @@ impl HashcasterKeccak {
 }
 
 // Helper function to perform a sumcheck round.
-fn perform_sumcheck<const N: usize, const M: usize, B>(
+fn perform_sumcheck<const N: usize, const CP: usize, B>(
     num_vars: usize,
     builder: B,
     challenger: &mut F128Challenger,
     claims: &[BinaryField128b],
-) -> (SumcheckProof<N, M>, Points)
+) -> (SumcheckProof<N, CP>, Points)
 where
-    B: SumcheckBuilder<N, M>,
-    Assert<{ M > 1 }>: IsTrue,
+    B: SumcheckBuilder<N, CP>,
+    Assert<{ CP > 1 }>: IsTrue,
+    [(); CP + 1]:,
 {
     // Sample the initial folding challenge.
     let gamma = challenger.sample();
@@ -516,6 +517,7 @@ fn perform_verification<const N: usize, const M: usize, const P: usize>(
 ) -> (BinaryField128b, Points, BinaryField128b)
 where
     Assert<{ P > 1 }>: IsTrue,
+    [(); P + 1]:,
 {
     // Sample a gamma
     let gamma = challenger.sample();

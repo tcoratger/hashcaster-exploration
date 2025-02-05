@@ -1,6 +1,8 @@
-use crate::{binary_field::BinaryField128b, poly::univariate::UnivariatePolynomial};
+use crate::binary_field::BinaryField128b;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::ops::Deref;
+
+use super::univariate::FixedUnivariatePolynomial;
 
 /// A compressed representation of a univariate polynomial in a binary field.
 ///
@@ -108,7 +110,7 @@ where
     /// - `sum`: The value of the polynomial evaluated at `x = 1`, i.e., `P(1) = ∑c_i`.
     ///
     /// # Returns
-    /// A `Vec<BinaryField128b>` representing the reconstructed polynomial coefficients.
+    /// A univariate polynomial with the coefficients of the original polynomial.
     ///
     /// # Example
     /// Given the polynomial:
@@ -122,7 +124,7 @@ where
     /// ```text
     /// [3, 4, 5, 6]
     /// ```
-    pub fn coeffs(&self, sum: BinaryField128b) -> UnivariatePolynomial {
+    pub fn coeffs(&self, sum: BinaryField128b) -> FixedUnivariatePolynomial<{ N + 1 }> {
         // Step 1: Extract the constant term `c0`.
         // Example: For P(x) = 3 + 4x + 5x^2 + 6x^3, c0 = 3.
         let c0 = self[0];
@@ -140,12 +142,24 @@ where
         // c1 = ev_1 - (sum of stored coefficients excluding c1) = 21 - 14 = 7.
         let c1 = self.iter().fold(BinaryField128b::ZERO, |a, b| a + *b) + ev_1;
 
-        // Step 4: Combine all coefficients:
-        // - Start with `c0`,
-        // - Add `c1`,
-        // - Append the remaining coefficients from the compressed form.
-        // Example: Result = [3, 7, 5, 6].
-        std::iter::once(c0).chain(std::iter::once(c1)).chain(self[1..].iter().copied()).collect()
+        // Step 4: Reconstruct the full polynomial by inserting `c1` at index `1`.
+        //
+        // The full polynomial will be stored in a fixed-size array.
+        let mut full_coeffs = [BinaryField128b::ZERO; N + 1];
+
+        // Step 4.1: Assign `c0` to index `0`
+        full_coeffs[0] = c0;
+
+        // Step 4.2: Assign the recovered `c1` to index `1`
+        full_coeffs[1] = c1;
+
+        // Step 4.3: Copy the remaining stored coefficients from `self[1..]` into the reconstructed
+        // array. These are all the coefficients except `c0` and `c1`, placed starting from
+        // index `2`.
+        full_coeffs[2..].copy_from_slice(&self[1..]);
+
+        // Step 5: Return the reconstructed polynomial wrapped in `FixedUnivariatePolynomial`.
+        FixedUnivariatePolynomial::new(full_coeffs)
     }
 }
 
@@ -244,7 +258,7 @@ mod tests {
         // Verify the reconstructed polynomial matches the original
         assert_eq!(
             reconstructed,
-            UnivariatePolynomial::new(poly.to_vec()),
+            FixedUnivariatePolynomial::new(poly),
             "Reconstructed polynomial does not match the original"
         );
     }
@@ -269,7 +283,7 @@ mod tests {
         // Verify the reconstructed polynomial matches the original
         assert_eq!(
             reconstructed,
-            UnivariatePolynomial::new(poly.to_vec()),
+            FixedUnivariatePolynomial::new(poly),
             "Reconstructed polynomial does not match the original when all coefficients are zero"
         );
     }
@@ -294,7 +308,7 @@ mod tests {
         // Verify the reconstructed polynomial matches the original
         assert_eq!(
             reconstructed,
-            UnivariatePolynomial::new(poly.to_vec()),
+            FixedUnivariatePolynomial::new(poly),
             "Reconstructed polynomial does not match the original for large coefficients"
         );
     }

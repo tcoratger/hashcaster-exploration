@@ -988,7 +988,7 @@ mod tests {
         // Verify the decompressed round polynomial.
         assert_eq!(
             round_polynomial,
-            UnivariatePolynomial::new(vec![
+            FixedUnivariatePolynomial::new([
                 BinaryField128b::new(332514690820570361331092984923254947853),
                 BinaryField128b::new(332514690820570361331092984923254947853),
                 BinaryField128b::new(1),
