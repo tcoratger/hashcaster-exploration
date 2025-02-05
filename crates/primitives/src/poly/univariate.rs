@@ -257,6 +257,28 @@ impl<const N: usize> Deref for FixedUnivariatePolynomial<N> {
     }
 }
 
+impl<const N: usize> DerefMut for FixedUnivariatePolynomial<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.coeffs
+    }
+}
+
+impl<const N: usize> MulAssign<BinaryField128b> for FixedUnivariatePolynomial<N> {
+    fn mul_assign(&mut self, point: BinaryField128b) {
+        for c in self.iter_mut() {
+            *c *= point;
+        }
+    }
+}
+
+impl<const N: usize> MulAssign<&BinaryField128b> for FixedUnivariatePolynomial<N> {
+    fn mul_assign(&mut self, point: &BinaryField128b) {
+        for c in self.iter_mut() {
+            *c *= point;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,14 +286,14 @@ mod tests {
     #[test]
     fn test_univariate_polynomial_evaluate_at() {
         // Define the coefficients for the polynomial P(x) = 3 + 2x + x^2
-        let coeffs = vec![
+        let coeffs = [
             BinaryField128b::from(3), // a_0
             BinaryField128b::from(2), // a_1
             BinaryField128b::from(1), // a_2
         ];
 
         // Create the polynomial
-        let poly = UnivariatePolynomial::new(coeffs);
+        let poly = FixedUnivariatePolynomial::new(coeffs);
 
         // Define the point to evaluate the polynomial at
         let x = BinaryField128b::from(2);
@@ -408,12 +430,12 @@ mod tests {
     #[test]
     fn test_mul_assign_univariate_poly_by_reference_to_point() {
         // Define the coefficients for the polynomial P(x) = 10 + 9x + 8x^2
-        let coeffs = vec![
+        let coeffs = [
             BinaryField128b::from(10), // a_0
             BinaryField128b::from(9),  // a_1
             BinaryField128b::from(8),  // a_2
         ];
-        let mut poly = UnivariatePolynomial::new(coeffs);
+        let mut poly = FixedUnivariatePolynomial::new(coeffs);
 
         // Define the multiplier point as a reference
         let point = BinaryField128b::from(5);
@@ -422,7 +444,7 @@ mod tests {
         poly *= &point;
 
         // Expected coefficients after multiplication
-        let expected_coeffs = vec![
+        let expected_coeffs = [
             BinaryField128b::from(10) * BinaryField128b::from(5),
             BinaryField128b::from(9) * BinaryField128b::from(5),
             BinaryField128b::from(8) * BinaryField128b::from(5),
