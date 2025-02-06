@@ -162,7 +162,7 @@ impl Points {
     pub fn eq_eval(&self, other: &Self) -> BinaryField128b {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + *x + *y))
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + x + y))
     }
 
     /// Computes the evaluation of the equality polynomial for a set of points and a slice of
@@ -194,7 +194,7 @@ impl Points {
     pub fn eq_eval_slice(&self, other: &[BinaryField128b]) -> BinaryField128b {
         self.iter()
             .zip_eq(other.iter())
-            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + *x + *y))
+            .fold(BinaryField128b::ONE, |acc, (x, y)| acc * (BinaryField128b::ONE + x + y))
     }
 
     /// Computes the inverse orbit of points by iteratively squaring their values

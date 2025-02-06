@@ -140,7 +140,7 @@ where
         // Example: Compressed coefficients = [3, 5, 6].
         // Sum of stored coefficients = 3 + 5 + 6 = 14.
         // c1 = ev_1 - (sum of stored coefficients excluding c1) = 21 - 14 = 7.
-        let c1 = self.iter().fold(BinaryField128b::ZERO, |a, b| a + *b) + ev_1;
+        let c1 = self.iter().fold(BinaryField128b::ZERO, |a, b| a + b) + ev_1;
 
         // Step 4: Reconstruct the full polynomial by inserting `c1` at index `1`.
         //

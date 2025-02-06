@@ -374,7 +374,7 @@ impl MulAddAssign<Self> for BinaryField128b {
 
 impl MulAddAssign<&Self> for BinaryField128b {
     fn mul_add_assign(&mut self, a: &Self, b: Self) {
-        *self = (*self * *a) + b;
+        *self = (*self * a) + b;
     }
 }
 

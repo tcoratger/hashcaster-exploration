@@ -117,7 +117,7 @@ mod tests {
         let lhs = output_apply
             .iter()
             .zip(input_transposed.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // **Compute dot product of `apply_transposed` output and `apply` input**
         // - This computes the right-hand side (rhs) of the transpose relationship: \( rhs = \sum (x
@@ -125,7 +125,7 @@ mod tests {
         let rhs = output_transposed
             .iter()
             .zip(input_apply.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // **Validate the transpose property**
         // - For a valid linear operator \( T \): \( \langle T(x), y \rangle = \langle x, T^T(y)

@@ -172,14 +172,14 @@ mod tests {
         let lhs = output_apply
             .iter()
             .zip(input_transposed.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // **Compute dot product of `apply_transposed` output and `apply` input**
         // - This computes `rhs = sum(x * (A^T(y) + B^T(y)))`.
         let rhs = output_transposed
             .iter()
             .zip(input_apply.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // **Validate the equality of `lhs` and `rhs`**
         // - **Mathematical justification**:

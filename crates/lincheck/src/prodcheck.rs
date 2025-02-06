@@ -708,7 +708,7 @@ mod tests {
             array::from_fn(|i| MultilinearLagrangianPolynomial::new(vec![q_vals[i]]));
 
         // Compute the claim manually.
-        let claim = p_vals.iter().zip(&q_vals).map(|(p, q)| *p * *q).sum();
+        let claim = p_vals.iter().zip(&q_vals).map(|(p, q)| *p * q).sum();
 
         // Create ProdCheck in the completed state.
         let prodcheck = ProdCheck::new(p_polys, q_polys, claim, true);

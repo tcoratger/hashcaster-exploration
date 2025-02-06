@@ -264,13 +264,13 @@ mod tests {
         let lhs = output_apply
             .iter()
             .zip(transposed_input.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // Compute the dot product of the `apply_transposed` output and the input to `apply`.
         let rhs = output_transposed
             .iter()
             .zip(input.iter())
-            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * *b));
+            .fold(BinaryField128b::from(0), |acc, (a, b)| acc + (*a * b));
 
         // Validate the mathematical equivalence of the transformations.
         //
