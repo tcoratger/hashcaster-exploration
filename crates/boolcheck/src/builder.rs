@@ -1,5 +1,4 @@
 use crate::{algebraic::AlgebraicOps, bool_trait::CompressedFoldedOps, BoolCheck};
-use bytemuck::zeroed_vec;
 use hashcaster_primitives::{
     binary_field::BinaryField128b,
     poly::{
@@ -13,7 +12,7 @@ use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSliceMut,
 };
-use std::array;
+use std::{array, mem::MaybeUninit};
 
 /// A builder for creating instances of `BoolCheck`.
 ///
@@ -218,6 +217,7 @@ where
     ///
     /// ### Output:
     /// - Returns an extended table as a `Vec<BinaryField128b>` containing the computed values.
+    #[allow(clippy::uninit_assumed_init, clippy::transmute_undefined_repr)]
     pub fn extend_n_tables(&self, trit_mapping: &[u16]) -> Vec<BinaryField128b> {
         // Log2 of table size, determines the dimensions.
         let dims = self.polys[0].len().ilog2() as usize;
@@ -234,13 +234,18 @@ where
         // base_stride: Offset step for table chunks.
         let base_stride = 1 << (C + 1);
 
-        // Preallocate the result vector to store the extended table.
-        let mut result = zeroed_vec(pow3 * pow2);
+        // Allocate memory without initialization
+        let mut result: Vec<MaybeUninit<BinaryField128b>> = Vec::with_capacity(pow3 * pow2);
+        unsafe { result.set_len(pow3 * pow2) };
 
         // Parallelize over chunks of the result to maximize performance.
         result.par_chunks_mut(pow3).enumerate().for_each(|(chunk_id, result_chunk)| {
             // `tables_ext` stores intermediate results for each ternary index.
-            let mut tables_ext = vec![[BinaryField128b::ZERO; N]; pow3_adj];
+            //
+            // Uninitialized tables_ext to avoid unnecessary zeroing
+            let mut tables_ext: Vec<MaybeUninit<[BinaryField128b; N]>> =
+                Vec::with_capacity(pow3_adj);
+            unsafe { tables_ext.set_len(pow3_adj) };
 
             // Base offset to determine which part of the input tables we are processing.
             let base_tab_offset = chunk_id * base_stride;
@@ -255,45 +260,61 @@ where
                         // Even offset: Fetch values directly from the input tables.
                         let idx = base_tab_offset + (offset >> 1);
                         let tab_ext = &mut tables_ext[j];
+                        // SAFETY: We are writing directly, so it's safe to assume uninitialized
+                        // memory
+                        let tab_ext = unsafe { tab_ext.as_mut_ptr().as_mut().unwrap() };
                         for (z, tab) in tab_ext.iter_mut().enumerate() {
                             // Copy table values at the current offset.
                             *tab = self.polys[z][idx];
                         }
 
                         // Sum the linear and quadratic parts.
-                        result_chunk[j] =
-                            self.quadratic_compressed(tab_ext) + self.linear_compressed(tab_ext);
+                        unsafe {
+                            *result_chunk.get_unchecked_mut(j) = MaybeUninit::new(
+                                self.quadratic_compressed(tab_ext) +
+                                    self.linear_compressed(tab_ext),
+                            );
+                        }
                     } else {
                         // Odd offset: Combine results from previous indices.
-                        let tab_ext1 = tables_ext[j - offset];
-                        let tab_ext2 = tables_ext[j - 2 * offset];
+                        let tab_ext1 = unsafe { tables_ext[j - offset].assume_init() };
+                        let tab_ext2 = unsafe { tables_ext[j - 2 * offset].assume_init() };
                         let tab_ext = &mut tables_ext[j];
-                        for (z, tab) in tab_ext.iter_mut().enumerate() {
-                            // Combine values recursively.
-                            *tab = tab_ext1[z] + tab_ext2[z];
-                        }
 
-                        // Compute the quadratic part.
-                        result_chunk[j] = self.quadratic_compressed(tab_ext);
+                        unsafe {
+                            let tab_ext = tab_ext.as_mut_ptr().as_mut().unwrap();
+                            for (z, tab) in tab_ext.iter_mut().enumerate() {
+                                *tab = tab_ext1[z] + tab_ext2[z];
+                            }
+
+                            // Compute the quadratic part.
+                            *result_chunk.get_unchecked_mut(j) =
+                                MaybeUninit::new(self.quadratic_compressed(tab_ext));
+                        }
                     }
                 } else {
                     // Case 2: Large indices (recursive range).
-                    let mut args = [BinaryField128b::ZERO; N];
-                    let tab_ext1 = &tables_ext[j - offset];
-                    let tab_ext2 = &tables_ext[j - 2 * offset];
+                    let mut args: [BinaryField128b; N] =
+                        unsafe { MaybeUninit::uninit().assume_init() };
+                    let tab_ext1 = unsafe { tables_ext[j - offset].assume_init() };
+                    let tab_ext2 = unsafe { tables_ext[j - 2 * offset].assume_init() };
+
                     for (z, arg) in args.iter_mut().enumerate() {
-                        // Combine values recursively.
                         *arg = tab_ext1[z] + tab_ext2[z];
                     }
 
                     // Apply the quadratic function.
-                    result_chunk[j] = self.quadratic_compressed(&args);
+                    unsafe {
+                        *result_chunk.get_unchecked_mut(j) =
+                            MaybeUninit::new(self.quadratic_compressed(&args));
+                    }
                 }
             }
         });
 
         // Return the fully extended table.
-        result
+        // SAFETY: All elements are initialized
+        unsafe { std::mem::transmute(result) }
     }
 }
 
