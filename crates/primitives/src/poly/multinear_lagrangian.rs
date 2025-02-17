@@ -315,7 +315,6 @@ pub fn restrict<const N: usize>(
     // - `num_chunks` is the number of chunks,
     // - `128` corresponds to the number of slots for each chunk,
     // - `n` is the number of input polynomials.
-    // let mut ret = vec![BinaryField128b::ZERO; num_chunks * 128 * N];
     let mut ret = zeroed_vec::<BinaryField128b>(num_chunks * 128 * N);
 
     // Create an atomic pointer to the `ret` vector for shared mutable access.
