@@ -21,3 +21,10 @@ rayon = { workspace = true }
 unroll = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "matrix_efficient"
+harness = false
