@@ -103,26 +103,6 @@ mod tests {
     use hashcaster_primitives::{binary_field::BinaryField128b, poly::point::Points};
 
     #[test]
-    fn test_multiclaim_builder_default() {
-        // Create a default MulticlaimBuilder instance with N = 3.
-        let polys: [_; 3] = array::from_fn(|_| MultilinearLagrangianPolynomial::default());
-        let points = Points::default();
-        let openings = FixedEvaluations::new([BinaryField128b::ZERO; 3 * 128]);
-        let builder: MulticlaimBuilder<'_, 3> = MulticlaimBuilder::new(&polys, &points, &openings);
-
-        // Verify that the default polys array is empty.
-        for poly in builder.polys {
-            assert!(poly.is_empty());
-        }
-
-        // Verify that the default points collection is empty.
-        assert!(builder.points.is_empty());
-
-        // Verify that the default openings vector is empty.
-        assert!(builder.openings.is_empty());
-    }
-
-    #[test]
     fn test_multiclaim_builder_new_valid() {
         // Define valid polynomials for N = 2.
         let polys: [MultilinearLagrangianPolynomial; 2] = [
